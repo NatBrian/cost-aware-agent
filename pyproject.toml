@@ -1,0 +1,21 @@
+[project]
+name = "cost-aware-agent"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+]
+
+[project.scripts]
+cost-aware-agent = "cost_aware_agent.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["cost_aware_agent*"]
+
+[tool.setuptools.package-data]
+cost_aware_agent = ["data/*.json", "data/*.ts"]

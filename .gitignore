@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.remember/
+.claude/scheduled_tasks.lock
+*.bak
+.venv/
+venv/
+
+# internal design notes, not part of the public repo
+VISION.md
+ARCHITECTURE.md
+research.md
+research-budget-injection.md
+.claude/settings.json
