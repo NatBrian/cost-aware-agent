@@ -1,0 +1,92 @@
+[
+  {
+    "id": "q0",
+    "question": "Glenn Quagmire is voiced by the creator of what 2012 film?",
+    "answer": "Ted",
+    "gold_titles": [
+      "Glenn Quagmire",
+      "Seth MacFarlane"
+    ]
+  },
+  {
+    "id": "q1",
+    "question": "Venus is a play by an American playwrite who what what prize?",
+    "answer": "Pulitzer Prize",
+    "gold_titles": [
+      "Venus (play)",
+      "Suzan-Lori Parks"
+    ]
+  },
+  {
+    "id": "q2",
+    "question": "The Un-Americans contained which wrestler who also went by what TNA Wrestling name?",
+    "answer": "Andrew Martin",
+    "gold_titles": [
+      "The Un-Americans",
+      "Test (wrestler)"
+    ]
+  },
+  {
+    "id": "q3",
+    "question": "Which Roman Emperor was grandfather to the children of Mark Antony?",
+    "answer": "Caligula",
+    "gold_titles": [
+      "Antonia Minor",
+      "Caligula"
+    ]
+  },
+  {
+    "id": "q4",
+    "question": "What church was the college Marjorie Hass is the 20th president of formerly affiliated with?",
+    "answer": "Presbyterian Church",
+    "gold_titles": [
+      "Marjorie Hass",
+      "Rhodes College"
+    ]
+  },
+  {
+    "id": "q5",
+    "question": "When was the American singer, songwriter, actress and LGBT rights activist born who won Grammy and Emmy award?",
+    "answer": "June 22, 1953",
+    "gold_titles": [
+      "Dee Does Broadway",
+      "Cyndi Lauper"
+    ]
+  },
+  {
+    "id": "q6",
+    "question": "What is the brand who makes canned meats that had its own cook off in Austin until 2007?",
+    "answer": "Hormel Foods Corporation",
+    "gold_titles": [
+      "Spamarama",
+      "Spam (food)"
+    ]
+  },
+  {
+    "id": "q7",
+    "question": "Candace Flynn was voiced by the actress who achieved mainstream success on what show?",
+    "answer": "The Suite Life of Zack & Cody",
+    "gold_titles": [
+      "Candace Flynn",
+      "Ashley Tisdale"
+    ]
+  },
+  {
+    "id": "q8",
+    "question": "Which English singer from the 1960s has an album entitled Dangerous Acquaintances released in 1981?",
+    "answer": "Marianne Evelyn Gabriel Faithfull",
+    "gold_titles": [
+      "Dangerous Acquaintances",
+      "Marianne Faithfull"
+    ]
+  },
+  {
+    "id": "q9",
+    "question": "Who wrote the novel that the movie directed by Stanley Kubrick that was sampled in the album \"Where Blood and Fire Bring Rest\" was based on?",
+    "answer": "Stephen King",
+    "gold_titles": [
+      "Where Blood and Fire Bring Rest",
+      "The Shining (film)"
+    ]
+  }
+]

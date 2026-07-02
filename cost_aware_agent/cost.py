@@ -11,6 +11,11 @@ from pathlib import Path
 _PRICE_MAP_PATH = Path(__file__).parent / "data" / "model_prices_and_context_window.json"
 _price_map: dict | None = None
 
+# Router prefixes that are OpenCode's own routing layer, not a LiteLLM pricing
+# key — LiteLLM tracks provider-native pricing (deepseek/, fireworks_ai/, ...),
+# never opencode/, so an exact-key lookup on the raw model id always misses.
+_ROUTER_PREFIXES = ("opencode/",)
+
 
 def _load_price_map() -> dict:
     global _price_map
@@ -20,11 +25,32 @@ def _load_price_map() -> dict:
 
 
 def price_for_model(model: str) -> dict | None:
-    """Exact-key lookup only for MVP — every model seen in a real transcript
-    so far has a direct key. Returns None if the model is unknown (caller
-    should cost that row as 0 rather than raise — advisory-only extends to
-    pricing gaps too)."""
-    return _load_price_map().get(model)
+    """Exact-key lookup first (covers every model seen in a real transcript
+    so far). Falls back to stripping a known router prefix, then a trailing
+    '-free' suffix, pricing at the underlying paid model's rate. The project
+    tracks simulated real-market cost, not the user's actual bill — a $0 API
+    tier must still show what the same usage would cost at retail, so the
+    agent gets genuine budget pressure regardless of which account it runs
+    under. Still returns None for a genuinely unpriced model — caller costs
+    that row as 0 rather than raise, advisory-only extends to pricing gaps."""
+    price_map = _load_price_map()
+    if model in price_map:
+        return price_map[model]
+
+    stripped = model
+    for prefix in _ROUTER_PREFIXES:
+        if stripped.startswith(prefix):
+            stripped = stripped[len(prefix):]
+            break
+    if stripped in price_map:
+        return price_map[stripped]
+
+    if stripped.lower().endswith("-free"):
+        base = stripped[: -len("-free")]
+        if base in price_map:
+            return price_map[base]
+
+    return None
 
 
 def cost_llm_usage(

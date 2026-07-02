@@ -12,6 +12,14 @@ CONFIG_PATH = HOME_DIR / "config.json"
 DB_PATH = HOME_DIR / "db.sqlite"
 
 DEFAULTS = {
+    # Master switch for advisory injection. When False the daemon still records
+    # llm_usage/tool_calls (so cost is measured identically) but returns no
+    # additionalContext anywhere — the OFF arm of the budget-awareness A/B, giving
+    # an injection-vs-none comparison with the exact same measurement path.
+    "inject_enabled": True,
+    # The budget is ALWAYS money: LLM API dollar cost for the session versus this
+    # dollar estimate. Tiers (HIGH/MEDIUM/LOW/CRITICAL) are computed from spend as
+    # a fraction of this budget.
     "session_budget_estimate_usd": 1.00,
     "tool_call_price_usd": 0.001,
     "streak_warning_threshold": 3,

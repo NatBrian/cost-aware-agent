@@ -62,7 +62,7 @@ export const CostAwareAgentPlugin: Plugin = async ({ $ }) => {
         const res = await post("/session/start", {
           session_id: sessionID,
           cli: "opencode",
-          model: input.model?.modelID ?? "",
+          model: input.model?.id ?? "",
         });
         if (res?.additionalContext) output.system.push(res.additionalContext);
         return;
@@ -90,6 +90,10 @@ export const CostAwareAgentPlugin: Plugin = async ({ $ }) => {
         await post("/llm/usage", {
           session_id: info.sessionID,
           model: info.modelID ?? "",
+          // message.updated fires repeatedly per turn with the same id and growing
+          // cumulative tokens — send the id so the daemon upserts one row per message
+          // (latest totals win) instead of summing every streamed snapshot.
+          message_id: info.id ?? null,
           usage: {
             input_tokens: t.input ?? 0,
             output_tokens: (t.output ?? 0) + (t.reasoning ?? 0), // reasoning bills as output, same as Claude Code
@@ -104,11 +108,23 @@ export const CostAwareAgentPlugin: Plugin = async ({ $ }) => {
       }
       if (event.type === "message.part.updated") {
         const part = event.properties.part as any;
-        if (part.type === "text" && typeof part.text === "string" && part.text.includes("<verification>")) {
-          await post("/verification/result", {
-            session_id: part.sessionID,
-            raw_response: part.text,
-          });
+        if (part.type === "text" && typeof part.text === "string") {
+          if (part.text.includes("<verification>")) {
+            await post("/verification/result", {
+              session_id: part.sessionID,
+              raw_response: part.text,
+            });
+          } else if (part.text.includes("<checklist>") && part.text.includes("</checklist>")) {
+            // Only OpenCode's push adapter needs this: CC seeds `plan` by parsing the
+            // transcript file directly, but OpenCode has no transcript to pull from, so
+            // the Planning checklist reply has to be captured here, streaming-text-part by
+            // streaming-text-part, same as the verification block above. Requiring the
+            // closing tag avoids posting a partial block mid-stream before it parses.
+            await post("/plan/seed", {
+              session_id: part.sessionID,
+              raw_response: part.text,
+            });
+          }
         }
         return;
       }

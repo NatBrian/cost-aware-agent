@@ -9,11 +9,13 @@ Before acting, decompose this task into constraints:
 - Exploration clues: what needs to be found/expanded to make progress
 - Verification clues: what needs to be validated once a candidate answer/fix exists
 
-Output your decomposition in this exact format (nothing else in this block):
+Output your decomposition in this exact format (nothing else in this block). Replace the
+placeholder text below with your own specific wording for this task — copying the placeholder
+text verbatim is wrong and produces a useless checklist:
 
 <checklist>
-<item type="exploration">short description</item>
-<item type="verification">short description</item>
+<item type="exploration">PLACEHOLDER — replace with what you need to find/expand</item>
+<item type="verification">PLACEHOLDER — replace with what you need to validate</item>
 </checklist>
 
 Each item will be tracked for the rest of this session — it is never deleted, only marked

@@ -134,7 +134,18 @@ def insert_llm_usage(
         "INSERT INTO llm_usage "
         "(session_id, message_id, model, input_tokens, output_tokens, "
         " cache_read_tokens, cache_creation_tokens, cache_creation_1h_tokens, cost_usd, source, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        # OpenCode's push path fires message.updated repeatedly per assistant turn,
+        # each carrying the SAME message id with growing *cumulative* token counts.
+        # Latest-wins UPSERT keeps one row per message at its final totals instead of
+        # summing every streamed snapshot (which double/triple-counted the turn). The
+        # partial unique index (session_id, message_id) only exists WHERE message_id
+        # IS NOT NULL, so message_id-less rows still plain-insert.
+        "ON CONFLICT(session_id, message_id) WHERE message_id IS NOT NULL "
+        "DO UPDATE SET model=excluded.model, input_tokens=excluded.input_tokens, "
+        " output_tokens=excluded.output_tokens, cache_read_tokens=excluded.cache_read_tokens, "
+        " cache_creation_tokens=excluded.cache_creation_tokens, "
+        " cache_creation_1h_tokens=excluded.cache_creation_1h_tokens, cost_usd=excluded.cost_usd",
         (session_id, message_id, model, input_tokens, output_tokens,
          cache_read_tokens, cache_creation_tokens, cache_creation_1h_tokens, cost_usd, source, now()),
     )
