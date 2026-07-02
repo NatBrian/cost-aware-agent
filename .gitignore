@@ -20,3 +20,6 @@ ARCHITECTURE.md
 research.md
 research-budget-injection.md
 .claude/settings.json
+
+# contaminated pre-integrity-fix runs, kept local for provenance
+experiments/hotpotqa/_prelim_archive/

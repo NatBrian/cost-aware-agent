@@ -37,7 +37,12 @@ LOGDIR = os.environ.get("SWEEP_LOGDIR", HERE)
 # against; the harness feeds real per-call token cost to /llm/usage so spend is live.
 #   (tag, inject_enabled, budget_usd)
 TIERS = [("off", False, 0.60), ("usd30", True, 0.30),
-         ("usd60", True, 0.60), ("usd120", True, 1.20)]
+         ("usd60", True, 0.60), ("usd120", True, 1.20),
+         # OpenCode arm (deepseek-v4-flash-free): priced at deepseek-v4-flash
+         # retail, ~20x cheaper than Sonnet, so a whole per-question session costs
+         # ~$0.01. Budgets are scaled down to that so the tier actually moves;
+         # distinct tags (oc*) avoid run-label collisions with the Claude arm.
+         ("ocoff", False, 0.012), ("oc6", True, 0.006), ("oc12", True, 0.012)]
 
 
 def set_condition(inject, budget_usd):
@@ -89,11 +94,24 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=10)
     ap.add_argument("--seeds", type=int, default=1)
-    ap.add_argument("--tiers", default="off,on5,on10,on20")
+    ap.add_argument("--tiers", default="off,usd30,usd60,usd120")
+    ap.add_argument("--harness", default="run_claude.py",
+                    help="model-gateway harness to invoke per run "
+                         "(run_claude.py or run_opencode.py)")
+    ap.add_argument("--budgets", default="",
+                    help="override tier dollar budgets, e.g. 'usd30:0.02,usd60:0.04'"
+                         " — needed for the OpenCode arm where deepseek is ~20x "
+                         "cheaper so the default $0.30+ tiers never bite")
     args = ap.parse_args()
 
     want = set(args.tiers.split(","))
-    tiers = [t for t in TIERS if t[0] in want]
+    tiers = [list(t) for t in TIERS if t[0] in want]
+    if args.budgets:
+        override = {k: float(v) for k, v in
+                    (kv.split(":") for kv in args.budgets.split(","))}
+        for t in tiers:
+            if t[0] in override:
+                t[2] = override[t[0]]
 
     print(f"=== SWEEP start: tiers={[t[0] for t in tiers]} n={args.n} seeds={args.seeds} ===",
           flush=True)
@@ -112,7 +130,7 @@ def main():
             label = tag if args.seeds == 1 else f"{tag}-s{seed}"
             print(f"--- run {label} ---", flush=True)
             subprocess.run(
-                [sys.executable, "-u", "run_claude.py", "--tag", label, "--n", str(args.n)],
+                [sys.executable, "-u", args.harness, "--tag", label, "--n", str(args.n)],
                 cwd=HERE)
     print("\n=== SWEEP done ===", flush=True)
 

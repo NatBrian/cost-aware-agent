@@ -1,92 +1,112 @@
 [
   {
     "id": "q0",
-    "question": "Glenn Quagmire is voiced by the creator of what 2012 film?",
-    "answer": "Ted",
+    "question": "What position does the First Vice Captain of Juventus play?",
+    "answer": "centre-back",
     "gold_titles": [
-      "Glenn Quagmire",
-      "Seth MacFarlane"
-    ]
+      "Claudio Marchisio",
+      "Giorgio Chiellini"
+    ],
+    "cb_pred": "Vice captain. Play midfield.",
+    "cb_f1": 0.0
   },
   {
     "id": "q1",
-    "question": "Venus is a play by an American playwrite who what what prize?",
-    "answer": "Pulitzer Prize",
+    "question": "Who produced the sequel to the anthology horror comedy film from 2012, which contained 26 different shorts?",
+    "answer": "Ant Timpson, Ted Geoghegan and Tim League",
     "gold_titles": [
-      "Venus (play)",
-      "Suzan-Lori Parks"
-    ]
+      "ABCs of Death 2.5",
+      "The ABCs of Death"
+    ],
+    "cb_pred": "Ghosts of Truth (aka \"Ghost Storie",
+    "cb_f1": 0.0
   },
   {
     "id": "q2",
-    "question": "The Un-Americans contained which wrestler who also went by what TNA Wrestling name?",
-    "answer": "Andrew Martin",
+    "question": "When Budweiser created a dog mascot to promote Bud Light in the 1980s, which rival brewer (with its own character Alex the Dog) were they competing with?",
+    "answer": "Stroh's",
     "gold_titles": [
-      "The Un-Americans",
-      "Test (wrestler)"
-    ]
+      "Alex the Dog",
+      "Spuds MacKenzie"
+    ],
+    "cb_pred": "Anheuser-Busch competed Miller Bre",
+    "cb_f1": 0.0
   },
   {
     "id": "q3",
-    "question": "Which Roman Emperor was grandfather to the children of Mark Antony?",
-    "answer": "Caligula",
+    "question": "During the Miss USA 2015, Olivia Jordan of Oklahoma was crowned by which American television host, model, taekwondo coach, and beauty queen who won Miss USA 2014?",
+    "answer": "Nia Sanchez",
     "gold_titles": [
-      "Antonia Minor",
-      "Caligula"
-    ]
+      "Miss USA 2015",
+      "Nia Sanchez"
+    ],
+    "cb_pred": "Olivia Culpo.",
+    "cb_f1": 0.0
   },
   {
     "id": "q4",
-    "question": "What church was the college Marjorie Hass is the 20th president of formerly affiliated with?",
-    "answer": "Presbyterian Church",
+    "question": "Which avant-garde Japanese composer studied with John Cage and wrote Music for Electric Metronomes?",
+    "answer": "Toshi Ichiyanagi",
     "gold_titles": [
-      "Marjorie Hass",
-      "Rhodes College"
-    ]
+      "Music for Electric Metronomes",
+      "Toshi Ichiyanagi"
+    ],
+    "cb_pred": "Toru Takemitsu.",
+    "cb_f1": 0.0
   },
   {
     "id": "q5",
-    "question": "When was the American singer, songwriter, actress and LGBT rights activist born who won Grammy and Emmy award?",
-    "answer": "June 22, 1953",
+    "question": "Dost Mohammad Khan was killed by a ruler who became the third king of what country?",
+    "answer": "Afghanistan",
     "gold_titles": [
-      "Dee Does Broadway",
-      "Cyndi Lauper"
-    ]
+      "Dost Mohammad Khan (Emir of Afghanistan)",
+      "Zaman Shah Durrani"
+    ],
+    "cb_pred": "Dost Mohammad Khan killed by Nader",
+    "cb_f1": 0.0
   },
   {
     "id": "q6",
-    "question": "What is the brand who makes canned meats that had its own cook off in Austin until 2007?",
-    "answer": "Hormel Foods Corporation",
+    "question": "The Party Machine with Nia Peeples was executive produced by the talk show host whose show originally ran during what time period?",
+    "answer": "from 1989 until 1994",
     "gold_titles": [
-      "Spamarama",
-      "Spam (food)"
-    ]
+      "The Party Machine with Nia Peeples",
+      "Arsenio Hall"
+    ],
+    "cb_pred": "Arsenio Hall exec produced it. His",
+    "cb_f1": 0.0
   },
   {
     "id": "q7",
-    "question": "Candace Flynn was voiced by the actress who achieved mainstream success on what show?",
-    "answer": "The Suite Life of Zack & Cody",
+    "question": "Who is the mother of Mary Robinson in Shakespeare's \"The Winter's Tale\"",
+    "answer": "Leontes",
     "gold_titles": [
-      "Candace Flynn",
-      "Ashley Tisdale"
-    ]
+      "Mary Robinson (poet)",
+      "Perdita (The Winter's Tale)"
+    ],
+    "cb_pred": "Hermione, Queen of Sicilia.",
+    "cb_f1": 0.0
   },
   {
     "id": "q8",
-    "question": "Which English singer from the 1960s has an album entitled Dangerous Acquaintances released in 1981?",
-    "answer": "Marianne Evelyn Gabriel Faithfull",
+    "question": "Naseer & Shahab is a Pakistani band playing a genre that dominated radio in what decade?",
+    "answer": "1970s",
     "gold_titles": [
-      "Dangerous Acquaintances",
-      "Marianne Faithfull"
-    ]
+      "Naseer &amp; Shahab",
+      "Soft rock"
+    ],
+    "cb_pred": "Naseer & Shahab play qawwali/pop-i",
+    "cb_f1": 0.0
   },
   {
     "id": "q9",
-    "question": "Who wrote the novel that the movie directed by Stanley Kubrick that was sampled in the album \"Where Blood and Fire Bring Rest\" was based on?",
-    "answer": "Stephen King",
+    "question": "Crestfallen's artwork is done by a photographer of which nationality?",
+    "answer": "Ukrainian",
     "gold_titles": [
-      "Where Blood and Fire Bring Rest",
-      "The Shining (film)"
-    ]
+      "Crestfallen",
+      "Yelena Yemchuk"
+    ],
+    "cb_pred": "Vittorio Storaro. Italian.",
+    "cb_f1": 0.0
   }
 ]

@@ -73,11 +73,28 @@ the official **HotpotQA** distractor dataset (`load_dataset("hotpot_qa", "distra
 Run outputs (`runs/`, `results/`) are gitignored — regenerable from the committed harness
 and dataset.
 
-**Preliminary finding:** on a 10-question subset with Claude Sonnet, no budget effect is
-yet detectable — the model answers much of this famous-entity trivia from parametric
-memory, so retrieval (and thus the budget) has little to bite on. A clean test needs
-harder / obscure questions that force retrieval, multiple seeds per cell, and the money
-chain verified end-to-end. Treat current numbers as a plumbing check, not a result.
+**Result (10 retrieval-forcing questions, 3 seeds/tier, all audit-clean).** Full tables and
+method in [`experiments/hotpotqa/RESULTS.md`](experiments/hotpotqa/RESULTS.md).
+
+The earlier null result had one cause — Sonnet answered famous-entity trivia from memory, so
+the budget had nothing to trim. Fixed with a **closed-book screen** that keeps only questions
+the model gets wrong without tools (all 10 kept have closed-book F1 = 0.0 → retrieval is forced).
+
+- **Claude / Sonnet — money drops at equal accuracy.** vs OFF ($0.2484/q), a **$0.30** budget
+  spends **$0.1789/q — 28% cheaper — with ΔEM 0.000** and F1 within noise. Under pressure the
+  model commits earlier (2.2 vs 2.83 tool calls) instead of over-exploring; looser budgets
+  ($0.60 / $1.20) exert less pressure and save ~10%. A real accuracy-vs-cost curve, and money
+  is the metric.
+- **OpenCode / deepseek-v4-flash-free — cross-agent, but capability-gated.** The same daemon
+  computes retail cost from OpenCode's token stream and injects the Budget Tracker into
+  deepseek's prompt (money/tracking path proven cross-agent). But deepseek **ignores** the
+  guidance — it keeps looping (q5 hits the 20-call cap under every tier), so savings are
+  near-noise (1.7–3.6%). Budget *reasoning* needs a capable model; the cross-agent *plumbing*
+  is model-independent.
+
+**Integrity:** a pilot caught the model `grep`-ing the gold answer out of `data/questions.json`
+(global settings override `--allowedTools ""`); fixed with an empty sandbox CWD + hard
+`--disallowedTools`. Every reported run is audit-clean (`web_requests=0`, `dirty=none`).
 
 ## Status
 

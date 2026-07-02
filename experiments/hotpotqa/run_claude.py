@@ -78,6 +78,51 @@ def tool_read(title):
 
 # --- model gateway: claude -p headless ---
 
+import signal  # noqa: E402
+import tempfile  # noqa: E402
+
+# Isolated, EMPTY working directory for the claude CLI. The model must answer
+# only from what the harness feeds it (question + SEARCH/READ observations). It
+# must NOT be able to read the gold answers (data/questions.json) or the raw
+# corpus off disk. A pilot proved this is a real leak: with the repo as CWD and
+# the user's global settings allowing Bash(*)/Grep(*), the model ran
+# `grep -A5 "Alex the Dog" data/questions.json` and read the gold answer directly
+# — `--allowedTools ""` did NOT block it because the global allow-list overrides.
+# Defense in depth: (1) run in this empty dir so there is nothing to grep, and
+# (2) hard-deny every file/web tool below. The sandbox also has no
+# .claude/settings.json, so the repo's cost-aware hooks don't fire for these
+# sub-sessions and pollute the daemon DB.
+_SANDBOX = os.path.join(tempfile.gettempdir(), "hotpotqa_claude_sandbox")
+os.makedirs(_SANDBOX, exist_ok=True)
+# Tools denied outright. Deny takes precedence over any allow rule, so this holds
+# even against the global Bash(*)/Read(*)/Grep(*) allow-list.
+_DENY_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep",
+               "WebSearch", "WebFetch", "Task", "NotebookEdit"]
+
+
+def _run_killable(cmd, timeout, cwd=None):
+    """Run cmd in its OWN process group and, on timeout, kill the WHOLE group.
+
+    subprocess.run(timeout=...) only signals the direct child. The claude CLI
+    spawns grandchildren (node workers) that keep the stdout pipe open, so a
+    hung call can block on pipe read long past the nominal timeout — observed in
+    the closed-book screen where one call wedged for >400s despite a 120s cap.
+    start_new_session=True puts the child in a new group; os.killpg tears down
+    the entire tree so a single stuck call can never stall the sweep."""
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                         text=True, start_new_session=True, cwd=cwd)
+    try:
+        out, _ = p.communicate(timeout=timeout)
+        return out or ""
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+        except Exception:
+            pass
+        p.communicate()
+        raise
+
+
 def claude_call(prompt, tries=4):
     """Call the Claude CLI headless in STREAM mode and return
     (text, cost_usd, usage, session_id, meta).
@@ -92,12 +137,13 @@ def claude_call(prompt, tries=4):
     last = None
     for i in range(tries):
         try:
-            p = subprocess.run(
+            stdout = _run_killable(
                 ["claude", "-p", prompt, "--model", MODEL,
-                 "--output-format", "stream-json", "--verbose", "--allowedTools", ""],
-                capture_output=True, text=True, timeout=180)
+                 "--output-format", "stream-json", "--verbose",
+                 "--allowedTools", "", "--disallowedTools", " ".join(_DENY_TOOLS)],
+                timeout=180, cwd=_SANDBOX)
             events = []
-            for line in p.stdout.splitlines():
+            for line in stdout.splitlines():
                 line = line.strip()
                 if not line:
                     continue
@@ -368,11 +414,19 @@ def run_question(q, run_id, tag, traces_dir):
         answer = "(max steps, no answer)"
 
     em, f1 = score(answer, q["answer"])
-    # cheat audit: the model is CLEAN iff it invoked no real CLI tools, no tool
-    # attempt was denied, and no server-side web request fired. Any nonzero here
-    # means it may have reached outside our offline corpus.
+    # cheat audit: the model is CLEAN iff it invoked no REAL cheat-capable CLI
+    # tool (filesystem/web) and no server-side web request fired. We deliberately
+    # ignore tool_use blocks whose name echoes our OWN ReAct verbs
+    # (SEARCH/READ/ANSWER): the model sometimes formats its action as a phantom
+    # tool call, the CLI rejects it ("No such tool available: SEARCH"), and the
+    # model then emits the same line as text which our BM25 handles. That is not a
+    # cheat — no gold was reached. Only names in _DENY_TOOLS (Bash/Read/Grep/...)
+    # can read data/questions.json off disk, so those are the real signal; the
+    # empty sandbox CWD means even a denied attempt read nothing.
     tool_use_names = [t.get("name") for t in all_tool_uses]
-    clean = not tool_use_names and not all_denials and web_reqs == 0
+    danger = set(_DENY_TOOLS)
+    real_cheat_uses = [n for n in tool_use_names if n in danger]
+    clean = not real_cheat_uses and web_reqs == 0
     row = {"id": q["id"], "session_id": sid, "question": q["question"],
            "gold": q["answer"], "answer": answer, "em": em, "f1": round(f1, 3),
            "tool_calls": tool_calls_used, "cost_usd": round(cost, 4),

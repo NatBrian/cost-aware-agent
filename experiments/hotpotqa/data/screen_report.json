@@ -1,0 +1,466 @@
+[
+  {
+    "idx": 0,
+    "em": 0.0,
+    "f1": 0.5,
+    "pred": "Simpsons season 23 \u2014 22 episodes.",
+    "question": "How many episodes were in the 23rd season of a Fox network show which, in it's twenty-second season, aired it's twenty-first episode which was written by John Frink and directed by Bob Anderson.",
+    "answer": "22 episodes."
+  },
+  {
+    "idx": 1,
+    "em": 0.0,
+    "f1": 0.33,
+    "pred": "IRA bomb Brighton hotel, 1984, tar",
+    "question": " Inglis Barracks bombing was the first IRA attack in England since a bombing thats purpose was to kill what leader?",
+    "answer": "Prime Minister Margaret Thatcher"
+  },
+  {
+    "idx": 2,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Vice captain. Play midfield.",
+    "question": "What position does the First Vice Captain of Juventus play?",
+    "answer": "centre-back"
+  },
+  {
+    "idx": 3,
+    "em": 0.0,
+    "f1": 0.8,
+    "pred": "Robert Blackwell",
+    "question": "Here's Little Richard is a debut album containing a song written by Little Richard, Enotris Johnson and who else?",
+    "answer": "Robert \"Bumps\" Blackwell"
+  },
+  {
+    "idx": 4,
+    "em": 0.0,
+    "f1": 0.25,
+    "pred": "CNCO. Formed January 28, 2015.",
+    "question": "Reggaet\u00f3n Lento is a song by the boy band formed on which date?",
+    "answer": "December 13, 2015"
+  },
+  {
+    "idx": 5,
+    "em": 0.0,
+    "f1": 0.25,
+    "pred": "Bronze medal (Frank Liles, 1984 Ol",
+    "question": "What Olympic medal did the opponent of Crawford Ashley for the World Boxing Association (WBA) World super middleweight title win in 1984?",
+    "answer": "a silver medal"
+  },
+  {
+    "idx": 6,
+    "em": 0.0,
+    "f1": 0.5,
+    "pred": "Terrence Malick? No\u2014football playe",
+    "question": "Which former American football player had a part in the movie \"Gamer?\"",
+    "answer": "Terry Crews"
+  },
+  {
+    "idx": 7,
+    "em": 1.0,
+    "f1": 1.0,
+    "pred": "American Idol",
+    "question": "Which contest did the singer of the song Mama's Song win ?",
+    "answer": "American Idol\""
+  },
+  {
+    "idx": 8,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Ghosts of Truth (aka \"Ghost Storie",
+    "question": "Who produced the sequel to the anthology horror comedy film from 2012, which contained 26 different shorts?",
+    "answer": "Ant Timpson, Ted Geoghegan and Tim League"
+  },
+  {
+    "idx": 9,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Arsenio Hall exec produced it. His",
+    "question": "The Party Machine with Nia Peeples was executive produced by the talk show host whose show originally ran during what time period?",
+    "answer": "from 1989 until 1994"
+  },
+  {
+    "idx": 10,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Anheuser-Busch competed Miller Bre",
+    "question": "When Budweiser created a dog mascot to promote Bud Light in the 1980s, which rival brewer (with its own character Alex the Dog) were they competing with?",
+    "answer": "Stroh's"
+  },
+  {
+    "idx": 11,
+    "em": 1.0,
+    "f1": 1.0,
+    "pred": "Germanicus",
+    "question": "Who was the biological father of the emperor who built the Nemi Ships?",
+    "answer": "Germanicus"
+  },
+  {
+    "idx": 12,
+    "em": 0.0,
+    "f1": 0.5,
+    "pred": "Jaffrey, New Hampshire",
+    "question": "Which town in New Hampshire with a population of 5,457 in 2010 is located by Mount Monadnock?",
+    "answer": "Jaffrey"
+  },
+  {
+    "idx": 13,
+    "em": 0.0,
+    "f1": 0.55,
+    "pred": "Pre\u0161evo, Bujanovac, and Medve\u0111a (P",
+    "question": "The National symbols of Albania are used in this part of Serbia that are composed of which municipalities?",
+    "answer": "municipalities of Bujanovac and Pre\u0161evo"
+  },
+  {
+    "idx": 14,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Olivia Culpo.",
+    "question": "During the Miss USA 2015, Olivia Jordan of Oklahoma was crowned by which American television host, model, taekwondo coach, and beauty queen who won Miss USA 2014?",
+    "answer": "Nia Sanchez"
+  },
+  {
+    "idx": 15,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Toru Takemitsu.",
+    "question": "Which avant-garde Japanese composer studied with John Cage and wrote Music for Electric Metronomes?",
+    "answer": "Toshi Ichiyanagi"
+  },
+  {
+    "idx": 16,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Dost Mohammad Khan killed by Nader",
+    "question": "Dost Mohammad Khan was killed by a ruler who became the third king of what country?",
+    "answer": "Afghanistan"
+  },
+  {
+    "idx": 17,
+    "em": 1.0,
+    "f1": 1.0,
+    "pred": "Two.",
+    "question": "How many albums did the company who released Tift Merritt's debut album release for Tif Merritt?",
+    "answer": "two"
+  },
+  {
+    "idx": 18,
+    "em": 0.0,
+    "f1": 0.29,
+    "pred": "Mountain West Conference \u2014 began 1",
+    "question": "In what year did the conference in which the 2005 Air Force Falcons participated begin operations?",
+    "answer": "1999"
+  },
+  {
+    "idx": 19,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Naseer & Shahab play qawwali/pop-i",
+    "question": "Naseer & Shahab is a Pakistani band playing a genre that dominated radio in what decade?",
+    "answer": "1970s"
+  },
+  {
+    "idx": 20,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Hermione, Queen of Sicilia.",
+    "question": "Who is the mother of Mary Robinson in Shakespeare's \"The Winter's Tale\"",
+    "answer": "Leontes"
+  },
+  {
+    "idx": 21,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Movie: \"I Capture the Castle\" (200",
+    "question": "What movie directed by Tim Fywell, included the actress who also appeared in \"Euro Trip\" and \"Inspector Gadget\"?  ",
+    "answer": "Ice Princess"
+  },
+  {
+    "idx": 22,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Vittorio Storaro. Italian.",
+    "question": "Crestfallen's artwork is done by a photographer of which nationality?",
+    "answer": "Ukrainian"
+  },
+  {
+    "idx": 23,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "60 chapters",
+    "question": "How many chapters does Y\u014dko Sh\u014dji's most famous manga have?",
+    "answer": "24"
+  },
+  {
+    "idx": 24,
+    "em": 1.0,
+    "f1": 1.0,
+    "pred": "1599",
+    "question": "What year was the namesake of a small island in the Town of East Hampton born?",
+    "answer": "1599"
+  },
+  {
+    "idx": 25,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Unknown \u2014 no reliable info on Sand",
+    "question": "What organization does Sandra Pizzarello and Doctorate have in common?",
+    "answer": "University"
+  },
+  {
+    "idx": 26,
+    "em": 0.0,
+    "f1": 0.44,
+    "pred": "Caesars Entertainment (World Serie",
+    "question": "Mark Newhouse finished 9th in a 2013 series of poker tournaments sponsored by what corporation?",
+    "answer": "Caesars Entertainment Corporation"
+  },
+  {
+    "idx": 27,
+    "em": 0.0,
+    "f1": 0.4,
+    "pred": "Coach Blaine Taylor. American.",
+    "question": " The 2010\u201311 Old Dominion Monarchs basketball team was led by the coach of what nationality?",
+    "answer": "American"
+  },
+  {
+    "idx": 28,
+    "em": 0.0,
+    "f1": 0.67,
+    "pred": "Nobel Prize (in Physics)",
+    "question": "Substorm was described in qualitative terms by a scientist nominated for what seven times?",
+    "answer": "Nobel Prize"
+  },
+  {
+    "idx": 29,
+    "em": 1.0,
+    "f1": 1.0,
+    "pred": "Francisco Rafael Arellano F\u00e9lix",
+    "question": "Who was the eldest brother of the Mexican drug trafficker born 12 March 1952?",
+    "answer": "Francisco Rafael Arellano F\u00e9lix"
+  },
+  {
+    "idx": 30,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Physicist.",
+    "question": "The Schumann\u2013Runge bands are named for at least one German what?",
+    "answer": "mathematician"
+  },
+  {
+    "idx": 31,
+    "em": 1.0,
+    "f1": 1.0,
+    "pred": "Chelsea.",
+    "question": "Which football club appeared in the 2015 FA Community Shield Cup, as well as, the 2014\u201315 Premier League championship?",
+    "answer": "Chelsea"
+  },
+  {
+    "idx": 32,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Sega Enterprises (Sega Amusement, ",
+    "question": "Bandit was built in 1988 by which Japanese amusement ride company that built roller coasters, giant wheels, carousels, flumes, dark rides, sky cycles and other amusement rides?",
+    "answer": "TOGO company"
+  },
+  {
+    "idx": 33,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Fred J. Lincoln",
+    "question": "Who was convicted of murdering the director of Schoolboy Crush?",
+    "answer": "Harlow Cuadra and Joseph Kerekes"
+  },
+  {
+    "idx": 34,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Rusty Chambers",
+    "question": "Which Naperville Central High School quarterback, became the 1988 starting quarterback for the Leicester Panthers?",
+    "answer": "Patrick Sean Payton"
+  },
+  {
+    "idx": 35,
+    "em": 0.0,
+    "f1": 0.8,
+    "pred": "Mollie King",
+    "question": "The group formed during the summer of 2007 included what girl born in 1987?",
+    "answer": "Mollie Elizabeth King"
+  },
+  {
+    "idx": 36,
+    "em": 0.0,
+    "f1": 0.44,
+    "pred": "Clinchfield Railroad (Carolina, Cl",
+    "question": "What railroad in which Challengers were most common was completed in 1915?",
+    "answer": "Clinchfield Railroad"
+  },
+  {
+    "idx": 37,
+    "em": 1.0,
+    "f1": 1.0,
+    "pred": "Gothic Revival",
+    "question": "What type of mansion was built for the founder of the company marketed the oil engine under the \"Hornsby-Akroyd\" name?",
+    "answer": "Gothic Revival"
+  },
+  {
+    "idx": 38,
+    "em": 0.0,
+    "f1": 0.5,
+    "pred": "2x Platinum",
+    "question": " \"JK Wedding Entrance Dance\" is a viral video that uses a song by a rapper whose first album was certified what?",
+    "answer": "double platinum"
+  },
+  {
+    "idx": 39,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "North-West Derby \u2014 \"dockers\" (Ever",
+    "question": " What term was used in the North-West Derby  to disparge their rivals?",
+    "answer": "Mickey Mouse Cup"
+  },
+  {
+    "idx": 41,
+    "em": 0.0,
+    "f1": 0.5,
+    "pred": "GameStop Corporation",
+    "question": "Evil controllers was featured on Game informer who was published by which monthly video magazine corporation?",
+    "answer": "GameStop Corp."
+  },
+  {
+    "idx": 42,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "loanDepot park LEED gold 2010.",
+    "question": "when the Marlins are the home team, games are played at this park which was LEED certified as the greenest MLB park in what year?",
+    "answer": "2012"
+  },
+  {
+    "idx": 43,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Ford Mustang GT500",
+    "question": "Which Arab World's car was  used in a  American action film directed by F. Gary Gray and written by Chris Morgan?",
+    "answer": "Lykan Hypersport"
+  },
+  {
+    "idx": 44,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "1966",
+    "question": "In what year was the scientific journal for which Danilo Erricolo is currently Editor-in-Chief established?",
+    "answer": "1952"
+  },
+  {
+    "idx": 45,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "11th",
+    "question": "What number largest commercial airline in the United States is Hana Hou! published for?",
+    "answer": "8th"
+  },
+  {
+    "idx": 46,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "No. 1 (Billboard Hot 100)",
+    "question": "What was the highest ranking in the United States for a single written by an English multi-instrumentalist?",
+    "answer": "25"
+  },
+  {
+    "idx": 47,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "26,783",
+    "question": "In 2011 what was the population of the town where Deep Purple were formed ?",
+    "answer": "about 26,000."
+  },
+  {
+    "idx": 48,
+    "em": 0.0,
+    "f1": 0.22,
+    "pred": "Jay left before \"Take Off\" DVD rel",
+    "question": "Who left the South Korean music group\"2PM\" before the release of the group's DVD called \"Take Off\"?",
+    "answer": "Jay Park"
+  },
+  {
+    "idx": 49,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Malik Sealy",
+    "question": "Which close friend of an American former basketball player was signed for to play for the Timberwolves?",
+    "answer": "signing free agent Chauncey Billups"
+  },
+  {
+    "idx": 50,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Both cliff/mountain wax made \u2014 sug",
+    "question": "What are both Jack Rabbit and Leap-The-Dips made of?",
+    "answer": "wooden"
+  },
+  {
+    "idx": 51,
+    "em": 0.0,
+    "f1": 0.5,
+    "pred": "New Ipswich, New Hampshire",
+    "question": "In what county is The Third Fitzwilliam Meetinghouse located?",
+    "answer": "Cheshire County, New Hampshire"
+  },
+  {
+    "idx": 52,
+    "em": 0.0,
+    "f1": 0.8,
+    "pred": "Frederick I Barbarossa",
+    "question": "Who is the grandfather to Frederick II and was the Holy Roman Emperor until death?",
+    "answer": "Frederick I"
+  },
+  {
+    "idx": 53,
+    "em": 0.0,
+    "f1": 0.4,
+    "pred": "University of Arkansas",
+    "question": "In which University is Richard Williams' former assistant a member of the Athletics Hall of Fame?",
+    "answer": "Campbellsville University"
+  },
+  {
+    "idx": 55,
+    "em": 0.0,
+    "f1": 0.5,
+    "pred": "Rudolf Hess \u2014 Deputy F\u00fchrer.",
+    "question": "The German geographer and geopolitician Otto Maull was part of a team led by Haushofer whose close associate was a prominent politician in Nazi Germany born in 1894 who served under Hitler in 1933 as what capacity?",
+    "answer": "Appointed Deputy F\u00fchrer"
+  },
+  {
+    "idx": 56,
+    "em": 0.0,
+    "f1": 0.55,
+    "pred": "Booker Prize (for The Remains of t",
+    "question": "What award did the writer of Never Let Me Go novel win in 1989?",
+    "answer": "Man Booker Prize for Fiction"
+  },
+  {
+    "idx": 57,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Ballet Society",
+    "question": "What production company was founded by George Balanchine to create a live stage version of the 1942 film Casablanca?",
+    "answer": "The Los Angeles Dance Theater"
+  },
+  {
+    "idx": 58,
+    "em": 0.0,
+    "f1": 0.0,
+    "pred": "Belgian.",
+    "question": "Christmas in the Sun was performed mainly by the entertainer of what nationality?",
+    "answer": "Australian"
+  },
+  {
+    "idx": 59,
+    "em": 1.0,
+    "f1": 1.0,
+    "pred": "England",
+    "question": "An english lawyer had Christopher Mont as an agent and was awarded denization where?",
+    "answer": "England"
+  }
+]
