@@ -1,7 +1,6 @@
-# Agent Budget — Vision
+# cost-aware-agent — Vision
 
 > What we are building and why.
-> No implementation here. See ARCHITECTURE.md for how.
 
 ---
 
