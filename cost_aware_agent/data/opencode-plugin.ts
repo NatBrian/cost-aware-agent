@@ -136,7 +136,11 @@ export const CostAwareAgentPlugin: Plugin = async ({ $ }) => {
         return;
       }
       if (event.type === "session.idle") {
-        await post("/session/stop", { session_id: event.properties.sessionID });
+        // idle fires after EVERY response, not at session end — treating it as
+        // session end marked live sessions 'ended' on their first turn (same
+        // bug class as CC's Stop hook). OpenCode exposes no true end-of-session
+        // event; sessions finish via the daemon's abandoned-after-idle rule.
+        await post("/turn/end", { session_id: event.properties.sessionID });
       }
     },
   };

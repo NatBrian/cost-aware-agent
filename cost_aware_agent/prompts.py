@@ -162,15 +162,24 @@ Given your checklist status and the Budget Tracker above, decide:
   share → stop this approach, try an alternative"""
 
 
-def spend_audit_question(delta_usd: float, budget_usd: float) -> str:
+def spend_audit_question(delta_usd: float, budget_usd: float,
+                         scope: str = "session estimate") -> str:
     """Model-driven self-audit at spend milestones — replaces rule-based
     dead-end detection (the harness never judges behavior; it states the
     measured number and asks). Appended to the tracker when spend crosses
-    another budget slice on an accumulating channel."""
+    another budget slice on an accumulating channel.
+
+    Wallet scope words it as PROJECT spend: the wallet delta includes every
+    session in the project, so 'you have spent' would wrongly blame this
+    session for a concurrent sibling's spend."""
     dp = 2 if budget_usd >= 0.095 or budget_usd <= 0 else 4
-    return (f"[BUDGET CHECKPOINT] You have spent ${delta_usd:.{dp}f} since the "
-            "last check. In one sentence: what did that spend buy? If it "
-            "bought nothing new, change course or finalize now.")
+    if scope == "project wallet":
+        subject = (f"This project has spent ${delta_usd:.{dp}f} across its "
+                   "sessions since the last check")
+    else:
+        subject = f"You have spent ${delta_usd:.{dp}f} since the last check"
+    return (f"[BUDGET CHECKPOINT] {subject}. In one sentence: what did that "
+            "spend buy? If it bought nothing new, change course or finalize now.")
 
 
 def streak_fact(streak: int) -> str:
@@ -227,6 +236,11 @@ def render_receipt(dump: dict) -> str:
         top = ", ".join(f"{t} {n}" for t, n in sorted(by_tool.items(), key=lambda kv: -kv[1]))
         lines.append(f"tool calls: {len(tools)} ({top})")
     lines.append(f"injections delivered: {len(dump.get('injections') or [])}")
+    unknown = sum(1 for r in usage if r.get("price_unknown"))
+    if unknown:
+        lines.append(f"WARNING: {unknown} call(s) used a model with no known price — "
+                     "costed at a conservative Sonnet-tier fallback; true total may "
+                     "be higher or lower")
     expensive = sorted(usage, key=lambda r: -(r.get("cost_usd") or 0.0))[:3]
     if expensive and (expensive[0].get("cost_usd") or 0.0) > 0:
         tops = ", ".join(f"${(r.get('cost_usd') or 0.0):.{dp}f}" for r in expensive)

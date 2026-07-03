@@ -34,9 +34,11 @@ A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) tracks cost per session
   row is flagged `price_unknown`, and the tracker shows a warning line.
 - **Subagent capture** — Claude Code Task-tool subagents write their own
   transcript files (`<session>/subagents/agent-*.jsonl`), not the parent
-  transcript; the daemon discovers and ingests them onto the parent session. On
-  a real multi-agent session this was **42% of true spend** ($10.59 of $25.29)
-  that parent-only parsing missed.
+  transcript — and Workflow-tool agents nest one level deeper
+  (`subagents/workflows/wf_*/agent-*.jsonl`). The daemon discovers the whole
+  `subagents/` tree recursively and ingests it onto the parent session. On a
+  real workflow-heavy session this was **71% of true spend** ($30.84 of
+  $43.60) that parent-only parsing missed.
 - **Budget Tracker** — injects current spend, remaining budget, measured burn
   rate, and tier (HIGH/MEDIUM/LOW/CRITICAL). The numbers come with a single
   delegation line — "decide yourself what these numbers mean" — not canned
@@ -104,6 +106,18 @@ cost-aware-agent budget show             # budget / spent / remaining
 adapters depend on for fields like `project_dir`.)
 
 Run the unit tests with `python3 -m pytest tests/`.
+
+## Tamper boundary (honest scope)
+
+The daemon is an unauthenticated localhost service and the DB is a local file:
+a Bash-capable agent on the same host can ultimately tamper (POST forged
+usage, run `budget set`, edit SQLite). The design answer is advisory-trust
+plus **tamper evidence**, not prevention: all inputs are validated at the
+boundary (negative token counts clamped at the cost formula *and* the intake;
+non-finite or non-positive budget overrides rejected), every accepted budget
+override is logged to `daemon.log`, and every usage row / injection / override
+is in the DB for post-hoc audit. Experiments additionally sandbox the agent
+away from the daemon and DB.
 
 ## Known accuracy limits (documented, by design or pending upstream)
 

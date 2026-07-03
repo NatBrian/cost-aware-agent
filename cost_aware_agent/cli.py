@@ -31,11 +31,14 @@ if ! curl -sf -m 1 "$DAEMON/health" > /dev/null 2>&1; then
   sleep 0.5
 fi
 
+# Stop fires after EVERY assistant response (NOT session end) -> /turn/end.
+# SessionEnd is the real end-of-session event -> /session/stop (receipt).
 case "$EVENT" in
   SessionStart) URL="$DAEMON/session/start" ;;
   PreToolUse)   URL="$DAEMON/tool/pre" ;;
   PostToolUse)  URL="$DAEMON/tool/post" ;;
-  Stop)         URL="$DAEMON/session/stop" ;;
+  Stop)         URL="$DAEMON/turn/end" ;;
+  SessionEnd)   URL="$DAEMON/session/stop" ;;
   *)            exit 0 ;;
 esac
 
@@ -70,7 +73,7 @@ fi
 exit 0
 """
 
-CLAUDE_HOOK_EVENTS = ["SessionStart", "PreToolUse", "PostToolUse", "Stop"]
+CLAUDE_HOOK_EVENTS = ["SessionStart", "PreToolUse", "PostToolUse", "Stop", "SessionEnd"]
 
 
 def _daemon_healthy() -> bool:
@@ -164,15 +167,19 @@ def cmd_install(args):
         sys.exit(1)
 
 
-def _resolved_project_dir(path: str) -> str:
-    # wallets are keyed by absolute path — adapters send absolute cwds, so the
-    # CLI must resolve too or "." and "/home/u/proj" would be different wallets
-    return str(Path(path).resolve())
-
-
 def cmd_budget_set(args):
+    import math
+
     from cost_aware_agent import db
-    project_dir = _resolved_project_dir(args.project_dir)
+    if not math.isfinite(args.amount) or args.amount <= 0:
+        # zero/negative/NaN wallet = permanent no-pressure tier; refuse loudly
+        # instead of silently disarming the budget
+        print(f"invalid budget amount: {args.amount} (must be a positive dollar figure)",
+              file=sys.stderr)
+        sys.exit(1)
+    # the daemon normalizes the hook's cwd the same way — both writers MUST
+    # agree or one project silently splits into two wallets
+    project_dir = db.normalize_project_dir(args.project_dir)
     db.init_db()
     with db.get_conn() as conn:
         db.set_wallet(conn, project_dir, args.amount)
@@ -182,7 +189,7 @@ def cmd_budget_set(args):
 
 def cmd_budget_show(args):
     from cost_aware_agent import db
-    project_dir = _resolved_project_dir(args.project_dir)
+    project_dir = db.normalize_project_dir(args.project_dir)
     db.init_db()
     with db.get_conn() as conn:
         wallet = db.get_wallet(conn, project_dir)

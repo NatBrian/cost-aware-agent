@@ -93,8 +93,19 @@ def cost_llm_usage(
     tokens at the 5m rate undercounted spend by ~24% in that session. Callers
     must pass the split, not a single aggregate cache_creation_tokens number.
 
-    An unpriced model is costed at FALLBACK_PRICE, never $0 (see resolve_price)."""
+    An unpriced model is costed at FALLBACK_PRICE, never $0 (see resolve_price).
+
+    Token counts are clamped to >= 0 here, at the single choke point every
+    caller goes through: a negative count (malformed payload, or a forged
+    /llm/usage POST from something with localhost access) would otherwise
+    produce a NEGATIVE cost row and silently reduce measured spend — a
+    spend-erasure channel."""
     price, _ = resolve_price(model)
+    input_tokens = max(0, input_tokens)
+    output_tokens = max(0, output_tokens)
+    cache_read_tokens = max(0, cache_read_tokens)
+    cache_creation_5m_tokens = max(0, cache_creation_5m_tokens)
+    cache_creation_1h_tokens = max(0, cache_creation_1h_tokens)
     return (
         input_tokens * price.get("input_cost_per_token", 0.0)
         + output_tokens * price.get("output_cost_per_token", 0.0)

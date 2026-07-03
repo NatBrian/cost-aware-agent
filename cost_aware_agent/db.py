@@ -5,11 +5,20 @@ already-complete usage block. Deduping by anything else double- or
 triple-counts that turn's cost.
 """
 
+import os
 import sqlite3
 import time
 from contextlib import contextmanager
 
 from cost_aware_agent.config import DB_PATH
+
+
+def normalize_project_dir(path: str) -> str:
+    """Wallets are keyed by this string, so EVERY writer (CLI `budget set`,
+    daemon /session/start) must normalize identically — a symlinked home, a
+    trailing slash, or a relative path would otherwise silently split one
+    project into two wallets and the budget would never deplete."""
+    return os.path.realpath(path)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -209,8 +218,12 @@ def insert_llm_usage(
     conn, session_id: str, model: str, input_tokens: int, output_tokens: int,
     cache_read_tokens: int, cache_creation_tokens: int, cost_usd: float,
     source: str, message_id: str | None = None, cache_creation_1h_tokens: int = 0,
-    price_unknown: bool = False,
+    price_unknown: bool = False, created_at: int | None = None,
 ) -> None:
+    # created_at is the OCCURRENCE time when the caller knows it (transcript
+    # rows carry their own timestamp); insert time is only the fallback. Burn
+    # rate and receipt duration read this column — stamping batch-ingested
+    # backlog with "now" would fake a spend spike that never happened.
     conn.execute(
         "INSERT INTO llm_usage "
         "(session_id, message_id, model, input_tokens, output_tokens, "
@@ -230,7 +243,7 @@ def insert_llm_usage(
         " price_unknown=excluded.price_unknown",
         (session_id, message_id, model, input_tokens, output_tokens,
          cache_read_tokens, cache_creation_tokens, cache_creation_1h_tokens, cost_usd,
-         int(price_unknown), source, now()),
+         int(price_unknown), source, created_at if created_at is not None else now()),
     )
 
 
@@ -316,21 +329,34 @@ def get_wallet(conn, project_dir: str | None):
     ).fetchone()
 
 
+# history line: only this many most-recent finished sessions — "last N" must
+# actually mean last N, and one ancient cheap session must not pin the range
+_HISTORY_LIMIT = 10
+# a session that never got its SessionEnd hook (crash, SIGKILL, network) would
+# otherwise stay 'active' forever and never count as history; idle this long =
+# finished for accounting purposes (its spend can no longer change much)
+_ABANDONED_AFTER_SECS = 24 * 3600
+
+
 def project_session_costs(conn, project_dir: str,
                           exclude_session: str | None = None) -> list[float]:
-    """Total measured cost of each prior ENDED session in this project (zero-
-    spend sessions excluded — hook misfires, empty runs). Feeds the session-
-    history line: measured facts the model can baseline against, never an
-    estimate."""
+    """Total measured cost of each prior FINISHED session in this project,
+    newest-first capped at _HISTORY_LIMIT, returned oldest-first. Finished =
+    marked ended (SessionEnd fired) OR idle past _ABANDONED_AFTER_SECS.
+    Zero-spend sessions excluded (hook misfires, empty runs). Feeds the
+    session-history line: measured facts the model can baseline against,
+    never an estimate."""
     rows = conn.execute(
-        "SELECT COALESCE(SUM(u.cost_usd), 0) AS c FROM sessions s "
+        "SELECT COALESCE(SUM(u.cost_usd), 0) AS c, MAX(u.created_at) AS last_at "
+        "FROM sessions s "
         "JOIN llm_usage u ON u.session_id = s.session_id "
-        "WHERE s.project_dir = ? AND s.state = 'ended' "
-        "AND s.session_id != COALESCE(?, '') "
-        "GROUP BY s.session_id HAVING c > 0 ORDER BY MIN(s.created_at)",
-        (project_dir, exclude_session),
+        "WHERE s.project_dir = ? AND s.session_id != COALESCE(?, '') "
+        "GROUP BY s.session_id "
+        "HAVING c > 0 AND (s.state = 'ended' OR last_at < ?) "
+        "ORDER BY last_at DESC LIMIT ?",
+        (project_dir, exclude_session, now() - _ABANDONED_AFTER_SECS, _HISTORY_LIMIT),
     ).fetchall()
-    return [float(r["c"]) for r in rows]
+    return [float(r["c"]) for r in reversed(rows)]
 
 
 def wallet_spent_usd(conn, project_dir: str) -> float:

@@ -8,6 +8,7 @@ adapter, which hands text over directly.
 """
 
 import logging
+import math
 from typing import Optional
 
 from fastapi import FastAPI
@@ -95,6 +96,7 @@ def _ingest_transcript(conn, session_id: str, transcript_path: Optional[str]) ->
                 message_id=turn["message_id"],
                 cache_creation_1h_tokens=cache_1h,
                 price_unknown=price_unknown,
+                created_at=turn["occurred_at"],  # occurrence, not ingest time
             )
             if plan_enabled and is_parent and transcript.has_verification_block(turn["text"]):
                 _handle_verification(conn, session_id, turn["text"])
@@ -238,7 +240,7 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
         if last_bucket is not None and bucket > last_bucket:
             delta = spent - (last_spent or 0.0)
             if delta > 0:
-                audit_question = prompts.spend_audit_question(delta, budget)
+                audit_question = prompts.spend_audit_question(delta, budget, scope)
         db.set_inject_state(conn, session_id, tier, bucket, spent)
 
     tracker = prompts.render_budget_tracker(
@@ -307,6 +309,11 @@ class SessionStopReq(BaseModel):
     transcript_path: Optional[str] = None
 
 
+class TurnEndReq(BaseModel):
+    session_id: str
+    transcript_path: Optional[str] = None
+
+
 # --- endpoints ---
 
 @app.get("/health")
@@ -316,9 +323,25 @@ def health():
 
 @app.post("/session/start")
 def session_start(req: SessionStartReq):
+    # Same normalization as the CLI's wallet writer — un-normalized paths would
+    # silently split one project into two wallets (never-depleting budget).
+    project_dir = db.normalize_project_dir(req.project_dir) if req.project_dir else None
+    budget_override = req.budget_usd
+    if budget_override is not None and (
+            not math.isfinite(budget_override) or budget_override <= 0):
+        # NaN/inf/zero/negative would neuter budget pressure (compute_tier
+        # treats <= 0 as "no budget configured" = permanent HIGH). Anything
+        # with localhost access can POST here, so reject at the boundary.
+        _log.warning("session %s: ignoring invalid budget override %r",
+                     req.session_id, budget_override)
+        budget_override = None
+    if budget_override is not None:
+        # tamper-evident: overrides are legitimate (experiments) but must be
+        # visible in the daemon log, not silent
+        _log.warning("session %s: budget override $%s", req.session_id, budget_override)
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, req.cli, req.task, req.model)
-        db.set_session_budget_source(conn, req.session_id, req.project_dir, req.budget_usd)
+        db.set_session_budget_source(conn, req.session_id, project_dir, budget_override)
         _ingest_transcript(conn, req.session_id, req.transcript_path)
         if req.source in ("compact", "clear"):
             # compaction/clear wiped every accumulated injection from the
@@ -330,11 +353,11 @@ def session_start(req: SessionStartReq):
                                        lagging=bool(req.transcript_path))
         else:
             parts = []
-            if req.project_dir:
+            if project_dir:
                 # measured history, not estimation: what past sessions in this
                 # project actually cost, as a baseline the model extrapolates from
                 history = prompts.session_history_fact(
-                    db.project_session_costs(conn, req.project_dir,
+                    db.project_session_costs(conn, project_dir,
                                              exclude_session=req.session_id))
                 if history:
                     parts.append(history)
@@ -400,7 +423,12 @@ def plan_seed(req: PlanSeedReq):
 
 @app.post("/llm/usage")
 def llm_usage(req: LlmUsageReq):
-    u = req.usage
+    # clamp BEFORE anything: negative counts (malformed payload or a forged
+    # POST — this port is open to anything on localhost, including a
+    # Bash-capable model) would store negative tokens and, without the
+    # cost-side clamp, negative cost = erased spend
+    u = {k: max(0, v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
+         for k, v in req.usage.items()}
     cache_creation_total = u.get("cache_creation_tokens", 0)
     # OpenCode's message.updated payload does not expose a 1h/5m cache-write
     # split the way Claude Code's transcript does (confirmed: its usage
@@ -451,6 +479,19 @@ def _dump_session(conn, session_id: str) -> dict:
         "injections": rows("SELECT * FROM injections WHERE session_id = ? ORDER BY id"),
         "plan": rows("SELECT * FROM plan WHERE session_id = ? ORDER BY id"),
     }
+
+
+@app.post("/turn/end")
+def turn_end(req: TurnEndReq):
+    """Claude Code's Stop hook fires after EVERY assistant response, not at
+    session end — treating it as session end marked live sessions 'ended' on
+    their first turn (polluting project history with partial costs) and logged
+    a receipt per turn. Stop now maps here: ingest the finished turn's usage,
+    nothing else. SessionEnd maps to /session/stop."""
+    with db.get_conn() as conn:
+        db.insert_session(conn, req.session_id, "", "", "")
+        _ingest_transcript(conn, req.session_id, req.transcript_path)
+    return {"additionalContext": None}
 
 
 @app.post("/session/stop")
