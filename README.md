@@ -219,6 +219,25 @@ the subagent tool Task→Agent (deny lists must cover both), and a
 session-metadata race in the OpenCode adapter (fixed + regression test).
 Details: [`experiments/e2e_verify/RESULTS.md`](experiments/e2e_verify/RESULTS.md).
 
+### 5. `experiments/swe_ab/` — real coding tasks, paired A/B (the slack benchmark)
+
+The follow-up to `real_cli`, on a dataset that *has* discretionary slack:
+**SWE-bench Lite** — real GitHub issues graded by each project's own
+FAIL_TO_PASS / PASS_TO_PASS tests. 6 mechanically-screened instances × 2 seeds,
+OFF vs ON (advisory money budget, wallet = 0.5× per-instance OFF median,
+rule pre-registered). **Result (Claude Code / Sonnet): the budget cut cost
+−29.4% paired (significant, t=2.53, 95% CI [$0.019, $0.345]), −40% total, with
+success rate up (0.67→0.75) and 2→0 runaway timeouts.** Savings concentrate on
+high-slack instances; low-slack ones barely move — confirming slack is the
+variable that decides whether an advisory budget saves money (HotpotQA, no
+slack, was +2.8% n.s.). Honest downside: 1/12 ON runs failed under budget
+pressure that OFF solved. The audit also caught a real contamination —
+bash `pip download` reached PyPI and one run read the fixed source (bash
+network egress was not sandboxed; fixed with a subprocess proxy black-hole,
+Anthropic whitelisted); the run was flagged, archived, and re-run clean.
+OpenCode arm deferred (free-tier quota exhausted). Details:
+[`experiments/swe_ab/EXPERIMENT_RESULTS_2026-07-03_2255.md`](experiments/swe_ab/EXPERIMENT_RESULTS_2026-07-03_2255.md).
+
 ## Status
 
 - Claude Code adapter — live-verified: hook delivery, transcript cost pull
