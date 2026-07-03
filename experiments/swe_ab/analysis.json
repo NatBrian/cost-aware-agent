@@ -1,0 +1,74 @@
+[
+  {
+    "platform": "claude",
+    "pairs": 10,
+    "off": {
+      "cost": 0.6191595299999999,
+      "tools": 14.4,
+      "success": 0.8,
+      "injections": 0
+    },
+    "on": {
+      "cost": 0.43690119,
+      "tools": 10.7,
+      "success": 0.7,
+      "injections": 5.1
+    },
+    "saved_usd_per_task": 0.1822583399999999,
+    "saved_pct": 29.436410354533336,
+    "money_stats": {
+      "n": 10,
+      "mean": 0.18225833999999996,
+      "sd": 0.22760073075496923,
+      "t": 2.532,
+      "tcrit": 2.262,
+      "ci95": [
+        0.01945389703393624,
+        0.3450627829660637
+      ],
+      "significant": true
+    },
+    "tool_stats": {
+      "n": 10,
+      "mean": 3.7,
+      "sd": 3.4334951418181574,
+      "t": 3.408,
+      "tcrit": 2.262,
+      "ci95": [
+        1.243996180784729,
+        6.156003819215272
+      ],
+      "significant": true
+    },
+    "per_instance_saving": {
+      "pylint-dev__pylint-6506": [
+        0.23491,
+        0.30343
+      ],
+      "pytest-dev__pytest-11143": [
+        0.01045,
+        0.14811
+      ],
+      "pytest-dev__pytest-11148": [
+        0.70467
+      ],
+      "sympy__sympy-21612": [
+        0.3601
+      ],
+      "sympy__sympy-22714": [
+        0.01827,
+        -0.0105
+      ],
+      "sympy__sympy-24213": [
+        0.0491,
+        0.00405
+      ]
+    },
+    "audit_clean_all": false,
+    "timeouts": 0
+  },
+  {
+    "platform": "opencode",
+    "error": "no common pairs"
+  }
+]
