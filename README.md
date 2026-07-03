@@ -62,6 +62,14 @@ A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) tracks cost per session
   (`injections` table). `GET /session/<id>/dump` exports a session's full history:
   LLM usage rows, tool calls, every injected text, plan state — runs are
   replayable and debuggable from the daemon alone.
+- **Session history (measured, not estimated)** — a new session in a project
+  with prior finished sessions starts with "[PROJECT HISTORY] Your last N
+  session(s) here cost $A–$B (median $M)" — real measured totals the model can
+  baseline against; nothing is injected when there is no history.
+- **End-of-session receipt** — `/session/stop` logs a human-readable receipt
+  (total by model, budget/wallet state, tool-call breakdown, biggest single
+  calls) to `daemon.log`; `cost-aware-agent receipt <session>` prints the same
+  on demand.
 - **Compaction survival** — Claude Code re-fires SessionStart with
   `source=compact` after compaction, which wipes every accumulated injection
   from the conversation; the daemon detects it, resets its on_change state,

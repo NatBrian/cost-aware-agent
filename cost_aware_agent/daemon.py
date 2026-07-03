@@ -7,6 +7,7 @@ itself with jq. /verification/result stays live for OpenCode's push-based
 adapter, which hands text over directly.
 """
 
+import logging
 from typing import Optional
 
 from fastapi import FastAPI
@@ -17,6 +18,9 @@ from cost_aware_agent.config import load_config
 
 app = FastAPI()
 _config = load_config()
+# uvicorn's stderr goes to ~/.cost-aware-agent/daemon.log (see cli.py), so the
+# end-of-session receipt lands there for the user to read
+_log = logging.getLogger("cost_aware_agent.receipt")
 
 
 @app.on_event("startup")
@@ -324,10 +328,19 @@ def session_start(req: SessionStartReq):
             db.set_inject_state(conn, req.session_id, None, None, None)
             context = _tracker_context(conn, req.session_id,
                                        lagging=bool(req.transcript_path))
-        elif _config.get("enable_plan_verification", False):
-            context = prompts.PLANNING_PROMPT
         else:
-            context = None
+            parts = []
+            if req.project_dir:
+                # measured history, not estimation: what past sessions in this
+                # project actually cost, as a baseline the model extrapolates from
+                history = prompts.session_history_fact(
+                    db.project_session_costs(conn, req.project_dir,
+                                             exclude_session=req.session_id))
+                if history:
+                    parts.append(history)
+            if _config.get("enable_plan_verification", False):
+                parts.append(prompts.PLANNING_PROMPT)
+            context = "\n\n".join(parts) if parts else None
         context = _deliver(conn, req.session_id, "session/start", context)
     return {"additionalContext": context}
 
@@ -417,12 +430,38 @@ def llm_usage(req: LlmUsageReq):
     return {"additionalContext": None}
 
 
+def _dump_session(conn, session_id: str) -> dict:
+    def rows(sql):
+        return [dict(r) for r in conn.execute(sql, (session_id,)).fetchall()]
+    session = db.get_session(conn, session_id)
+    session_spent, _ = db.spent_usd(conn, session_id)
+    view_spent, budget, scope = _budget_view(conn, session_id)
+    tier, _ = cost.compute_tier(view_spent, budget)
+    return {
+        "session": dict(session) if session else None,
+        # this session's own spend — stable meaning regardless of wallet
+        "spent_usd": session_spent,
+        # what the budget pressure was computed from (wallet-level when a
+        # project wallet is active, session-level otherwise)
+        "budget_view": {"spent_usd": view_spent, "budget_usd": budget,
+                        "scope": scope},
+        "tier": tier,
+        "llm_usage": rows("SELECT * FROM llm_usage WHERE session_id = ? ORDER BY id"),
+        "tool_calls": rows("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY id"),
+        "injections": rows("SELECT * FROM injections WHERE session_id = ? ORDER BY id"),
+        "plan": rows("SELECT * FROM plan WHERE session_id = ? ORDER BY id"),
+    }
+
+
 @app.post("/session/stop")
 def session_stop(req: SessionStopReq):
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, "", "", "")
         _ingest_transcript(conn, req.session_id, req.transcript_path)
         db.mark_session_ended(conn, req.session_id)
+        # end-of-session receipt -> daemon.log; the same text is available on
+        # demand via `cost-aware-agent receipt <session>` (reads /dump)
+        _log.warning("\n%s", prompts.render_receipt(_dump_session(conn, req.session_id)))
     return {"additionalContext": None}
 
 
@@ -432,26 +471,7 @@ def session_dump(session_id: str):
     llm_usage row, tool call, delivered injection, plan item, and the session
     row itself. This is the 'all events retrievable' contract."""
     with db.get_conn() as conn:
-        def rows(sql):
-            return [dict(r) for r in conn.execute(sql, (session_id,)).fetchall()]
-        session = db.get_session(conn, session_id)
-        session_spent, _ = db.spent_usd(conn, session_id)
-        view_spent, budget, scope = _budget_view(conn, session_id)
-        tier, _ = cost.compute_tier(view_spent, budget)
-        dump = {
-            "session": dict(session) if session else None,
-            # this session's own spend — stable meaning regardless of wallet
-            "spent_usd": session_spent,
-            # what the budget pressure was computed from (wallet-level when a
-            # project wallet is active, session-level otherwise)
-            "budget_view": {"spent_usd": view_spent, "budget_usd": budget,
-                            "scope": scope},
-            "tier": tier,
-            "llm_usage": rows("SELECT * FROM llm_usage WHERE session_id = ? ORDER BY id"),
-            "tool_calls": rows("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY id"),
-            "injections": rows("SELECT * FROM injections WHERE session_id = ? ORDER BY id"),
-            "plan": rows("SELECT * FROM plan WHERE session_id = ? ORDER BY id"),
-        }
+        dump = _dump_session(conn, session_id)
     return dump
 
 

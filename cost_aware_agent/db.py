@@ -316,6 +316,23 @@ def get_wallet(conn, project_dir: str | None):
     ).fetchone()
 
 
+def project_session_costs(conn, project_dir: str,
+                          exclude_session: str | None = None) -> list[float]:
+    """Total measured cost of each prior ENDED session in this project (zero-
+    spend sessions excluded — hook misfires, empty runs). Feeds the session-
+    history line: measured facts the model can baseline against, never an
+    estimate."""
+    rows = conn.execute(
+        "SELECT COALESCE(SUM(u.cost_usd), 0) AS c FROM sessions s "
+        "JOIN llm_usage u ON u.session_id = s.session_id "
+        "WHERE s.project_dir = ? AND s.state = 'ended' "
+        "AND s.session_id != COALESCE(?, '') "
+        "GROUP BY s.session_id HAVING c > 0 ORDER BY MIN(s.created_at)",
+        (project_dir, exclude_session),
+    ).fetchall()
+    return [float(r["c"]) for r in rows]
+
+
 def wallet_spent_usd(conn, project_dir: str) -> float:
     """Real LLM dollars across ALL sessions of this project — the wallet
     depletes over the project's lifetime, not per session."""

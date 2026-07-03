@@ -175,3 +175,60 @@ def spend_audit_question(delta_usd: float, budget_usd: float) -> str:
 
 def streak_fact(streak: int) -> str:
     return f"[STREAK] You have chosen CONTINUE {streak} times in a row while budget was LOW or CRITICAL."
+
+
+def session_history_fact(costs: list[float]) -> str | None:
+    """Experience without estimation (§6): tell the model what past sessions in
+    this project MEASURABLY cost and let it extrapolate. None when there is no
+    history — never a guess."""
+    if not costs:
+        return None
+    lo, hi = min(costs), max(costs)
+    median = sorted(costs)[len(costs) // 2]
+    dp = 2 if hi >= 0.095 else 4
+    return (f"[PROJECT HISTORY] Your last {len(costs)} session(s) in this project "
+            f"cost ${lo:.{dp}f}–${hi:.{dp}f} (median ${median:.{dp}f}). "
+            "Use these measured costs as a baseline for what work here tends to cost.")
+
+
+def render_receipt(dump: dict) -> str:
+    """Human-readable end-of-session receipt from a /session/<id>/dump payload.
+    Used by both the daemon (logged at /session/stop) and the CLI
+    (`cost-aware-agent receipt <session>`), so the two never drift."""
+    session = dump.get("session") or {}
+    usage = dump.get("llm_usage") or []
+    tools = dump.get("tool_calls") or []
+    view = dump.get("budget_view") or {}
+    spent = dump.get("spent_usd", 0.0)
+    budget = view.get("budget_usd", 0.0)
+
+    by_model: dict[str, tuple[int, float]] = {}
+    for row in usage:
+        n, c = by_model.get(row.get("model") or "?", (0, 0.0))
+        by_model[row.get("model") or "?"] = (n + 1, c + (row.get("cost_usd") or 0.0))
+    by_tool: dict[str, int] = {}
+    for row in tools:
+        by_tool[row.get("tool_name") or "?"] = by_tool.get(row.get("tool_name") or "?", 0) + 1
+
+    dp = 2 if budget >= 0.095 or budget <= 0 else 4
+    lines = [f"=== cost-aware-agent receipt — session {session.get('session_id', '?')} ==="]
+    times = [r["created_at"] for r in usage if r.get("created_at")]
+    if times:
+        lines.append(f"duration: {(max(times) - min(times)) // 60}m {(max(times) - min(times)) % 60}s (first to last LLM call)")
+    lines.append(f"LLM cost: ${spent:.{dp}f} across {len(usage)} calls")
+    for model, (n, c) in sorted(by_model.items(), key=lambda kv: -kv[1][1]):
+        lines.append(f"  {model}: ${c:.{dp}f} ({n} calls)")
+    if budget > 0:
+        pct = view.get("spent_usd", spent) / budget * 100
+        lines.append(f"budget: ${budget:.{dp}f} ({view.get('scope', 'session estimate')}) — {pct:.0f}% used")
+        if view.get("scope") == "project wallet":
+            lines.append(f"wallet remaining: ${max(0.0, budget - view.get('spent_usd', 0.0)):.{dp}f}")
+    if by_tool:
+        top = ", ".join(f"{t} {n}" for t, n in sorted(by_tool.items(), key=lambda kv: -kv[1]))
+        lines.append(f"tool calls: {len(tools)} ({top})")
+    lines.append(f"injections delivered: {len(dump.get('injections') or [])}")
+    expensive = sorted(usage, key=lambda r: -(r.get("cost_usd") or 0.0))[:3]
+    if expensive and (expensive[0].get("cost_usd") or 0.0) > 0:
+        tops = ", ".join(f"${(r.get('cost_usd') or 0.0):.{dp}f}" for r in expensive)
+        lines.append(f"biggest single calls: {tops}")
+    return "\n".join(lines)

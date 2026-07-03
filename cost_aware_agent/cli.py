@@ -216,6 +216,16 @@ def cmd_status(args):
         sys.exit(1)
 
 
+def cmd_receipt(args):
+    from cost_aware_agent.prompts import render_receipt
+    try:
+        with urllib.request.urlopen(f"{DAEMON_URL}/session/{args.session_id}/dump", timeout=2) as resp:
+            print(render_receipt(json.loads(resp.read())))
+    except urllib.error.URLError as e:
+        print(f"could not reach daemon: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(prog="cost-aware-agent")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -235,6 +245,10 @@ def main():
     status_p = sub.add_parser("status")
     status_p.add_argument("session_id")
     status_p.set_defaults(func=cmd_status)
+
+    receipt_p = sub.add_parser("receipt", help="human-readable cost receipt for a session")
+    receipt_p.add_argument("session_id")
+    receipt_p.set_defaults(func=cmd_receipt)
 
     init_p = sub.add_parser("init", help="set the project's dollar budget (one number)")
     init_p.add_argument("--budget", dest="amount", type=float, required=True)
