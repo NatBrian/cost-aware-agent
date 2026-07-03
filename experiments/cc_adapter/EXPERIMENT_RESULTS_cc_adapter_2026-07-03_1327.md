@@ -98,7 +98,7 @@ HotpotQA's job).
    per-turn usage hook, so the daemon pulls spend from the transcript, which lags.
    Within a single `claude -p` session the injected "spent" can stay frozen at the
    first turn's cost while real cost climbs (final total is correct). Consequence:
-   BATS-style *escalating* pressure (HIGH→CRITICAL as you spend) can't be delivered
+   *escalating* pressure (HIGH→CRITICAL as you spend) can't be delivered
    in-session on CC; you get a roughly static tier set by the budget. The ON arm
    here used a tight budget so the static tier read CRITICAL throughout.
 

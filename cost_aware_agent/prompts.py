@@ -29,7 +29,7 @@ budget is low."""
 # ("Prefer the most promising approach...", "Finalize with current
 # evidence...") are gone: tier labels stay as compact state, and one fixed
 # delegation line replaces the verdicts. (Deviates from the 2026-07-01
-# BATS-mimic decision — superseded by the user-endorsed model-does-the-judgment
+# rule-text decision — superseded by the user-endorsed model-does-the-judgment
 # philosophy.)
 TIER_DELEGATION = "Decide yourself what these numbers mean for your next step."
 

@@ -77,7 +77,7 @@ A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) tracks cost per session
   from the conversation; the daemon detects it, resets its on_change state,
   and re-delivers the tracker immediately (same for `clear`).
 - **Planning / Self-Verification (dormant)** — session-start checklist and
-  milestone-triggered verification prompts (BATS-style) never demonstrated
+  milestone-triggered verification prompts never demonstrated
   value in any experiment and are **off by default**
   (`enable_plan_verification: false`); the code paths stay behind the flag.
 

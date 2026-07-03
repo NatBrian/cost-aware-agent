@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Multi-hop QA A/B harness (Claude Sonnet gateway) — BATS replication.
+"""Multi-hop QA A/B harness (Claude Sonnet gateway).
 
 Model = Claude Sonnet via the local `claude -p` CLI (headless JSON). Instead of
 OpenAI function-calling we drive a plain-text ReAct protocol: each turn the model
