@@ -6,8 +6,11 @@
 - **Dataset**: SWE-bench Lite — 6 real GitHub issues, graded by each project's
   own FAIL_TO_PASS / PASS_TO_PASS tests
 - **Money spent**: **$14.65 real Anthropic billing** (OFF $9.16 + ON $5.49)
-- **OpenCode arm**: deferred — the zen free tier returned 402 "Insufficient
-  Balance" for deepseek-v4-flash-free (quota exhausted). Runner is ready for it.
+- **OpenCode arm**: run 2026-07-04 (quota returned) — see the OpenCode section
+  below. Plumbing fully verified (12/12 feature checks); cost result is the
+  OPPOSITE of Claude Code (budget makes the weak model *more* expensive via the
+  rebuilt-channel cache tax). Full paired arm partially blocked by a deepseek
+  free-tier degradation window.
 
 ## Headline
 
@@ -170,6 +173,64 @@ lives in the HF dataset, never on disk).
   claim zero downside (one run failed under budget pressure that OFF solved).
 - Single agent (sonnet), 6 instances, 2 seeds — a real but small A/B. The
   effect is significant at this n; a larger sweep would tighten the CI.
+
+## OpenCode arm (deepseek-v4-flash-free, 2026-07-04)
+
+Same 6 instances, same wallets rule (0.5× per-instance OFF median), production
+plugin (rebuilt/system-transform channel). OpenCode free tier bills $0; money =
+the daemon's retail price of the pushed tokens (the number the budget runs on).
+
+**Harness plumbing: 12/12 machine checks pass** (`verify_oc.py`, `verify_oc.json`):
+OFF gating (0 injections across all 12 OFF runs), ON injection delivery on the
+rebuilt channel, retail cost exact (`cost_usd == daemon_spent`), tier escalation
+(HIGH/MEDIUM/CRITICAL seen live), Budget Tracker block delivered, project-wallet
+scope wording, `~$` bucket-grid quantization, zero harness-tamper refs, every
+network attempt flagged (not silent), **subagent capture** (deepseek spawned
+`task` subagents — the daemon ingested all of them, the same feature proven for
+Claude Code subagents), and session tracking. Every OpenCode harness feature
+works end-to-end on real coding tasks.
+
+**Cost result — the opposite of Claude Code.** On the clean OFF/ON pairs the
+budget makes OpenCode *more* expensive, not less:
+
+| instance | OFF $ | ON $ | ON injections | note |
+|---|---|---|---|---|
+| pytest-11143 | 0.0044 | 0.0053 | 6 | +20%, mild cache tax |
+| pytest-11148 | 0.0189 | 0.1540 | 29 | **+8×**, cache tax blowup |
+
+The mechanism is the documented rebuilt-channel cache tax: OpenCode rebuilds the
+system prompt every call, so each injected Budget Tracker update (tier/bucket
+transition) invalidates deepseek's prompt cache from that point. At 29
+injections in one run, nearly every call reprocesses full context fresh →
+retail cost balloons. Behaviorally deepseek does not respond to the budget
+(consistent with the prior HotpotQA finding), so there is no offsetting saving —
+only the tax. This is the honest limit of the approach: **the budget saves money
+on a capable model that acts on it (Claude Code, −29%) and costs money on a weak
+model that ignores it while paying the injection tax (OpenCode).**
+
+**Reliability caveats (external, not harness bugs):**
+- deepseek is weak: it solves the easy instances (sympy/pytest small patches,
+  ~$0.004–0.016) and loops/times out on the hard ones — the same instances
+  Claude Code also failed.
+- The free tier hit a degradation window mid-ON-arm (timing out even on a
+  trivial "reply OK"), producing total-loss timeout runs (no session, no spend).
+  The runner now recovers spend from the daemon when the CLI is killed, and
+  retries transient stream-error timeouts once; runs that still yield nothing
+  are recorded as losses and excluded from the cost stats. The full paired ON
+  arm was not completed in this window — the 2 clean pairs above show the
+  direction; more pairs would tighten it.
+
+**Bugs found and fixed during this arm** (all in the experiment scaffolding,
+none in the daemon):
+1. The Claude-Code black-hole proxy hung OpenCode at startup (it fetches
+   models.dev / its gateway through the same proxy env). Split into
+   platform-specific policies: proxy for CC, `PIP_NO_INDEX`-only for OC.
+2. OpenCode buffers `--format json` stdout and loses it on SIGKILL → recover the
+   session + spend from the daemon (plugin pushed live).
+3. OpenCode's stdout tool list is unreliable (1 parsed vs 20 in the daemon) →
+   audit and count tools from the daemon dump, so the cheat audit can never see
+   a truncated subset (`reaudit_oc.py` backfills earlier runs).
+4. deepseek free-tier stream errors → retry once on empty/zero-work timeouts.
 
 ## Reproduce / debug
 
