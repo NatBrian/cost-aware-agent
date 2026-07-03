@@ -66,24 +66,34 @@ WALLET_FRACTION = 0.5     # pre-registered: wallet = 0.5 x per-instance OFF medi
 P2P_SAMPLE = 3            # regression sample (first N — the same N screening verified)
 MAX_CC_SPEND_USD = 25.0   # hard safety backstop (OFF+ON ~ $18 expected); this
                           # is a runaway guard, not a per-arm budget
-TIMEOUT_S = 900
+TIMEOUT_S = 900       # Claude Code
+OC_TIMEOUT_S = 480    # OpenCode/deepseek loops on hard tasks — fail faster
 
-# Network egress block for the AGENT subprocess only (the venv is built before
-# the agent runs, so its editable install is unaffected). Closes a real hole
-# found in the first run: bash `pip download pytest==8.0.0` reached PyPI and one
-# run read the released (fixed) source. WebSearch/WebFetch tool denial does not
-# cover bash. A black-hole proxy breaks curl/wget/pip/urllib; PIP_NO_INDEX is
-# belt-and-braces. Any attempt still shows in the audit (net_refs).
-NET_BLOCK = {
+# --- network egress block for the AGENT subprocess only (venv built before the
+# agent runs, so its editable install is unaffected). Closes a real hole found
+# in the first run: bash `pip download pytest==8.0.0` reached PyPI and one run
+# read the released (fixed) source. WebSearch/WebFetch tool denial does not
+# cover bash.
+#
+# Two policies, because the two CLIs have different infra needs:
+#  - Claude Code only phones api.anthropic.com, so a black-hole proxy with
+#    Anthropic whitelisted breaks curl/wget/pip/git while the CLI still runs.
+#  - OpenCode fetches models.dev, its zen gateway, auth etc. at startup through
+#    the SAME proxy env, and NO_PROXY host-matching is unreliable across its
+#    node HTTP stack — a black-hole proxy hangs it at startup (verified: 900s
+#    timeout, zero output). So for OpenCode use NO proxy and block the actual
+#    demonstrated vector — pip — with PIP_NO_INDEX (needs no proxy). Any other
+#    bash egress (curl/git) is caught by the audit's net_refs and invalidated
+#    post-hoc, exactly as the CC contamination was.
+NET_BLOCK_CC = {
     "HTTP_PROXY": "http://127.0.0.1:1", "HTTPS_PROXY": "http://127.0.0.1:1",
     "http_proxy": "http://127.0.0.1:1", "https_proxy": "http://127.0.0.1:1",
     "PIP_NO_INDEX": "1", "PIP_INDEX_URL": "http://127.0.0.1:1/simple",
-    # the CLI reaches its own model API through this same env — whitelist
-    # Anthropic (and the OpenCode zen gateway) so the agent still runs, while
-    # PyPI / GitHub / arbitrary hosts hit the black hole. Verified: pypi.org ->
-    # Connection refused, api.anthropic.com -> reachable.
-    "no_proxy": ".anthropic.com,anthropic.com,opencode.ai,127.0.0.1,localhost",
-    "NO_PROXY": ".anthropic.com,anthropic.com,opencode.ai,127.0.0.1,localhost",
+    "no_proxy": ".anthropic.com,anthropic.com,127.0.0.1,localhost",
+    "NO_PROXY": ".anthropic.com,anthropic.com,127.0.0.1,localhost",
+}
+NET_BLOCK_OC = {
+    "PIP_NO_INDEX": "1", "PIP_INDEX_URL": "http://127.0.0.1:1/simple",
 }
 
 REPO_CACHE = os.environ.get(
@@ -228,7 +238,7 @@ def cc_settings(run_dir):
 def drive_claude(task, run_dir, proj):
     hook_log = os.path.join(run_dir, "hook.jsonl")
     open(hook_log, "w").close()
-    env = dict(os.environ, CAA_HOOK_LOG=hook_log, PWD=proj, **NET_BLOCK)
+    env = dict(os.environ, CAA_HOOK_LOG=hook_log, PWD=proj, **NET_BLOCK_CC)
     events_path = os.path.join(run_dir, "events.jsonl")
     cmd = ["claude", "-p", task, "--model", CC_MODEL,
            "--output-format", "stream-json", "--verbose",
@@ -263,17 +273,47 @@ def drive_claude(task, run_dir, proj):
             "timed_out": err == "TIMEOUT"}
 
 
+def _newest_oc_session(since_ts):
+    """OpenCode buffers its --format json stdout and flushes only at exit, so a
+    SIGKILL (timeout) loses events, session_id and trajectory entirely. But the
+    plugin has been pushing to the daemon the whole time. Recover the session by
+    taking the newest opencode session created at/after this run started."""
+    try:
+        import sqlite3
+        db = os.path.expanduser("~/.cost-aware-agent/db.sqlite")
+        c = sqlite3.connect(db)
+        row = c.execute(
+            "SELECT session_id FROM sessions WHERE cli='opencode' "
+            "AND created_at >= ? ORDER BY created_at DESC LIMIT 1",
+            (int(since_ts),)).fetchone()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
 def drive_opencode(task, run_dir, proj):
     events_path = os.path.join(run_dir, "events.jsonl")
     cmd = ["opencode", "run", "--format", "json", "--print-logs",
            "--log-level", "ERROR", "-m", OC_MODEL, task]
-    err = run_real.run_killable(cmd, timeout=TIMEOUT_S, cwd=proj,
-                                env=dict(os.environ, PWD=proj, **NET_BLOCK),
+    started = time.time()
+    err = run_real.run_killable(cmd, timeout=OC_TIMEOUT_S, cwd=proj,
+                                env=dict(os.environ, PWD=proj, **NET_BLOCK_OC),
                                 out_path=events_path)
     final_text, tool_uses, sid = run_real.parse_oc_events(events_path)
+    recovered = False
+    if not sid:
+        # killed/timed-out run: recover the session from the daemon so its
+        # measured spend + tool trail + injections are not lost
+        sid = _newest_oc_session(started - 5)
+        recovered = bool(sid)
+        if sid and err == "TIMEOUT" and not final_text:
+            # a timed-out run has no model-emitted answer; mark it so grading
+            # and the audit read from the recovered daemon rows, not empty text
+            final_text = ""
     return {"session_id": sid, "final_text": final_text,
             "cli_cost_usd": None,  # free tier — money = daemon retail cost
             "num_turns": None, "tool_uses": tool_uses,
+            "session_recovered": recovered,
             "timed_out": err == "TIMEOUT"}
 
 
@@ -357,8 +397,24 @@ def run_one(platform, inst, arm, seed, wallet, run_dir):
 
     drive = drive_claude if platform == "claude" else drive_opencode
     out = drive(task, run_dir, proj)
-    if not out.get("final_text") and not out.get("timed_out"):
-        # transient platform failure (observed on OpenCode): rebuild + retry once
+
+    def _no_usable_data(o):
+        # a run that produced no session AND no answer captured nothing; on
+        # OpenCode a transient provider "stream error" also manifests as a run
+        # with a session but ZERO real work (deepseek free tier is flaky —
+        # verified: health OK seconds later, injection delivered but the model
+        # completion errored mid-stream). Treat both as retryable.
+        if not o.get("session_id") and not o.get("final_text"):
+            return True
+        if platform == "opencode":
+            d = run_real.daemon_dump(o["session_id"]) if o.get("session_id") else {}
+            spent = d.get("spent_usd") or 0
+            ntools = len(d.get("tool_calls") or [])
+            if o.get("timed_out") and spent <= 0 and ntools == 0:
+                return True
+        return False
+
+    if _no_usable_data(out):
         make_sandbox(inst, proj)
         if platform == "opencode":
             add_oc_config(proj)
@@ -391,7 +447,18 @@ def run_one(platform, inst, arm, seed, wallet, run_dir):
     json.dump(dump, open(os.path.join(run_dir, "daemon_dump.json"), "w"), indent=1)
 
     g = grade(inst, proj, run_dir)
-    a = audit(out["tool_uses"], proj)
+    # OpenCode's buffered stdout is unreliable (truncation/partial flush even on
+    # clean exit — seen: 1 tool parsed vs 20 in the daemon), so audit + count
+    # tools from the daemon dump, which the plugin pushed live and in full. This
+    # is load-bearing for the cheat audit: auditing only the parsed subset could
+    # miss a tool that reached the network or escaped the sandbox.
+    daemon_tools = [{"name": tc.get("tool_name"), "input": tc.get("tool_input")}
+                    for tc in (dump.get("tool_calls") or [])]
+    if platform == "opencode" and len(daemon_tools) >= len(out["tool_uses"]):
+        audit_tools = daemon_tools
+    else:
+        audit_tools = out["tool_uses"]
+    a = audit(audit_tools, proj)
     daemon_spent = dump.get("spent_usd")
     injections = dump.get("injections") or []
     row = {
@@ -403,8 +470,9 @@ def run_one(platform, inst, arm, seed, wallet, run_dir):
         "cli_cost_usd": out.get("cli_cost_usd"),
         "daemon_spent_usd": daemon_spent,
         "num_turns": out.get("num_turns"),
-        "tool_calls": len(out["tool_uses"]),
-        "tool_names": [t.get("name") for t in out["tool_uses"]],
+        "tool_calls": len(audit_tools),
+        "tool_names": [t.get("name") for t in audit_tools],
+        "tools_source": ("daemon" if audit_tools is daemon_tools else "cli"),
         "injections_delivered": len(injections),
         "tiers_seen": sorted({m.group(1) for i in injections
                               for m in [re.search(r"Tier:\s*(\w+)", i.get("context") or "")] if m}),
