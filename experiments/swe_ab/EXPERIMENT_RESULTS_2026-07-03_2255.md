@@ -98,6 +98,51 @@ regex false-positives on in-venv `python -c` repro scripts (no host reached).
 that wandered into other host dirs — no writes, no gold access (SWE-bench gold
 lives in the HF dataset, never on disk).
 
+## Findings
+
+1. **Slack is the variable that decides whether an advisory budget saves
+   money.** Identical harness, identical prompts — HotpotQA (no slack) → +2.8%
+   n.s.; SWE-bench (real discretionary slack) → −29% significant. Within this
+   experiment the saving tracks per-instance slack: high on pytest-11148 /
+   pylint-6506 / sympy-21612, ~0 on the cheap sympy issues. The budget trims
+   discretionary exploration and re-verification, not required work.
+
+2. **The budget prevents runaway timeouts.** OFF hit the 900s wall twice
+   (pytest-11148 s1, sympy-21612 s1) — both *failed*. ON completed both cheaper
+   and *succeeded*. Net success went up under budget (0.67 → 0.75), not down.
+
+3. **But budget can also cut work that was actually needed.** sympy-21612 s0:
+   ON stopped earlier ($0.505 vs $0.865) and failed where OFF succeeded. Real
+   downside, 1/12 here. At this wallet size (0.5× OFF median) the runaway wins
+   outnumber the over-cut losses, but the loss is not zero — budget size is a
+   real accuracy/cost knob, not free.
+
+4. **Cheating tends to cost *more*, not less.** The one contaminated run
+   (pip-download the fix) spent $1.039; the honest re-run solved the same issue
+   for $0.307. The detour to fetch and grep a release burned tokens. A money
+   budget therefore has a mild anti-cheat pressure of its own — the expensive
+   shortcut looks expensive.
+
+5. **Bash network egress was a real sandbox hole.** Denying WebSearch/WebFetch
+   *tools* does nothing about `curl`/`pip`/`git` run through bash. A model
+   reached PyPI and read fixed source. Any tool-level web denial that forgets
+   bash is porous. Fixed with a subprocess proxy black-hole (agent-only,
+   Anthropic whitelisted). Lesson for the harness's own threat model: the daemon
+   port is localhost-open and bash is network-capable — sandboxing must be at
+   the process/network layer, not the tool-allowlist layer.
+
+6. **The daemon measures money perfectly even when the CLI is killed.** A 900s
+   timeout emits no `result` event, so the CLI reports no cost and no
+   session_id — but every completed turn was already ingested via the Stop →
+   `/turn/end` hook. Recovering the session_id from `hook.jsonl` read back the
+   full $2.05 of spend from the daemon dump. Measurement does not depend on the
+   agent exiting cleanly; only the *experiment's* sid plumbing did (now fixed).
+
+7. **setuptools-scm vs. history-stripping** (methodology gotcha worth keeping):
+   the venv `-e` install must run while real git history/tags are present, or
+   the package version resolves to `0.1.dev1` and pytest's own `minversion`
+   gate rejects the test run at grade time. Strip `.git` *after* install.
+
 ## Harness features exercised (all live-verified)
 
 - **OFF/ON gating**: OFF arm delivered **0 injections** across all 12 runs while
