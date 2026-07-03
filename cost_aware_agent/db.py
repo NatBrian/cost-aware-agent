@@ -324,6 +324,20 @@ def wallet_spent_usd(conn, project_dir: str) -> float:
 
 # --- aggregation ---
 
+def recent_spend_usd(conn, session_id: str, window_secs: int) -> float:
+    """This session's LLM dollars over the trailing window — pure arithmetic on
+    measured rows (the burn-rate line is measurement the model extrapolates
+    from, never a harness prediction). Uses each usage row's first-seen time:
+    the push path's cumulative UPSERT rewrites cost but not created_at, so one
+    message counts once, at the time it started."""
+    row = conn.execute(
+        "SELECT COALESCE(SUM(cost_usd), 0) AS s FROM llm_usage "
+        "WHERE session_id = ? AND created_at >= ?",
+        (session_id, now() - window_secs),
+    ).fetchone()
+    return float(row["s"])
+
+
 def spent_usd(conn, session_id: str) -> tuple[float, int]:
     """Returns (spent_usd, tool_calls count). Money-only budget: spend is the
     REAL LLM dollar cost of this session, NOT a synthetic per-tool-call charge.

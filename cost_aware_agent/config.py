@@ -39,6 +39,10 @@ DEFAULTS = {
     # from context, not save tokens.
     "inject_mode": "on_change",
     "inject_spend_bucket_pct": 10,
+    # Burn-rate line in the tracker: this session's measured spend over the
+    # trailing window (pure arithmetic on llm_usage timestamps — the model
+    # extrapolates, the harness never predicts). 0 disables the line.
+    "burn_rate_window_secs": 600,
     "streak_warning_threshold": 3,
     "context_mask_threshold_chars": 640000,
     "milestone_tool_patterns": ["Edit", "Write", "edit", "write"],

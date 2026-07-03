@@ -78,6 +78,7 @@ def render_budget_tracker(
     spent_usd: float, budget_estimate_usd: float, tool_calls_used: int | None,
     tier: str, plan_rows, lagging: bool = False, approximate: bool = False,
     price_unknown: bool = False, scope: str = "session estimate",
+    burn_usd: float | None = None, burn_window_secs: int = 600,
 ) -> str:
     """tool_calls_used=None omits the per-call counter line and approximate=True
     prefixes the dollar figures with '~'. Both exist for REBUILT channels
@@ -98,6 +99,13 @@ def render_budget_tracker(
     lag_line = f"{LAG_NOTE}\n" if lagging else ""
     # flips 0->1 at most once per session, so rebuilt-channel byte-stability holds
     price_unknown_line = f"{PRICE_UNKNOWN_NOTE}\n" if price_unknown else ""
+    # measured trailing spend, shown only once non-zero — the model does the
+    # extrapolating (rebuilt-channel callers pass burn quantized to the bucket
+    # step so the line stays byte-stable between transitions)
+    burn_line = ""
+    if burn_usd is not None and burn_usd > 0:
+        burn_line = (f"Burn rate: {approx}${burn_usd:.{dp}f} spent in the last "
+                     f"{max(1, burn_window_secs // 60)} min\n")
     tools_line = (f"Tool calls used: {tool_calls_used}\n"
                   if tool_calls_used is not None else "")
     block = (
@@ -105,6 +113,7 @@ def render_budget_tracker(
         f"LLM cost used: {approx}${spent_usd:.{dp}f}, "
         f"remaining (of {scope}): {approx}${remaining_usd:.{dp}f}\n"
         f"{tools_line}"
+        f"{burn_line}"
         f"Tier: {tier}\n"
         f"{TIER_GUIDANCE[tier]}\n"
         f"{lag_line}"

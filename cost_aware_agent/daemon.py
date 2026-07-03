@@ -188,6 +188,8 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
     # flips at most once per session (0 -> 1), so it does not violate the
     # rebuilt channel's byte-stability requirement
     price_unknown = db.session_has_unknown_priced_usage(conn, session_id)
+    burn_window = int(_config.get("burn_rate_window_secs", 600))
+    burn = db.recent_spend_usd(conn, session_id, burn_window) if burn_window > 0 else 0.0
 
     # Injection policy — both branches exist to stop the harness taxing the
     # session it meters (both taxes were MEASURED, not hypothetical):
@@ -208,9 +210,15 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
         bucket = _spend_bucket(spent, budget)
         pct = max(1, int(_config.get("inject_spend_bucket_pct", 10)))
         spent_display = (bucket * pct / 100.0) * budget if budget > 0 else spent
+        # burn quantized to the same bucket step as spend: an exact per-call
+        # burn figure would mutate the text every call and bust the provider
+        # prompt cache (the measured +92% tax the quantization exists to stop)
+        step = (pct / 100.0) * budget
+        burn_display = int(burn / step) * step if step > 0 else burn
         return prompts.render_budget_tracker(
             spent_display, budget, None, tier, plan_rows, lagging=lagging,
             approximate=True, price_unknown=price_unknown, scope=scope,
+            burn_usd=burn_display, burn_window_secs=burn_window,
         )
 
     if _config.get("inject_mode", "on_change") == "on_change":
@@ -223,6 +231,7 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
     return prompts.render_budget_tracker(
         spent, budget, tool_calls_used, tier, plan_rows, lagging=lagging,
         price_unknown=price_unknown, scope=scope,
+        burn_usd=burn, burn_window_secs=burn_window,
     )
 
 
