@@ -63,6 +63,9 @@ export const CostAwareAgentPlugin: Plugin = async ({ $ }) => {
           session_id: sessionID,
           cli: "opencode",
           model: input.model?.id ?? "",
+          // wallet key. PWD first: OpenCode resolves its project root from the
+          // PWD env var, not the real cwd (verified live 2026-07-03 handoff §8)
+          project_dir: process.env["PWD"] ?? process.cwd(),
         });
         if (res?.additionalContext) output.system.push(res.additionalContext);
         return;

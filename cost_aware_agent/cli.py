@@ -52,7 +52,8 @@ BODY=$(echo "$INPUT" | jq \\
     tool_name: $tool,
     tool_input: (.tool_input // {{}}),
     tool_result: ((.tool_response // .tool_result // "") | tostring),
-    transcript_path: $tp
+    transcript_path: $tp,
+    project_dir: (.cwd // "")
   }}')
 
 CONTEXT=$(curl -sf -m 5 -X POST "$URL" -H "Content-Type: application/json" -d "$BODY" 2>/dev/null | \\
@@ -162,6 +163,49 @@ def cmd_install(args):
         sys.exit(1)
 
 
+def _resolved_project_dir(path: str) -> str:
+    # wallets are keyed by absolute path — adapters send absolute cwds, so the
+    # CLI must resolve too or "." and "/home/u/proj" would be different wallets
+    return str(Path(path).resolve())
+
+
+def cmd_budget_set(args):
+    from cost_aware_agent import db
+    project_dir = _resolved_project_dir(args.project_dir)
+    db.init_db()
+    with db.get_conn() as conn:
+        db.set_wallet(conn, project_dir, args.amount)
+    print(f"wallet set: ${args.amount:.2f} for {project_dir}")
+    print("depletes across all sessions in this project until exhausted (advisory only)")
+
+
+def cmd_budget_show(args):
+    from cost_aware_agent import db
+    project_dir = _resolved_project_dir(args.project_dir)
+    db.init_db()
+    with db.get_conn() as conn:
+        wallet = db.get_wallet(conn, project_dir)
+        if wallet is None:
+            print(f"no wallet for {project_dir} — set one with: cost-aware-agent budget set <amount>")
+            return
+        spent = db.wallet_spent_usd(conn, project_dir)
+    budget = wallet["budget_usd"]
+    print(f"project:   {project_dir}")
+    print(f"budget:    ${budget:.2f}")
+    print(f"spent:     ${spent:.4f}")
+    print(f"remaining: ${max(0.0, budget - spent):.4f}")
+
+
+def cmd_init(args):
+    # "one number from the user, maximum": init IS budget-set (plus a hint to
+    # install the adapter if that hasn't happened yet)
+    cmd_budget_set(args)
+    settings = Path(args.project_dir) / ".claude" / "settings.json"
+    if not settings.exists() and not (Path(args.project_dir) / ".opencode").exists():
+        print("hint: no adapter detected in this project — run "
+              "`cost-aware-agent install --for claude-code --project-dir .`")
+
+
 def cmd_status(args):
     try:
         with urllib.request.urlopen(f"{DAEMON_URL}/status/{args.session_id}", timeout=2) as resp:
@@ -190,6 +234,21 @@ def main():
     status_p = sub.add_parser("status")
     status_p.add_argument("session_id")
     status_p.set_defaults(func=cmd_status)
+
+    init_p = sub.add_parser("init", help="set the project's dollar budget (one number)")
+    init_p.add_argument("--budget", dest="amount", type=float, required=True)
+    init_p.add_argument("--project-dir", default=".")
+    init_p.set_defaults(func=cmd_init)
+
+    budget_p = sub.add_parser("budget")
+    budget_sub = budget_p.add_subparsers(dest="budget_command", required=True)
+    budget_set_p = budget_sub.add_parser("set")
+    budget_set_p.add_argument("amount", type=float)
+    budget_set_p.add_argument("--project-dir", default=".")
+    budget_set_p.set_defaults(func=cmd_budget_set)
+    budget_show_p = budget_sub.add_parser("show")
+    budget_show_p.add_argument("--project-dir", default=".")
+    budget_show_p.set_defaults(func=cmd_budget_show)
 
     args = parser.parse_args()
     args.func(args)

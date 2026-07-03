@@ -22,7 +22,19 @@ CREATE TABLE IF NOT EXISTS sessions (
     low_tier_continue_streak INTEGER DEFAULT 0,
     last_inject_tier TEXT,
     last_inject_bucket INTEGER,
+    project_dir TEXT,                  -- links the session to a project wallet
+    budget_override_usd REAL,          -- explicit per-session budget (beats wallet + config)
     created_at INTEGER
+);
+
+-- Project wallet: ONE number from the user ("$10 for my project"), depleting
+-- across every session run in that project dir until exhausted. The session
+-- budget becomes a view over the wallet, not a per-session reset.
+CREATE TABLE IF NOT EXISTS wallets (
+    project_dir TEXT PRIMARY KEY,
+    budget_usd REAL,
+    created_at INTEGER,
+    updated_at INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS llm_usage (
@@ -96,6 +108,10 @@ def init_db() -> None:
             conn.execute("ALTER TABLE sessions ADD COLUMN last_inject_tier TEXT")
         if "last_inject_bucket" not in cols:
             conn.execute("ALTER TABLE sessions ADD COLUMN last_inject_bucket INTEGER")
+        if "project_dir" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN project_dir TEXT")
+        if "budget_override_usd" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN budget_override_usd REAL")
         usage_cols = {r["name"] for r in conn.execute("PRAGMA table_info(llm_usage)")}
         if "price_unknown" not in usage_cols:
             conn.execute("ALTER TABLE llm_usage ADD COLUMN price_unknown INTEGER DEFAULT 0")
@@ -126,6 +142,23 @@ def insert_session(conn, session_id: str, cli: str, task: str, model: str) -> No
         "(session_id, cli, task, model, start_time, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         (session_id, cli, task, model, now(), now()),
     )
+
+
+def set_session_budget_source(conn, session_id: str, project_dir: str | None,
+                              budget_override_usd: float | None) -> None:
+    """Written from /session/start, which is authoritative for both fields —
+    but hooks re-fire SessionStart (e.g. source=compact after compaction), so
+    never clobber an existing non-null value with a null one."""
+    if project_dir:
+        conn.execute(
+            "UPDATE sessions SET project_dir = ? WHERE session_id = ?",
+            (project_dir, session_id),
+        )
+    if budget_override_usd is not None:
+        conn.execute(
+            "UPDATE sessions SET budget_override_usd = ? WHERE session_id = ?",
+            (budget_override_usd, session_id),
+        )
 
 
 def get_session(conn, session_id: str):
@@ -255,6 +288,38 @@ def update_plan_status(conn, session_id: str, item_id: int, status: str) -> None
         "UPDATE plan SET status = ?, updated_at = ? WHERE session_id = ? AND id = ?",
         (status, now(), session_id, item_id),
     )
+
+
+# --- wallets ---
+
+def set_wallet(conn, project_dir: str, budget_usd: float) -> None:
+    conn.execute(
+        "INSERT INTO wallets (project_dir, budget_usd, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(project_dir) DO UPDATE SET budget_usd = excluded.budget_usd, "
+        " updated_at = excluded.updated_at",
+        (project_dir, budget_usd, now(), now()),
+    )
+
+
+def get_wallet(conn, project_dir: str | None):
+    if not project_dir:
+        return None
+    return conn.execute(
+        "SELECT * FROM wallets WHERE project_dir = ?", (project_dir,)
+    ).fetchone()
+
+
+def wallet_spent_usd(conn, project_dir: str) -> float:
+    """Real LLM dollars across ALL sessions of this project — the wallet
+    depletes over the project's lifetime, not per session."""
+    row = conn.execute(
+        "SELECT COALESCE(SUM(u.cost_usd), 0) AS s FROM llm_usage u "
+        "JOIN sessions s ON s.session_id = u.session_id "
+        "WHERE s.project_dir = ?",
+        (project_dir,),
+    ).fetchone()
+    return float(row["s"])
 
 
 # --- aggregation ---

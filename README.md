@@ -39,6 +39,13 @@ A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) tracks cost per session
   that parent-only parsing missed.
 - **Budget Tracker** — injects current spend, remaining budget, tier
   (HIGH/MEDIUM/LOW/CRITICAL), and tier guidance.
+- **Project wallet** — one number from the user, maximum: `cost-aware-agent
+  init --budget 10` gives the project a dollar wallet that **depletes across
+  every session** in that directory until exhausted (the session budget is a
+  view over the wallet, not a per-session reset). Resolution order for a
+  session's budget: explicit `/session/start` override (used by experiments to
+  switch conditions without a daemon restart) → project wallet → config
+  default. `cost-aware-agent budget show` prints budget/spent/remaining.
 - **Injection policy (anti-tax)** — on accumulating channels (Claude Code's
   `additionalContext` persists in the conversation) the tracker is re-injected
   **only when the signal changes**: tier transition, or spend crossing another
@@ -72,7 +79,12 @@ unreachable, adapters silently no-op rather than blocking the agent.
 pip install -e .
 cost-aware-agent install --for claude-code --project-dir .
 # or: cost-aware-agent install --for opencode --project-dir .
+cost-aware-agent init --budget 10        # "$10 for my project" — the one number
+cost-aware-agent budget show             # budget / spent / remaining
 ```
+
+(Re-run `install` after upgrading — it rewrites the hook script, which the
+adapters depend on for fields like `project_dir`.)
 
 Run the unit tests with `python3 -m pytest tests/`.
 

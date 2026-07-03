@@ -102,8 +102,8 @@ def _handle_verification(conn, session_id: str, raw_response: str) -> Optional[s
     for item_id, status in items:
         db.update_plan_status(conn, session_id, item_id, status)
 
-    spent, _ = db.spent_usd(conn, session_id)
-    tier, _ = cost.compute_tier(spent, _config["session_budget_estimate_usd"])
+    spent, budget, _scope = _budget_view(conn, session_id)
+    tier, _ = cost.compute_tier(spent, budget)
 
     session = db.get_session(conn, session_id)
     current_streak = session["low_tier_continue_streak"] if session else 0
@@ -137,6 +137,30 @@ def _deliver(conn, session_id: str, endpoint: str, context):
     return delivered
 
 
+def _budget_view(conn, session_id: str) -> tuple[float, float, str]:
+    """(spent, budget, scope_label) for the session's budget pressure.
+
+    Resolution order:
+      1. per-session override sent on /session/start (experiments switch
+         conditions without a daemon restart)
+      2. project wallet — ONE user number ("$10 for my project") depleting
+         across every session of the project; spend/budget are project-level
+      3. config default (per-session estimate)
+    scope_label feeds the tracker text so the model knows whether the number
+    is this session's estimate or the project's remaining wallet."""
+    session = db.get_session(conn, session_id)
+    if session is not None:
+        if session["budget_override_usd"] is not None:
+            spent, _ = db.spent_usd(conn, session_id)
+            return spent, float(session["budget_override_usd"]), "session estimate"
+        wallet = db.get_wallet(conn, session["project_dir"])
+        if wallet is not None:
+            spent = db.wallet_spent_usd(conn, session["project_dir"])
+            return spent, float(wallet["budget_usd"]), "project wallet"
+    spent, _ = db.spent_usd(conn, session_id)
+    return spent, _config["session_budget_estimate_usd"], "session estimate"
+
+
 def _spend_bucket(spent: float, budget: float) -> int:
     """Which inject_spend_bucket_pct slice of the budget spend sits in. Past
     100% the cadence coarsens to one bucket per HALF-budget overspent: the
@@ -157,9 +181,9 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
     # Budget is ALWAYS money: the real dollar cost of LLM API calls this session
     # versus the session's dollar budget. There is no tool-call budget mode —
     # cost is money, not a count of actions.
-    spent, tool_calls_used = db.spent_usd(conn, session_id)
+    _, tool_calls_used = db.spent_usd(conn, session_id)
     plan_rows = db.get_plan(conn, session_id)
-    budget = _config["session_budget_estimate_usd"]
+    spent, budget, scope = _budget_view(conn, session_id)
     tier, _ = cost.compute_tier(spent, budget)
     # flips at most once per session (0 -> 1), so it does not violate the
     # rebuilt channel's byte-stability requirement
@@ -186,7 +210,7 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
         spent_display = (bucket * pct / 100.0) * budget if budget > 0 else spent
         return prompts.render_budget_tracker(
             spent_display, budget, None, tier, plan_rows, lagging=lagging,
-            approximate=True, price_unknown=price_unknown,
+            approximate=True, price_unknown=price_unknown, scope=scope,
         )
 
     if _config.get("inject_mode", "on_change") == "on_change":
@@ -198,7 +222,7 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
 
     return prompts.render_budget_tracker(
         spent, budget, tool_calls_used, tier, plan_rows, lagging=lagging,
-        price_unknown=price_unknown,
+        price_unknown=price_unknown, scope=scope,
     )
 
 
@@ -210,6 +234,11 @@ class SessionStartReq(BaseModel):
     task: str = ""
     model: str = ""
     transcript_path: Optional[str] = None
+    # links the session to a project wallet (adapters send the project cwd)
+    project_dir: Optional[str] = None
+    # explicit per-session budget — beats wallet and config; lets experiments
+    # switch conditions per session instead of restarting the daemon per config
+    budget_usd: Optional[float] = None
 
 
 class ToolPreReq(BaseModel):
@@ -264,6 +293,7 @@ def health():
 def session_start(req: SessionStartReq):
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, req.cli, req.task, req.model)
+        db.set_session_budget_source(conn, req.session_id, req.project_dir, req.budget_usd)
         _ingest_transcript(conn, req.session_id, req.transcript_path)
         context = _deliver(conn, req.session_id, "session/start", prompts.PLANNING_PROMPT)
     return {"additionalContext": context}
@@ -369,11 +399,17 @@ def session_dump(session_id: str):
         def rows(sql):
             return [dict(r) for r in conn.execute(sql, (session_id,)).fetchall()]
         session = db.get_session(conn, session_id)
-        spent, tool_calls_used = db.spent_usd(conn, session_id)
-        tier, _ = cost.compute_tier(spent, _config["session_budget_estimate_usd"])
+        session_spent, _ = db.spent_usd(conn, session_id)
+        view_spent, budget, scope = _budget_view(conn, session_id)
+        tier, _ = cost.compute_tier(view_spent, budget)
         dump = {
             "session": dict(session) if session else None,
-            "spent_usd": spent,
+            # this session's own spend — stable meaning regardless of wallet
+            "spent_usd": session_spent,
+            # what the budget pressure was computed from (wallet-level when a
+            # project wallet is active, session-level otherwise)
+            "budget_view": {"spent_usd": view_spent, "budget_usd": budget,
+                            "scope": scope},
             "tier": tier,
             "llm_usage": rows("SELECT * FROM llm_usage WHERE session_id = ? ORDER BY id"),
             "tool_calls": rows("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY id"),
@@ -386,11 +422,15 @@ def session_dump(session_id: str):
 @app.get("/status/{session_id}")
 def status(session_id: str):
     with db.get_conn() as conn:
-        spent, _ = db.spent_usd(conn, session_id)
-        tier, _ = cost.compute_tier(spent, _config["session_budget_estimate_usd"])
+        session_spent, _ = db.spent_usd(conn, session_id)
+        view_spent, budget, scope = _budget_view(conn, session_id)
+        tier, _ = cost.compute_tier(view_spent, budget)
         plan_rows = db.get_plan(conn, session_id)
         plan = [
             {"id": r["id"], "type": r["clue_type"], "text": r["clue_text"], "status": r["status"]}
             for r in plan_rows
         ]
-    return {"spent_usd": spent, "tier": tier, "plan": plan}
+    return {"spent_usd": session_spent,
+            "budget_view": {"spent_usd": view_spent, "budget_usd": budget,
+                            "scope": scope},
+            "tier": tier, "plan": plan}

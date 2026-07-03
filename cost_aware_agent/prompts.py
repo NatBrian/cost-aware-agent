@@ -77,7 +77,7 @@ PRICE_UNKNOWN_NOTE = ("Warning: some LLM calls this session used a model with no
 def render_budget_tracker(
     spent_usd: float, budget_estimate_usd: float, tool_calls_used: int | None,
     tier: str, plan_rows, lagging: bool = False, approximate: bool = False,
-    price_unknown: bool = False,
+    price_unknown: bool = False, scope: str = "session estimate",
 ) -> str:
     """tool_calls_used=None omits the per-call counter line and approximate=True
     prefixes the dollar figures with '~'. Both exist for REBUILT channels
@@ -103,7 +103,7 @@ def render_budget_tracker(
     block = (
         "Budget Tracker <budget>\n"
         f"LLM cost used: {approx}${spent_usd:.{dp}f}, "
-        f"remaining (of session estimate): {approx}${remaining_usd:.{dp}f}\n"
+        f"remaining (of {scope}): {approx}${remaining_usd:.{dp}f}\n"
         f"{tools_line}"
         f"Tier: {tier}\n"
         f"{TIER_GUIDANCE[tier]}\n"
