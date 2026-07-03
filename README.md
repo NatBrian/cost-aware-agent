@@ -96,6 +96,24 @@ the model gets wrong without tools (all 10 kept have closed-book F1 = 0.0 → re
 (global settings override `--allowedTools ""`); fixed with an empty sandbox CWD + hard
 `--disallowedTools`. Every reported run is audit-clean (`web_requests=0`, `dirty=none`).
 
+### Does it hold in *real* Claude Code? (`experiments/cc_adapter/`)
+
+The HotpotQA harness fed the Budget Tracker straight into the model's **prompt** (high
+salience). Real Claude Code delivers hook output as a low-salience `additionalContext`
+system-reminder — so a second experiment drives a real `claude -p` (CC's own agent loop +
+native tools) with the **live PreToolUse hook** injecting the budget, on a 10-file sandbox.
+Full method + tables in
+[`experiments/cc_adapter/EXPERIMENT_RESULTS_cc_adapter_2026-07-03_1327.md`](experiments/cc_adapter/EXPERIMENT_RESULTS_cc_adapter_2026-07-03_1327.md).
+
+**Result: the effect is real but conditional on task slack.** On a *discretionary* task
+(brief overview, budget $0.05 → CRITICAL) the model took the cheap path — `Glob` + summarize
+instead of reading files — cutting **tool calls −56% / cost −9%** with coverage held. On a
+*hard-requirement* task (find all bugs) it refused to trade recall for budget — same tool
+count, +44% cost (injection token-tax). That is close to ideal economic judgement: spend less
+when the marginal work is optional, don't cut corners when it isn't. **Limitation found:** CC
+has no per-turn usage hook, so in-session spend lags (the injected tier can stay static within
+one session); BATS-style *escalating* pressure isn't deliverable on CC today.
+
 ## Status
 
 - Claude Code adapter — built, live-verified against real sessions. Planning/Self-Verification

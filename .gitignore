@@ -23,3 +23,8 @@ research-budget-injection.md
 
 # contaminated pre-integrity-fix runs, kept local for provenance
 experiments/hotpotqa/_prelim_archive/
+
+# real-CC adapter experiment: per-run traces (regenerable) + the runtime-generated
+# hook settings file. results/run_summaries.json IS committed (the snapshot).
+experiments/cc_adapter/runs/
+experiments/cc_adapter/.hooks_settings.json
