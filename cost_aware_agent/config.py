@@ -44,6 +44,11 @@ DEFAULTS = {
     # extrapolates, the harness never predicts). 0 disables the line.
     "burn_rate_window_secs": 600,
     "streak_warning_threshold": 3,
+    # Planning checklist + Self-Verification XML + streak counter: never
+    # demonstrated value in any experiment (hotpotqa, cc_adapter, real_cli) and
+    # add prompt surface the model can game. OFF by default (§6: less harness
+    # judgment, more model judgment); code paths stay dormant behind this flag.
+    "enable_plan_verification": False,
     "context_mask_threshold_chars": 640000,
     "milestone_tool_patterns": ["Edit", "Write", "edit", "write"],
     "milestone_bash_test_patterns": [

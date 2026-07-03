@@ -53,7 +53,8 @@ BODY=$(echo "$INPUT" | jq \\
     tool_input: (.tool_input // {{}}),
     tool_result: ((.tool_response // .tool_result // "") | tostring),
     transcript_path: $tp,
-    project_dir: (.cwd // "")
+    project_dir: (.cwd // ""),
+    source: (.source // "")
   }}')
 
 CONTEXT=$(curl -sf -m 5 -X POST "$URL" -H "Content-Type: application/json" -d "$BODY" 2>/dev/null | \\

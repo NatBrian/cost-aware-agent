@@ -62,9 +62,14 @@ A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) tracks cost per session
   (`injections` table). `GET /session/<id>/dump` exports a session's full history:
   LLM usage rows, tool calls, every injected text, plan state — runs are
   replayable and debuggable from the daemon alone.
-- **Planning / Self-Verification** — session-start checklist prompt and
-  milestone-triggered verification prompts (BATS-style), tracked in the `plan`
-  table.
+- **Compaction survival** — Claude Code re-fires SessionStart with
+  `source=compact` after compaction, which wipes every accumulated injection
+  from the conversation; the daemon detects it, resets its on_change state,
+  and re-delivers the tracker immediately (same for `clear`).
+- **Planning / Self-Verification (dormant)** — session-start checklist and
+  milestone-triggered verification prompts (BATS-style) never demonstrated
+  value in any experiment and are **off by default**
+  (`enable_plan_verification: false`); the code paths stay behind the flag.
 
 Two adapters, two capture mechanisms:
 

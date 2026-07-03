@@ -58,11 +58,12 @@ def _ingest_transcript(conn, session_id: str, transcript_path: Optional[str]) ->
     paths = [(transcript_path, True)] + [
         (p, False) for p in transcript.subagent_transcript_paths(transcript_path)
     ]
+    plan_enabled = _config.get("enable_plan_verification", False)
     for path, is_parent in paths:
         turns = transcript.parse_new_assistant_turns(path, seen)
         for turn in turns:
             seen.add(turn["message_id"])
-            if is_parent and not plan_seeded:
+            if plan_enabled and is_parent and not plan_seeded:
                 plan_seeded = _seed_checklist_if_new(conn, session_id, turn["text"])
 
             model = turn["model"]
@@ -91,7 +92,7 @@ def _ingest_transcript(conn, session_id: str, transcript_path: Optional[str]) ->
                 cache_creation_1h_tokens=cache_1h,
                 price_unknown=price_unknown,
             )
-            if is_parent and transcript.has_verification_block(turn["text"]):
+            if plan_enabled and is_parent and transcript.has_verification_block(turn["text"]):
                 _handle_verification(conn, session_id, turn["text"])
 
 
@@ -257,6 +258,8 @@ class SessionStartReq(BaseModel):
     # explicit per-session budget — beats wallet and config; lets experiments
     # switch conditions per session instead of restarting the daemon per config
     budget_usd: Optional[float] = None
+    # Claude Code SessionStart source: startup | resume | clear | compact
+    source: str = ""
 
 
 class ToolPreReq(BaseModel):
@@ -313,7 +316,19 @@ def session_start(req: SessionStartReq):
         db.insert_session(conn, req.session_id, req.cli, req.task, req.model)
         db.set_session_budget_source(conn, req.session_id, req.project_dir, req.budget_usd)
         _ingest_transcript(conn, req.session_id, req.transcript_path)
-        context = _deliver(conn, req.session_id, "session/start", prompts.PLANNING_PROMPT)
+        if req.source in ("compact", "clear"):
+            # compaction/clear wiped every accumulated injection from the
+            # conversation — the model no longer sees ANY budget state. Reset
+            # the on_change dedup state so the next render is a guaranteed
+            # delivery, and hand the tracker over right here.
+            db.set_inject_state(conn, req.session_id, None, None, None)
+            context = _tracker_context(conn, req.session_id,
+                                       lagging=bool(req.transcript_path))
+        elif _config.get("enable_plan_verification", False):
+            context = prompts.PLANNING_PROMPT
+        else:
+            context = None
+        context = _deliver(conn, req.session_id, "session/start", context)
     return {"additionalContext": context}
 
 
@@ -341,7 +356,8 @@ def tool_post(req: ToolPostReq):
             str(req.tool_input)[:2000], (req.tool_result or "")[:500],
             cost.cost_tool_call(_config),
         )
-        milestone = prompts.is_milestone(req.tool_name, req.tool_input, _config)
+        milestone = (_config.get("enable_plan_verification", False)
+                     and prompts.is_milestone(req.tool_name, req.tool_input, _config))
         context = prompts.SELF_VERIFICATION_PROMPT if milestone else None
         context = _deliver(conn, req.session_id, "tool/post", context)
     return {"additionalContext": context}
@@ -351,7 +367,8 @@ def tool_post(req: ToolPostReq):
 def verification_result(req: VerificationResultReq):
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, "", "", "")
-        context = _handle_verification(conn, req.session_id, req.raw_response)
+        context = (_handle_verification(conn, req.session_id, req.raw_response)
+                   if _config.get("enable_plan_verification", False) else None)
         # Must gate like every other endpoint: when inject_enabled is False (the
         # A/B OFF arm) this streak nudge must be suppressed too, else the OFF
         # control leaks injected [STREAK] text on the OpenCode push path.
@@ -363,7 +380,8 @@ def verification_result(req: VerificationResultReq):
 def plan_seed(req: PlanSeedReq):
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, "", "", "")
-        _seed_checklist_if_new(conn, req.session_id, req.raw_response)
+        if _config.get("enable_plan_verification", False):
+            _seed_checklist_if_new(conn, req.session_id, req.raw_response)
     return {"additionalContext": None}
 
 
