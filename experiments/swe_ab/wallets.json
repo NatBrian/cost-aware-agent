@@ -7,6 +7,13 @@
     "sympy__sympy-22714": 0.162418,
     "sympy__sympy-21612": 0.447895
   },
-  "opencode": {},
+  "opencode": {
+    "sympy__sympy-24213": 0.002536,
+    "pytest-dev__pytest-11143": 0.002073,
+    "pytest-dev__pytest-11148": 0.008133,
+    "pylint-dev__pylint-6506": 0.004404,
+    "sympy__sympy-22714": 0.007843,
+    "sympy__sympy-21612": 0.006591
+  },
   "_rule": "wallet = 0.5 x per-instance OFF median"
 }

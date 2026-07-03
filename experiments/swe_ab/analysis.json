@@ -69,6 +69,54 @@
   },
   {
     "platform": "opencode",
-    "error": "no common pairs"
+    "pairs": 2,
+    "off": {
+      "cost": 0.0116628148,
+      "tools": 14.5,
+      "success": 0.5,
+      "injections": 0
+    },
+    "on": {
+      "cost": 0.079684374,
+      "tools": 17.5,
+      "success": 0.5,
+      "injections": 17.5
+    },
+    "saved_usd_per_task": -0.0680215592,
+    "saved_pct": -583.2344967014309,
+    "money_stats": {
+      "n": 2,
+      "mean": -0.0680215592,
+      "sd": 0.09489380244296908,
+      "t": -1.014,
+      "tcrit": 12.706,
+      "ci95": [
+        -0.9205948097472,
+        0.7845516913472
+      ],
+      "significant": false
+    },
+    "tool_stats": {
+      "n": 2,
+      "mean": -3,
+      "sd": 9.899494936611665,
+      "t": -0.429,
+      "tcrit": 12.706,
+      "ci95": [
+        -91.942,
+        85.942
+      ],
+      "significant": false
+    },
+    "per_instance_saving": {
+      "pytest-dev__pytest-11143": [
+        -0.00092
+      ],
+      "pytest-dev__pytest-11148": [
+        -0.13512
+      ]
+    },
+    "audit_clean_all": false,
+    "timeouts": 0
   }
 ]
