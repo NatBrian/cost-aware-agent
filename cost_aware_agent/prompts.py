@@ -159,5 +159,16 @@ Given your checklist status and the Budget Tracker above, decide:
   share → stop this approach, try an alternative"""
 
 
+def spend_audit_question(delta_usd: float, budget_usd: float) -> str:
+    """Model-driven self-audit at spend milestones — replaces rule-based
+    dead-end detection (the harness never judges behavior; it states the
+    measured number and asks). Appended to the tracker when spend crosses
+    another budget slice on an accumulating channel."""
+    dp = 2 if budget_usd >= 0.095 or budget_usd <= 0 else 4
+    return (f"[BUDGET CHECKPOINT] You have spent ${delta_usd:.{dp}f} since the "
+            "last check. In one sentence: what did that spend buy? If it "
+            "bought nothing new, change course or finalize now.")
+
+
 def streak_fact(streak: int) -> str:
     return f"[STREAK] You have chosen CONTINUE {streak} times in a row while budget was LOW or CRITICAL."

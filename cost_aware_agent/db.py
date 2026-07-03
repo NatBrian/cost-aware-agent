@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     last_inject_bucket INTEGER,
     project_dir TEXT,                  -- links the session to a project wallet
     budget_override_usd REAL,          -- explicit per-session budget (beats wallet + config)
+    last_inject_spent_usd REAL,        -- spend at the last delivered tracker (self-audit delta)
     created_at INTEGER
 );
 
@@ -112,6 +113,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE sessions ADD COLUMN project_dir TEXT")
         if "budget_override_usd" not in cols:
             conn.execute("ALTER TABLE sessions ADD COLUMN budget_override_usd REAL")
+        if "last_inject_spent_usd" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN last_inject_spent_usd REAL")
         usage_cols = {r["name"] for r in conn.execute("PRAGMA table_info(llm_usage)")}
         if "price_unknown" not in usage_cols:
             conn.execute("ALTER TABLE llm_usage ADD COLUMN price_unknown INTEGER DEFAULT 0")
@@ -173,20 +176,23 @@ def mark_session_ended(conn, session_id: str) -> None:
     )
 
 
-def get_inject_state(conn, session_id: str) -> tuple[str | None, int | None]:
+def get_inject_state(conn, session_id: str) -> tuple[str | None, int | None, float | None]:
     row = conn.execute(
-        "SELECT last_inject_tier, last_inject_bucket FROM sessions WHERE session_id = ?",
+        "SELECT last_inject_tier, last_inject_bucket, last_inject_spent_usd "
+        "FROM sessions WHERE session_id = ?",
         (session_id,),
     ).fetchone()
     if row is None:
-        return None, None
-    return row["last_inject_tier"], row["last_inject_bucket"]
+        return None, None, None
+    return row["last_inject_tier"], row["last_inject_bucket"], row["last_inject_spent_usd"]
 
 
-def set_inject_state(conn, session_id: str, tier: str, bucket: int) -> None:
+def set_inject_state(conn, session_id: str, tier: str, bucket: int,
+                     spent_usd: float) -> None:
     conn.execute(
-        "UPDATE sessions SET last_inject_tier = ?, last_inject_bucket = ? WHERE session_id = ?",
-        (tier, bucket, session_id),
+        "UPDATE sessions SET last_inject_tier = ?, last_inject_bucket = ?, "
+        "last_inject_spent_usd = ? WHERE session_id = ?",
+        (tier, bucket, spent_usd, session_id),
     )
 
 

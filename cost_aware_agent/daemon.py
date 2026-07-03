@@ -221,18 +221,27 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
             burn_usd=burn_display, burn_window_secs=burn_window,
         )
 
+    audit_question = None
     if _config.get("inject_mode", "on_change") == "on_change":
         bucket = _spend_bucket(spent, budget)
-        last_tier, last_bucket = db.get_inject_state(conn, session_id)
+        last_tier, last_bucket, last_spent = db.get_inject_state(conn, session_id)
         if tier == last_tier and bucket == last_bucket:
             return None
-        db.set_inject_state(conn, session_id, tier, bucket)
+        # spend milestone (not a mere tier relabel): ask the model to account
+        # for the delta — model-driven self-audit instead of rule-based
+        # dead-end detection (§6 philosophy: the harness measures, the model judges)
+        if last_bucket is not None and bucket > last_bucket:
+            delta = spent - (last_spent or 0.0)
+            if delta > 0:
+                audit_question = prompts.spend_audit_question(delta, budget)
+        db.set_inject_state(conn, session_id, tier, bucket, spent)
 
-    return prompts.render_budget_tracker(
+    tracker = prompts.render_budget_tracker(
         spent, budget, tool_calls_used, tier, plan_rows, lagging=lagging,
         price_unknown=price_unknown, scope=scope,
         burn_usd=burn, burn_window_secs=burn_window,
     )
+    return f"{tracker}\n\n{audit_question}" if audit_question else tracker
 
 
 # --- request/response models ---

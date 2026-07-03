@@ -53,13 +53,13 @@ def test_spend_is_money_only_tool_calls_do_not_count(conn):
 
 def test_inject_state_roundtrip(conn):
     db.insert_session(conn, "s4", "x", "", "m")
-    assert db.get_inject_state(conn, "s4") == (None, None)
-    db.set_inject_state(conn, "s4", "MEDIUM", 3)
-    assert db.get_inject_state(conn, "s4") == ("MEDIUM", 3)
+    assert db.get_inject_state(conn, "s4") == (None, None, None)
+    db.set_inject_state(conn, "s4", "MEDIUM", 3, 0.35)
+    assert db.get_inject_state(conn, "s4") == ("MEDIUM", 3, 0.35)
 
 
 def test_inject_state_missing_session(conn):
-    assert db.get_inject_state(conn, "nope") == (None, None)
+    assert db.get_inject_state(conn, "nope") == (None, None, None)
 
 
 def test_insert_session_is_idempotent(conn):
