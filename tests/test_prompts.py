@@ -73,6 +73,17 @@ def test_tracker_rebuilt_channel_stability_features():
     assert "~$0.10" in t
 
 
+def test_tracker_delegates_judgment_no_canned_verdicts():
+    """§6: the harness states numbers; the model judges. No tier may carry a
+    prescriptive sentence ('finalize now', 'prefer the most promising...')."""
+    for tier in ("HIGH", "MEDIUM", "LOW", "CRITICAL"):
+        t = prompts.render_budget_tracker(0.5, 1.0, 2, tier, [])
+        assert prompts.TIER_DELEGATION in t
+        for verdict in ("Prefer the most promising", "Finalize with current",
+                        "Avoid starting new exploration", "Full exploration budget"):
+            assert verdict not in t
+
+
 def test_tracker_subcent_budget_gets_decimals():
     # a $0.0025 retail budget at :.2f reads "$0.00 of $0.00" — useless numbers
     t = prompts.render_budget_tracker(0.0015, 0.0025, 3, "LOW", [])

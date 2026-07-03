@@ -23,12 +23,15 @@ satisfied / contradicted / unverifiable as you gather evidence. Update your chec
 priority as budget shrinks: narrow exploration breadth and increase verification depth when
 budget is low."""
 
-TIER_GUIDANCE = {
-    "HIGH": "Full exploration budget available. Investigate multiple approaches if the problem is ambiguous.",
-    "MEDIUM": "Budget available but not abundant. Prefer the most promising approach over broad exploration.",
-    "LOW": "Budget constrained. Commit to current approach unless clearly contradicted. Avoid starting new exploration threads.",
-    "CRITICAL": "Budget nearly exhausted. Finalize with current evidence unless it is clearly insufficient.",
-}
+# §6 philosophy (2026-07-03): the harness states measured facts and delegates
+# ALL judgment to the model — we measure the MODEL's economics, not our rule
+# text. The four prescriptive per-tier sentences that used to live here
+# ("Prefer the most promising approach...", "Finalize with current
+# evidence...") are gone: tier labels stay as compact state, and one fixed
+# delegation line replaces the verdicts. (Deviates from the 2026-07-01
+# BATS-mimic decision — superseded by the user-endorsed model-does-the-judgment
+# philosophy.)
+TIER_DELEGATION = "Decide yourself what these numbers mean for your next step."
 
 _ITEM_RE = re.compile(
     r'<item\s+type="(exploration|verification)">(.*?)</item>', re.DOTALL
@@ -115,7 +118,7 @@ def render_budget_tracker(
         f"{tools_line}"
         f"{burn_line}"
         f"Tier: {tier}\n"
-        f"{TIER_GUIDANCE[tier]}\n"
+        f"{TIER_DELEGATION}\n"
         f"{lag_line}"
         f"{price_unknown_line}"
         "</budget>"

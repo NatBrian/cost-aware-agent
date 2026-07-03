@@ -37,8 +37,12 @@ A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) tracks cost per session
   transcript; the daemon discovers and ingests them onto the parent session. On
   a real multi-agent session this was **42% of true spend** ($10.59 of $25.29)
   that parent-only parsing missed.
-- **Budget Tracker** — injects current spend, remaining budget, tier
-  (HIGH/MEDIUM/LOW/CRITICAL), and tier guidance.
+- **Budget Tracker** — injects current spend, remaining budget, measured burn
+  rate, and tier (HIGH/MEDIUM/LOW/CRITICAL). The numbers come with a single
+  delegation line — "decide yourself what these numbers mean" — not canned
+  per-tier verdicts: the harness measures, the model judges. At spend
+  milestones (each 10% budget slice crossed) it asks one accounting question:
+  "what did that spend buy? If nothing new, change course or finalize."
 - **Project wallet** — one number from the user, maximum: `cost-aware-agent
   init --budget 10` gives the project a dollar wallet that **depletes across
   every session** in that directory until exhausted (the session budget is a
