@@ -50,32 +50,49 @@ def _ingest_transcript(conn, session_id: str, transcript_path: Optional[str]) ->
         (session_id,),
     ).fetchall()
     seen = {r["message_id"] for r in seen_rows}
-    turns = transcript.parse_new_assistant_turns(transcript_path, seen)
     plan_seeded = len(db.get_plan(conn, session_id)) > 0
-    for turn in turns:
-        if not plan_seeded:
-            plan_seeded = _seed_checklist_if_new(conn, session_id, turn["text"])
+    # Task-tool subagents write SEPARATE transcripts (see
+    # transcript.subagent_transcript_paths) — skipping them leaves all subagent
+    # LLM spend unmeasured. Their spend lands on the parent session; only the
+    # parent's own text drives checklist seeding / verification parsing.
+    paths = [(transcript_path, True)] + [
+        (p, False) for p in transcript.subagent_transcript_paths(transcript_path)
+    ]
+    for path, is_parent in paths:
+        turns = transcript.parse_new_assistant_turns(path, seen)
+        for turn in turns:
+            seen.add(turn["message_id"])
+            if is_parent and not plan_seeded:
+                plan_seeded = _seed_checklist_if_new(conn, session_id, turn["text"])
 
-        model = turn["model"]
-        usage = turn["usage"]
-        cache_1h = usage["cache_creation_1h_tokens"]
-        # clamp: a malformed payload with 1h > total must not yield negative 5m
-        # tokens (which would *reduce* computed cost).
-        cache_5m = max(0, usage["cache_creation_tokens"] - cache_1h)
-        c = cost.cost_llm_usage(
-            model,
-            usage["input_tokens"], usage["output_tokens"],
-            usage["cache_read_tokens"], cache_5m, cache_1h,
-        )
-        db.insert_llm_usage(
-            conn, session_id, model,
-            usage["input_tokens"], usage["output_tokens"],
-            usage["cache_read_tokens"], usage["cache_creation_tokens"],
-            c, source="pull", message_id=turn["message_id"],
-            cache_creation_1h_tokens=cache_1h,
-        )
-        if transcript.has_verification_block(turn["text"]):
-            _handle_verification(conn, session_id, turn["text"])
+            model = turn["model"]
+            usage = turn["usage"]
+            cache_1h = usage["cache_creation_1h_tokens"]
+            # clamp: a malformed payload with 1h > total must not yield negative 5m
+            # tokens (which would *reduce* computed cost).
+            cache_5m = max(0, usage["cache_creation_tokens"] - cache_1h)
+            c = cost.cost_llm_usage(
+                model,
+                usage["input_tokens"], usage["output_tokens"],
+                usage["cache_read_tokens"], cache_5m, cache_1h,
+            )
+            # zero-token rows (CC synthetic '<synthetic>' entries) spent nothing —
+            # flagging them would put a permanent spurious warning in the tracker.
+            total_tokens = (usage["input_tokens"] + usage["output_tokens"]
+                            + usage["cache_read_tokens"] + usage["cache_creation_tokens"])
+            _, price_unknown = cost.resolve_price(model)
+            price_unknown = price_unknown and total_tokens > 0
+            db.insert_llm_usage(
+                conn, session_id, model,
+                usage["input_tokens"], usage["output_tokens"],
+                usage["cache_read_tokens"], usage["cache_creation_tokens"],
+                c, source="pull" if is_parent else "pull-subagent",
+                message_id=turn["message_id"],
+                cache_creation_1h_tokens=cache_1h,
+                price_unknown=price_unknown,
+            )
+            if is_parent and transcript.has_verification_block(turn["text"]):
+                _handle_verification(conn, session_id, turn["text"])
 
 
 def _handle_verification(conn, session_id: str, raw_response: str) -> Optional[str]:
@@ -144,6 +161,9 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
     plan_rows = db.get_plan(conn, session_id)
     budget = _config["session_budget_estimate_usd"]
     tier, _ = cost.compute_tier(spent, budget)
+    # flips at most once per session (0 -> 1), so it does not violate the
+    # rebuilt channel's byte-stability requirement
+    price_unknown = db.session_has_unknown_priced_usage(conn, session_id)
 
     # Injection policy — both branches exist to stop the harness taxing the
     # session it meters (both taxes were MEASURED, not hypothetical):
@@ -166,7 +186,7 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
         spent_display = (bucket * pct / 100.0) * budget if budget > 0 else spent
         return prompts.render_budget_tracker(
             spent_display, budget, None, tier, plan_rows, lagging=lagging,
-            approximate=True,
+            approximate=True, price_unknown=price_unknown,
         )
 
     if _config.get("inject_mode", "on_change") == "on_change":
@@ -178,6 +198,7 @@ def _tracker_context(conn, session_id: str, channel: str = "accumulating",
 
     return prompts.render_budget_tracker(
         spent, budget, tool_calls_used, tier, plan_rows, lagging=lagging,
+        price_unknown=price_unknown,
     )
 
 
@@ -314,6 +335,9 @@ def llm_usage(req: LlmUsageReq):
         u.get("input_tokens", 0), u.get("output_tokens", 0),
         u.get("cache_read_tokens", 0), cache_5m, cache_1h,
     )
+    total_tokens = (u.get("input_tokens", 0) + u.get("output_tokens", 0)
+                    + u.get("cache_read_tokens", 0) + cache_creation_total)
+    _, price_unknown = cost.resolve_price(req.model)
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, "", "", req.model)
         db.insert_llm_usage(
@@ -322,6 +346,7 @@ def llm_usage(req: LlmUsageReq):
             u.get("cache_read_tokens", 0), cache_creation_total,
             c, source="push", message_id=req.message_id,
             cache_creation_1h_tokens=cache_1h,
+            price_unknown=price_unknown and total_tokens > 0,
         )
     return {"additionalContext": None}
 

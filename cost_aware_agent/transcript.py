@@ -67,3 +67,19 @@ def parse_new_assistant_turns(transcript_path: str, seen_message_ids: set[str]) 
 
 def has_verification_block(text: str) -> bool:
     return _VERIFICATION_RE_MARKER in text
+
+
+def subagent_transcript_paths(transcript_path: str) -> list[str]:
+    """Task-tool subagents do NOT write into the parent transcript (verified
+    2026-07-03 against a real session: 0 sidechain assistant lines in the
+    parent, subagent message ids absent from it). Current Claude Code writes
+    each subagent to <transcript_dir>/<session-uuid>/subagents/agent-*.jsonl.
+    Without ingesting these, all Task-tool LLM spend is invisible — an
+    unmeasured channel that voids the budget. (Older CC versions wrote
+    sidechain turns inline in the parent file; those parse via the normal
+    path — type == 'assistant' — and message-id dedup makes overlap safe.)"""
+    parent = Path(transcript_path)
+    subagents_dir = parent.parent / parent.stem / "subagents"
+    if not subagents_dir.is_dir():
+        return []
+    return sorted(str(p) for p in subagents_dir.glob("agent-*.jsonl"))

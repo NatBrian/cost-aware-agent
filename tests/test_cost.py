@@ -63,8 +63,32 @@ def test_llm_cost_1h_rate_falls_back_to_5m_when_absent():
     assert c == pytest.approx(10_000 * price.get("cache_creation_input_token_cost", 0.0))
 
 
-def test_llm_cost_unknown_model_is_zero_not_error():
-    assert cost.cost_llm_usage("no-such-model-xyz", 1000, 1000, 0, 0, 0) == 0.0
+def test_llm_cost_unknown_model_charges_fallback_never_zero():
+    """A $0-cost unknown model is a cheat channel: route work through an
+    unpriced model id and spend vanishes from the budget. Unknown models must
+    charge the conservative FALLBACK_PRICE."""
+    c = cost.cost_llm_usage("no-such-model-xyz", 1000, 1000, 0, 0, 0)
+    fp = cost.FALLBACK_PRICE
+    assert c == pytest.approx(
+        1000 * fp["input_cost_per_token"] + 1000 * fp["output_cost_per_token"]
+    )
+    assert c > 0.0
+
+
+def test_resolve_price_flags_unknown_model():
+    price, unknown = cost.resolve_price("no-such-model-xyz")
+    assert unknown is True
+    assert price == cost.FALLBACK_PRICE
+    price, unknown = cost.resolve_price(SONNET)
+    assert unknown is False
+    assert price is not cost.FALLBACK_PRICE
+
+
+def test_price_none_or_empty_model_treated_as_unknown():
+    # CC synthetic entries can carry model None/'<synthetic>' — must not crash
+    assert cost.price_for_model("") is None
+    assert cost.price_for_model(None) is None
+    assert cost.resolve_price("<synthetic>")[1] is True
 
 
 # --- price_for_model ---

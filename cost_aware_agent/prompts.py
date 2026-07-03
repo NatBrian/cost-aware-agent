@@ -69,10 +69,15 @@ def render_checklist(plan_rows) -> str:
 LAG_NOTE = ("Note: cost is measured from completed turns; the current turn's "
             "tokens are not included yet, so true spend is slightly higher.")
 
+PRICE_UNKNOWN_NOTE = ("Warning: some LLM calls this session used a model with no "
+                      "known price; they are costed at a conservative default "
+                      "rate, so true spend may differ from the number above.")
+
 
 def render_budget_tracker(
     spent_usd: float, budget_estimate_usd: float, tool_calls_used: int | None,
     tier: str, plan_rows, lagging: bool = False, approximate: bool = False,
+    price_unknown: bool = False,
 ) -> str:
     """tool_calls_used=None omits the per-call counter line and approximate=True
     prefixes the dollar figures with '~'. Both exist for REBUILT channels
@@ -91,6 +96,8 @@ def render_budget_tracker(
     dp = 2 if budget_estimate_usd >= 0.095 or budget_estimate_usd <= 0 else 4
     approx = "~" if approximate else ""
     lag_line = f"{LAG_NOTE}\n" if lagging else ""
+    # flips 0->1 at most once per session, so rebuilt-channel byte-stability holds
+    price_unknown_line = f"{PRICE_UNKNOWN_NOTE}\n" if price_unknown else ""
     tools_line = (f"Tool calls used: {tool_calls_used}\n"
                   if tool_calls_used is not None else "")
     block = (
@@ -101,6 +108,7 @@ def render_budget_tracker(
         f"Tier: {tier}\n"
         f"{TIER_GUIDANCE[tier]}\n"
         f"{lag_line}"
+        f"{price_unknown_line}"
         "</budget>"
     )
     checklist = render_checklist(plan_rows)

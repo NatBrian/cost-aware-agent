@@ -28,7 +28,15 @@ A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) tracks cost per session
 
 - **Cost Engine** — real `$` from token counts and model pricing (vendored LiteLLM
   price map), including Anthropic's split pricing for 5-minute vs 1-hour
-  prompt-cache writes.
+  prompt-cache writes. A model with no price-map entry is **never costed $0**
+  (that would be an unmeasured channel — route work through an unpriced model id
+  and spend vanishes): it's charged a conservative mid-tier fallback rate, the
+  row is flagged `price_unknown`, and the tracker shows a warning line.
+- **Subagent capture** — Claude Code Task-tool subagents write their own
+  transcript files (`<session>/subagents/agent-*.jsonl`), not the parent
+  transcript; the daemon discovers and ingests them onto the parent session. On
+  a real multi-agent session this was **42% of true spend** ($10.59 of $25.29)
+  that parent-only parsing missed.
 - **Budget Tracker** — injects current spend, remaining budget, tier
   (HIGH/MEDIUM/LOW/CRITICAL), and tier guidance.
 - **Injection policy (anti-tax)** — on accumulating channels (Claude Code's
@@ -82,7 +90,9 @@ Run the unit tests with `python3 -m pytest tests/`.
 - **OpenCode's usage payload has no 5m/1h cache-write split**; cache writes are
   priced at the 5-minute rate — a conservative undercount.
 - **LiteLLM price-map staleness** — refresh by re-vendoring
-  `cost_aware_agent/data/model_prices_and_context_window.json`.
+  `cost_aware_agent/data/model_prices_and_context_window.json`. A stale map
+  degrades to the conservative fallback rate + `price_unknown` flag, never to
+  silent $0.
 
 ## Experiments — does cost-awareness change behavior?
 

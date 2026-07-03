@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     cache_creation_tokens INTEGER,      -- total cache-write tokens (5m + 1h)
     cache_creation_1h_tokens INTEGER DEFAULT 0,  -- portion billed at the 1h ephemeral rate; see cost.py
     cost_usd REAL,
+    price_unknown INTEGER DEFAULT 0,    -- 1 = model had no price map entry; costed at cost.FALLBACK_PRICE
     source TEXT,
     created_at INTEGER
 );
@@ -95,6 +96,9 @@ def init_db() -> None:
             conn.execute("ALTER TABLE sessions ADD COLUMN last_inject_tier TEXT")
         if "last_inject_bucket" not in cols:
             conn.execute("ALTER TABLE sessions ADD COLUMN last_inject_bucket INTEGER")
+        usage_cols = {r["name"] for r in conn.execute("PRAGMA table_info(llm_usage)")}
+        if "price_unknown" not in usage_cols:
+            conn.execute("ALTER TABLE llm_usage ADD COLUMN price_unknown INTEGER DEFAULT 0")
         conn.commit()
     finally:
         conn.close()
@@ -166,12 +170,13 @@ def insert_llm_usage(
     conn, session_id: str, model: str, input_tokens: int, output_tokens: int,
     cache_read_tokens: int, cache_creation_tokens: int, cost_usd: float,
     source: str, message_id: str | None = None, cache_creation_1h_tokens: int = 0,
+    price_unknown: bool = False,
 ) -> None:
     conn.execute(
         "INSERT INTO llm_usage "
         "(session_id, message_id, model, input_tokens, output_tokens, "
-        " cache_read_tokens, cache_creation_tokens, cache_creation_1h_tokens, cost_usd, source, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        " cache_read_tokens, cache_creation_tokens, cache_creation_1h_tokens, cost_usd, price_unknown, source, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         # OpenCode's push path fires message.updated repeatedly per assistant turn,
         # each carrying the SAME message id with growing *cumulative* token counts.
         # Latest-wins UPSERT keeps one row per message at its final totals instead of
@@ -182,10 +187,20 @@ def insert_llm_usage(
         "DO UPDATE SET model=excluded.model, input_tokens=excluded.input_tokens, "
         " output_tokens=excluded.output_tokens, cache_read_tokens=excluded.cache_read_tokens, "
         " cache_creation_tokens=excluded.cache_creation_tokens, "
-        " cache_creation_1h_tokens=excluded.cache_creation_1h_tokens, cost_usd=excluded.cost_usd",
+        " cache_creation_1h_tokens=excluded.cache_creation_1h_tokens, cost_usd=excluded.cost_usd, "
+        " price_unknown=excluded.price_unknown",
         (session_id, message_id, model, input_tokens, output_tokens,
-         cache_read_tokens, cache_creation_tokens, cache_creation_1h_tokens, cost_usd, source, now()),
+         cache_read_tokens, cache_creation_tokens, cache_creation_1h_tokens, cost_usd,
+         int(price_unknown), source, now()),
     )
+
+
+def session_has_unknown_priced_usage(conn, session_id: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM llm_usage WHERE session_id = ? AND price_unknown = 1 LIMIT 1",
+        (session_id,),
+    ).fetchone()
+    return row is not None
 
 
 # --- tool_calls ---
