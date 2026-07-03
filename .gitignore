@@ -30,6 +30,11 @@ experiments/cc_adapter/.hooks_settings.json
 # regenerable). data/, budgets.json, analysis.json and RESULTS.md ARE committed.
 experiments/real_cli/runs/
 experiments/real_cli/daemon_sweep.out
+
+# e2e feature-verification: per-run traces incl. persistent sandbox projects
+# (regenerable). verify.json snapshot of the reported run IS copied into
+# RESULTS.md; raw runs stay local.
+experiments/e2e_verify/runs/
 experiments/real_cli/sweep_all.log
 
 .pytest_cache/

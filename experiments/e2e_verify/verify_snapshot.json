@@ -1,0 +1,1162 @@
+{
+  "total": 165,
+  "hard_fails": 0,
+  "warns": 0,
+  "checks": [
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.2139906"
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "OFF: zero injections delivered",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "run": "cc1",
+      "kind": "HARD",
+      "name": "hook: Stop fired per response (>=1)",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "run": "cc1",
+      "kind": "SOFT",
+      "name": "hook: SessionEnd fired naturally",
+      "ok": true,
+      "detail": "events=['PostToolUse', 'PreToolUse', 'SessionEnd', 'SessionStart', 'Stop'] forced=False"
+    },
+    {
+      "run": "cc1",
+      "kind": "SOFT",
+      "name": "daemon spend within 25% of CLI-reported cost",
+      "ok": true,
+      "detail": "cli=0.2140 daemon=0.2140"
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.1797222"
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "ON: tracker delivered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "ON: wallet scope in tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "ON: delegation line (no canned verdicts)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "hook: Stop fired per response (>=1)",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "run": "cc2",
+      "kind": "SOFT",
+      "name": "hook: SessionEnd fired naturally",
+      "ok": true,
+      "detail": "events=['PostToolUse', 'PreToolUse', 'SessionEnd', 'SessionStart', 'Stop'] forced=False"
+    },
+    {
+      "run": "cc2",
+      "kind": "HARD",
+      "name": "on_change: injections < PreToolUse fires",
+      "ok": true,
+      "detail": "inj=2 pre=2"
+    },
+    {
+      "run": "cc2",
+      "kind": "SOFT",
+      "name": "daemon spend within 25% of CLI-reported cost",
+      "ok": true,
+      "detail": "cli=0.1797 daemon=0.1797"
+    },
+    {
+      "run": "cc2",
+      "kind": "SOFT",
+      "name": "burn-rate line appeared in some tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.15117419999999998"
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "ON: tracker delivered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "ON: wallet scope in tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "ON: delegation line (no canned verdicts)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "hook: Stop fired per response (>=1)",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "run": "cc3",
+      "kind": "SOFT",
+      "name": "hook: SessionEnd fired naturally",
+      "ok": true,
+      "detail": "events=['PostToolUse', 'PreToolUse', 'SessionEnd', 'SessionStart', 'Stop'] forced=False"
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "on_change: injections < PreToolUse fires",
+      "ok": true,
+      "detail": "inj=3 pre=3"
+    },
+    {
+      "run": "cc3",
+      "kind": "SOFT",
+      "name": "daemon spend within 25% of CLI-reported cost",
+      "ok": true,
+      "detail": "cli=0.1512 daemon=0.1512"
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "history: [PROJECT HISTORY] injected",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc3",
+      "kind": "HARD",
+      "name": "wallet depletion: view spend > own session spend",
+      "ok": true,
+      "detail": "view=0.3308964 own=0.15117419999999998"
+    },
+    {
+      "run": "cc3",
+      "kind": "SOFT",
+      "name": "burn-rate line appeared in some tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.4158264"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "ON: tracker delivered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "ON: wallet scope in tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "ON: delegation line (no canned verdicts)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "hook: Stop fired per response (>=1)",
+      "ok": true,
+      "detail": "2"
+    },
+    {
+      "run": "cc4",
+      "kind": "SOFT",
+      "name": "hook: SessionEnd fired naturally",
+      "ok": true,
+      "detail": "events=['PostToolUse', 'PreToolUse', 'SessionEnd', 'SessionStart', 'Stop'] forced=False"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "on_change: injections < PreToolUse fires",
+      "ok": true,
+      "detail": "inj=3 pre=4"
+    },
+    {
+      "run": "cc4",
+      "kind": "SOFT",
+      "name": "daemon spend within 25% of CLI-reported cost",
+      "ok": true,
+      "detail": "cli=0.4210 daemon=0.4158"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "subagent usage captured (source=pull-subagent)",
+      "ok": true,
+      "detail": "['pull', 'pull-subagent']"
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "subagent transcripts archived",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc4",
+      "kind": "HARD",
+      "name": "subagent tool actually used",
+      "ok": true,
+      "detail": "['Agent', 'Glob', 'Read', 'Read']"
+    },
+    {
+      "run": "cc4",
+      "kind": "SOFT",
+      "name": "burn-rate line appeared in some tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.1865187"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "ON: tracker delivered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "ON: wallet scope in tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "ON: delegation line (no canned verdicts)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "hook: Stop fired per response (>=1)",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "run": "cc5",
+      "kind": "SOFT",
+      "name": "hook: SessionEnd fired naturally",
+      "ok": true,
+      "detail": "events=['PostToolUse', 'PreToolUse', 'SessionEnd', 'SessionStart', 'Stop'] forced=False"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "on_change: injections < PreToolUse fires",
+      "ok": true,
+      "detail": "inj=3 pre=3"
+    },
+    {
+      "run": "cc5",
+      "kind": "SOFT",
+      "name": "daemon spend within 25% of CLI-reported cost",
+      "ok": true,
+      "detail": "cli=0.1865 daemon=0.1865"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "checkpoint question injected",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "tight budget: LOW/CRITICAL tier reached",
+      "ok": true,
+      "detail": "['HIGH', 'CRITICAL', 'CRITICAL']"
+    },
+    {
+      "run": "cc5",
+      "kind": "HARD",
+      "name": "advisory-only: run still completed over pressure",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "cc5",
+      "kind": "SOFT",
+      "name": "burn-rate line appeared in some tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.002672348"
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc1",
+      "kind": "HARD",
+      "name": "OFF: zero injections delivered",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.005114575200000001"
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "ON: tracker delivered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "ON: wallet scope in tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "ON: delegation line (no canned verdicts)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "rebuilt: approximate (~$) tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "rebuilt: spend quantized to bucket grid",
+      "ok": true,
+      "detail": "spends=[0.0, 0.0018, 0.0036, 0.0042] step=0.000600"
+    },
+    {
+      "run": "oc2",
+      "kind": "HARD",
+      "name": "rebuilt: same-quantized-state deliveries byte-identical",
+      "ok": true,
+      "detail": "4 unique of 4, 4 states"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.0043357607999999995"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "ON: tracker delivered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "ON: wallet scope in tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "ON: delegation line (no canned verdicts)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "rebuilt: approximate (~$) tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "rebuilt: spend quantized to bucket grid",
+      "ok": true,
+      "detail": "spends=[0.0048, 0.006, 0.006] step=0.000600"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "rebuilt: same-quantized-state deliveries byte-identical",
+      "ok": true,
+      "detail": "3 unique of 3, 3 states"
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "history: [PROJECT HISTORY] injected",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc3",
+      "kind": "HARD",
+      "name": "wallet depletion: view spend > own session spend",
+      "ok": true,
+      "detail": "view=0.009450336 own=0.0043357607999999995"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.005659455200000001"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "ON: tracker delivered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "ON: wallet scope in tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "ON: delegation line (no canned verdicts)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "rebuilt: approximate (~$) tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "rebuilt: spend quantized to bucket grid",
+      "ok": true,
+      "detail": "spends=[0.0, 0.002, 0.0022, 0.0024] step=0.000200"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "rebuilt: same-quantized-state deliveries byte-identical",
+      "ok": true,
+      "detail": "4 unique of 4, 4 states"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "tight budget: LOW/CRITICAL tier reached",
+      "ok": true,
+      "detail": "['HIGH', 'CRITICAL', 'CRITICAL', 'CRITICAL']"
+    },
+    {
+      "run": "oc4",
+      "kind": "HARD",
+      "name": "advisory-only: run still completed over pressure",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "run completed (final answer produced)",
+      "ok": true,
+      "detail": "timed_out=False"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "daemon measured spend > 0",
+      "ok": true,
+      "detail": "0.0044640008"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "llm_usage rows recorded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "audit: no danger tools",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "audit: zero web requests",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "audit: no outside-sandbox path refs",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "audit: no tool input touches daemon/DB/wallet",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "receipt renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "no negative token/cost rows stored",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "ON: tracker delivered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "ON: wallet scope in tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "ON: delegation line (no canned verdicts)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "rebuilt: approximate (~$) tracker",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "rebuilt: spend quantized to bucket grid",
+      "ok": true,
+      "detail": "spends=[0.0, 0.0012, 0.0015] step=0.000100"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "rebuilt: same-quantized-state deliveries byte-identical",
+      "ok": true,
+      "detail": "3 unique of 3, 3 states"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "tight budget: LOW/CRITICAL tier reached",
+      "ok": true,
+      "detail": "['HIGH', 'CRITICAL', 'CRITICAL']"
+    },
+    {
+      "run": "oc5",
+      "kind": "HARD",
+      "name": "advisory-only: run still completed over pressure",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

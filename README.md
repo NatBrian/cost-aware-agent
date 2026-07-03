@@ -203,6 +203,22 @@ Headline findings (full tables in
   injection cost must be engineered to ~zero (now measured and mostly fixed)
   or it eats the benefit.
 
+### 4. `experiments/e2e_verify/` — end-to-end feature acceptance (post-audit)
+
+Not an A/B experiment: an acceptance test of the whole post-audit harness on
+the real CLIs. 5 runs per agent (Claude Code 2.1.199 / Sonnet, OpenCode
+1.17.13 / deepseek-v4-flash-free), each run targeting specific features;
+**165/165 machine-checked assertions pass** (`verify.py`) with a clean cheat
+audit. Live-proved in one sweep: exact-to-the-cent cost capture (4/5 CC runs
+match CLI billing to full float precision), subagent capture (30% of the
+delegation run's spend arrived via `pull-subagent` rows), wallet depletion
+across sessions + [PROJECT HISTORY], spend-milestone checkpoints, tier
+escalation to CRITICAL, advisory-only under 3× overspend, per-turn
+`/turn/end`, receipts, and OFF-arm silence. Also caught: CC ≥ 2.1.x renamed
+the subagent tool Task→Agent (deny lists must cover both), and a
+session-metadata race in the OpenCode adapter (fixed + regression test).
+Details: [`experiments/e2e_verify/RESULTS.md`](experiments/e2e_verify/RESULTS.md).
+
 ## Status
 
 - Claude Code adapter — live-verified: hook delivery, transcript cost pull

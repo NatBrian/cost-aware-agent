@@ -154,6 +154,17 @@ def insert_session(conn, session_id: str, cli: str, task: str, model: str) -> No
         "(session_id, cli, task, model, start_time, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         (session_id, cli, task, model, now(), now()),
     )
+    # A usage/turn event can beat /session/start to the first insert (observed
+    # live: OpenCode's message.updated raced the plugin's session/start POST,
+    # leaving cli=''). Ingest endpoints pass '' for the identity fields, so
+    # backfill columns that are still empty — never clobber a non-empty value.
+    for col, val in (("cli", cli), ("task", task), ("model", model)):
+        if val:
+            conn.execute(
+                f"UPDATE sessions SET {col} = ? "
+                f"WHERE session_id = ? AND ({col} IS NULL OR {col} = '')",
+                (val, session_id),
+            )
 
 
 def set_session_budget_source(conn, session_id: str, project_dir: str | None,

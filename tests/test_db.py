@@ -67,3 +67,16 @@ def test_insert_session_is_idempotent(conn):
     db.insert_session(conn, "s5", "", "", "")  # hook refire must not clobber
     row = db.get_session(conn, "s5")
     assert row["cli"] == "claude-code"
+
+
+def test_insert_session_backfills_empty_identity_fields(conn):
+    """A usage/turn event can beat /session/start to the first insert (seen
+    live: OpenCode message.updated raced the plugin's session/start POST,
+    leaving cli=''). Later inserts must backfill empty identity columns —
+    and never clobber non-empty ones."""
+    db.insert_session(conn, "race", "", "", "")          # ingest arrives first
+    db.insert_session(conn, "race", "opencode", "task", "deepseek")
+    row = db.get_session(conn, "race")
+    assert (row["cli"], row["task"], row["model"]) == ("opencode", "task", "deepseek")
+    db.insert_session(conn, "race", "other-cli", "", "")  # must NOT clobber
+    assert db.get_session(conn, "race")["cli"] == "opencode"
