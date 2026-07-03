@@ -24,12 +24,24 @@ import os
 import re
 import string
 import subprocess
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
 MODEL = "sonnet"
+
+# Same sandbox + hard tool deny as the main harness (run_claude.py). Without it,
+# the closed-book screen runs in the repo CWD with the user's global
+# Bash(*)/Grep(*)/Read(*) allow-list, so `--allowedTools ""` does NOT stop the
+# model reading gold answers off disk (data/candidates.json) — a proven leak. If
+# the screen could cheat, "cb_f1=0.0 proves not-memorized" is unreliable. Empty
+# CWD (nothing to grep) + deny>allow precedence closes it.
+_SANDBOX = os.path.join(tempfile.gettempdir(), "hotpotqa_screen_sandbox")
+os.makedirs(_SANDBOX, exist_ok=True)
+_DENY_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep",
+               "WebSearch", "WebFetch", "Task", "NotebookEdit"]
 
 
 def _norm(s):
@@ -71,8 +83,9 @@ def closed_book(question, tries=3):
         try:
             p = subprocess.run(
                 ["claude", "-p", prompt, "--model", MODEL,
-                 "--output-format", "json", "--allowedTools", ""],
-                capture_output=True, text=True, timeout=120)
+                 "--output-format", "json", "--allowedTools", "",
+                 "--disallowedTools", " ".join(_DENY_TOOLS)],
+                capture_output=True, text=True, timeout=120, cwd=_SANDBOX)
             d = json.loads(p.stdout)
             if d.get("is_error"):
                 raise RuntimeError(str(d.get("result"))[:120])

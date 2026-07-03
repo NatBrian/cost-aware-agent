@@ -59,7 +59,9 @@ def _ingest_transcript(conn, session_id: str, transcript_path: Optional[str]) ->
         model = turn["model"]
         usage = turn["usage"]
         cache_1h = usage["cache_creation_1h_tokens"]
-        cache_5m = usage["cache_creation_tokens"] - cache_1h
+        # clamp: a malformed payload with 1h > total must not yield negative 5m
+        # tokens (which would *reduce* computed cost).
+        cache_5m = max(0, usage["cache_creation_tokens"] - cache_1h)
         c = cost.cost_llm_usage(
             model,
             usage["input_tokens"], usage["output_tokens"],
@@ -209,7 +211,10 @@ def verification_result(req: VerificationResultReq):
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, "", "", "")
         context = _handle_verification(conn, req.session_id, req.raw_response)
-    return {"additionalContext": context}
+    # Must go through _gate like every other endpoint: when inject_enabled is
+    # False (the A/B OFF arm) this streak nudge must be suppressed too, else the
+    # OFF control leaks injected [STREAK] text on the OpenCode push path.
+    return {"additionalContext": _gate(context)}
 
 
 @app.post("/plan/seed")
@@ -230,7 +235,7 @@ def llm_usage(req: LlmUsageReq):
     # amount — conservative (undercounts if OpenCode also defaults to 1h
     # caching), not a guess in the expensive direction.
     cache_1h = u.get("cache_creation_1h_tokens", 0)
-    cache_5m = cache_creation_total - cache_1h
+    cache_5m = max(0, cache_creation_total - cache_1h)
     c = cost.cost_llm_usage(
         req.model,
         u.get("input_tokens", 0), u.get("output_tokens", 0),

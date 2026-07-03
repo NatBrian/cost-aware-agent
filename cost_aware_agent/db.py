@@ -192,18 +192,19 @@ def update_plan_status(conn, session_id: str, item_id: int, status: str) -> None
 # --- aggregation ---
 
 def spent_usd(conn, session_id: str) -> tuple[float, int]:
-    """Returns (total spent_usd, tool_calls count) — both needed for the
-    Budget Tracker block's 'Tool calls used: N' line."""
+    """Returns (spent_usd, tool_calls count). Money-only budget: spend is the
+    REAL LLM dollar cost of this session, NOT a synthetic per-tool-call charge.
+    The old behaviour added SUM(tool_calls.cost) (a fixed tool_call_price_usd
+    per call) into the total, which contradicted the money-only design and, on
+    small budgets, folded a large non-LLM term into the injected 'LLM cost used'
+    pressure. tool_calls are still recorded (and their count is returned for the
+    tracker's 'Tool calls used: N' line) but do not contribute to spend."""
     llm = conn.execute(
         "SELECT COALESCE(SUM(cost_usd), 0) AS s FROM llm_usage WHERE session_id = ?",
-        (session_id,),
-    ).fetchone()["s"]
-    tools = conn.execute(
-        "SELECT COALESCE(SUM(cost_usd), 0) AS s FROM tool_calls WHERE session_id = ?",
         (session_id,),
     ).fetchone()["s"]
     tool_call_count = conn.execute(
         "SELECT COUNT(*) AS c FROM tool_calls WHERE session_id = ?",
         (session_id,),
     ).fetchone()["c"]
-    return float(llm) + float(tools), tool_call_count
+    return float(llm), tool_call_count

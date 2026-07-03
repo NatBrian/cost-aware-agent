@@ -153,7 +153,7 @@ def claude_call(prompt, tries=4):
                     pass
             result = next((e for e in reversed(events) if e.get("type") == "result"), None)
             if result is None:
-                raise RuntimeError(f"no result event; stdout head: {p.stdout[:160]!r}")
+                raise RuntimeError(f"no result event; stdout head: {stdout[:160]!r}")
             if result.get("is_error"):
                 raise RuntimeError(str(result.get("result"))[:120])
             # Every tool the model actually invoked, by name.
@@ -182,16 +182,23 @@ def claude_call(prompt, tries=4):
 import urllib.request  # noqa: E402
 
 
-def report_llm_usage(session_id, usage, message_id):
+def report_llm_usage(session_id, usage, message_id, priced_model=PRICED_MODEL):
     """Feed a model call's REAL token usage to the daemon so its dollar-mode
     budget tracker reflects true accumulated spend. Without this, spent_usd stays
     $0 and the budget injection exerts no pressure. Maps the claude-CLI usage
-    shape onto the daemon's expected field names; message_id dedups retries."""
+    shape onto the daemon's expected field names; message_id dedups retries.
+
+    priced_model is the LiteLLM pricing key the DAEMON should cost this usage
+    against — it MUST match the model that actually ran. The OpenCode arm reuses
+    this helper for deepseek, so it has to pass its own key; defaulting to the
+    Claude key here (as an earlier version hardcoded) makes the daemon price
+    deepseek tokens at Sonnet rates (~20x), which slams sub-cent OpenCode budgets
+    to CRITICAL on the first call and destroys the graded-budget signal."""
     u = usage or {}
     cc = u.get("cache_creation", {}) or {}
     body = {
         "session_id": session_id,
-        "model": PRICED_MODEL,
+        "model": priced_model,
         "message_id": message_id,
         "usage": {
             "input_tokens": u.get("input_tokens", 0),
@@ -519,7 +526,13 @@ def main():
                "mean_out_tok": round(sum(r["out_tok"] for r in ok) / n, 1) if n else None,
                "mean_f1": round(sum(r["f1"] for r in ok) / n, 3) if n else None,
                "mean_em": round(sum(r["em"] for r in ok) / n, 3) if n else None,
-               "total_cost_usd": round(sum(r["cost_usd"] for r in rows), 4),
+               # Cost over the SUCCESSFUL rows only, matching the accuracy means
+               # above. Summing over all rows (incl. failed rows forced to $0)
+               # would drag total cost down for an arm that had a failure and
+               # make it look spuriously cheaper — cost and accuracy must be over
+               # the same matched set.
+               "total_cost_usd": round(sum(r["cost_usd"] for r in ok), 4),
+               "mean_cost_usd": round(sum(r["cost_usd"] for r in ok) / n, 5) if n else None,
                "hit_cap": sum(bool(r["hit_cap"]) for r in ok),
                # cheat audit rollup: how many questions were clean, and every
                # tool/web signal seen across the run (empty = nobody cheated).

@@ -83,6 +83,10 @@ def cost_tool_call(config: dict) -> float:
 
 
 def compute_tier(spent: float, session_budget_estimate_usd: float) -> tuple[str, float]:
+    # A non-positive budget means "no budget configured" — treat as no pressure
+    # (HIGH) rather than dividing by zero and 500-ing every /tool/pre and /status.
+    if session_budget_estimate_usd <= 0:
+        return "HIGH", 100.0
     pct_remaining = max(
         0.0,
         (session_budget_estimate_usd - spent) / session_budget_estimate_usd,

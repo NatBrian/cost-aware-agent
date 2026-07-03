@@ -75,13 +75,19 @@ def analyze_gateway(gw, recs):
     tier_q = defaultdict(lambda: defaultdict(list))
     tier_seeds = defaultdict(set)
     tier_budget = {}       # tier -> (inject, budget)
+    tier_raw = defaultdict(lambda: [0, 0, 0])  # tier -> [total rows, failed, capped]
     for rec in recs:
         t = rec["tier"]
         tier_seeds[t].add(rec["label"])
         tier_budget[t] = (rec["inject"], rec["budget"])
         for r in rec["rows"]:
-            if not r.get("failed"):
+            tier_raw[t][0] += 1
+            if r.get("failed"):
+                tier_raw[t][1] += 1
+            else:
                 tier_q[t][r["id"]].append(r)
+            if r.get("hit_cap"):
+                tier_raw[t][2] += 1
 
     def order(t):
         inject, budget = tier_budget[t]
@@ -93,6 +99,12 @@ def analyze_gateway(gw, recs):
     print(f"tiers: {tiers}")
     print(f"seeds/tier: {{{', '.join(f'{t}:{len(tier_seeds[t])}' for t in tiers)}}}")
     print(f"paired questions (present & non-failed in all tiers): {len(common)} {common}")
+    # Per-tier honesty counts: if a tier crashed (failed) more questions its pool
+    # shrinks and the paired intersection silently drops those ids for EVERY tier.
+    # Print raw totals so a reader can see any asymmetric attrition, not just the
+    # surviving paired set.
+    print("per-tier rows [total / failed / capped]: "
+          + ", ".join(f"{t} {tier_raw[t][0]}/{tier_raw[t][1]}/{tier_raw[t][2]}" for t in tiers))
     if not common:
         print("no common questions"); return
 

@@ -21,7 +21,10 @@ DEFAULTS = {
     # dollar estimate. Tiers (HIGH/MEDIUM/LOW/CRITICAL) are computed from spend as
     # a fraction of this budget.
     "session_budget_estimate_usd": 1.00,
-    "tool_call_price_usd": 0.001,
+    # Money-only budget: spend = real LLM dollars, so tool calls carry no
+    # synthetic price. Kept as a config knob (recorded on each tool_call row) but
+    # default 0 so it never contaminates the injected 'LLM cost used' pressure.
+    "tool_call_price_usd": 0.0,
     "streak_warning_threshold": 3,
     "context_mask_threshold_chars": 640000,
     "milestone_tool_patterns": ["Edit", "Write", "edit", "write"],

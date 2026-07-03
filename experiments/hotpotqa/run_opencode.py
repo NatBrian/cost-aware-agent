@@ -45,7 +45,8 @@ from cost_aware_agent import cost as costeng  # same retail pricing the daemon u
 HERE = rc.HERE
 RUNS_DIR = rc.RUNS_DIR
 OC_MODEL = "opencode/deepseek-v4-flash-free"
-PRICED_MODEL = "deepseek-v4-flash-free"  # daemon pricing key (free → ~$0, by design)
+PRICED_MODEL = "deepseek-v4-flash-free"  # daemon pricing key; cost.py strips -free
+                                         # and prices at paid deepseek-v4-flash retail
 
 
 def _run_killable(cmd, timeout, cwd):
@@ -150,8 +151,12 @@ def run_question(q, run_id, traces_dir):
         cost += c
         out_tok += (usage or {}).get("output_tokens", 0)
         trace("cli_raw", step=step, events=events)
-        rc.report_llm_usage(sid, {**usage,
-                                  "cache_creation": {}}, message_id=f"{sid}-s{step}")
+        # Price the daemon's budget against the model that ACTUALLY ran (deepseek),
+        # not run_claude's default Sonnet key — otherwise the injected budget
+        # spend is ~20x too high and every sub-cent OpenCode budget pins to
+        # CRITICAL on call 1 (oc6 and oc12 become indistinguishable).
+        rc.report_llm_usage(sid, {**usage, "cache_creation": {}},
+                             message_id=f"{sid}-s{step}", priced_model=PRICED_MODEL)
         verb, arg = rc.parse_action(text)
         trace("step", step=step, injected_tracker=tracker,
               sim_budget=rc.parse_tracker(tracker), prompt=prompt,
