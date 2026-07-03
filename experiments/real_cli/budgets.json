@@ -1,0 +1,13 @@
+{
+  "rule": "budget = median OFF cost/question on held-out calibration set",
+  "claude": {
+    "median": 0.1813224,
+    "n": 12,
+    "budget": 0.18
+  },
+  "opencode": {
+    "median": 0.0025498452000000003,
+    "n": 12,
+    "budget": 0.0025
+  }
+}

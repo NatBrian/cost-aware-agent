@@ -28,3 +28,11 @@ experiments/hotpotqa/_prelim_archive/
 # hook settings file. results/run_summaries.json IS committed (the snapshot).
 experiments/cc_adapter/runs/
 experiments/cc_adapter/.hooks_settings.json
+
+# real-CLI experiment: per-run traces (events/transcripts/hook logs/daemon dumps,
+# regenerable). data/, budgets.json, analysis.json and RESULTS.md ARE committed.
+experiments/real_cli/runs/
+experiments/real_cli/daemon_sweep.out
+experiments/real_cli/sweep_all.log
+
+.pytest_cache/

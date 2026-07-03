@@ -354,7 +354,11 @@ def run_question(q, run_id, tag, traces_dir):
     web_reqs = 0                # Anthropic server-side web_search + web_fetch
 
     for step in range(MAX_STEPS):
-        tracker = daemon_post("/tool/pre", {"session_id": sid, "tool_name": "search"})
+        # channel "rebuilt": this harness reconstructs the whole prompt every
+        # step (stateless claude -p calls), so the tracker must be present each
+        # time — daemon-side on_change suppression is for accumulating channels.
+        tracker = daemon_post("/tool/pre", {"session_id": sid, "tool_name": "search",
+                                            "channel": "rebuilt"})
         prompt = build_prompt(q["question"], transcript, tracker)
         text, c, usage, cli_sid, meta, events = claude_call(prompt)
         cost += c

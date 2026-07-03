@@ -138,7 +138,8 @@ def run_question(q, run_id, traces_dir):
     answer = "(no answer)"
 
     for step in range(rc.MAX_STEPS):
-        tracker = rc.daemon_post("/tool/pre", {"session_id": sid, "tool_name": "search"})
+        tracker = rc.daemon_post("/tool/pre", {"session_id": sid, "tool_name": "search",
+                                               "channel": "rebuilt"})
         prompt = rc.build_prompt(q["question"], transcript, tracker)
         text, _oc_cost, usage, meta, events = opencode_call(prompt)
         # MONEY = simulated retail cost. opencode's own `cost` is $0 (free tier);

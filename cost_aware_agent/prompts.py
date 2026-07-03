@@ -66,17 +66,41 @@ def render_checklist(plan_rows) -> str:
     return "\n".join(lines)
 
 
+LAG_NOTE = ("Note: cost is measured from completed turns; the current turn's "
+            "tokens are not included yet, so true spend is slightly higher.")
+
+
 def render_budget_tracker(
-    spent_usd: float, budget_estimate_usd: float, tool_calls_used: int, tier: str,
-    plan_rows,
+    spent_usd: float, budget_estimate_usd: float, tool_calls_used: int | None,
+    tier: str, plan_rows, lagging: bool = False, approximate: bool = False,
 ) -> str:
+    """tool_calls_used=None omits the per-call counter line and approximate=True
+    prefixes the dollar figures with '~'. Both exist for REBUILT channels
+    (OpenCode's system prompt), where the tracker is re-sent on every LLM call:
+    any byte that changes per call (an exact running total, a call counter)
+    invalidates the provider's prompt cache from that point on. Measured on
+    deepseek: exact per-call text halved the cache-hit rate (72% -> 44% of input
+    tokens) and nearly DOUBLED session cost (+92%) — the harness taxing the
+    session it is meant to cheapen. Callers on rebuilt channels pass spend
+    quantized to the injection bucket so the rendered text is byte-stable
+    between bucket/tier transitions."""
     remaining_usd = max(0.0, budget_estimate_usd - spent_usd)
+    # adaptive precision: a $0.0025 budget rendered at :.2f reads "$0.00 of
+    # $0.00" — the model gets tier text but no usable numbers. Sub-cent scales
+    # (cheap models priced at retail) need more decimals.
+    dp = 2 if budget_estimate_usd >= 0.095 or budget_estimate_usd <= 0 else 4
+    approx = "~" if approximate else ""
+    lag_line = f"{LAG_NOTE}\n" if lagging else ""
+    tools_line = (f"Tool calls used: {tool_calls_used}\n"
+                  if tool_calls_used is not None else "")
     block = (
         "Budget Tracker <budget>\n"
-        f"LLM cost used: ${spent_usd:.2f}, remaining (of session estimate): ${remaining_usd:.2f}\n"
-        f"Tool calls used: {tool_calls_used}\n"
+        f"LLM cost used: {approx}${spent_usd:.{dp}f}, "
+        f"remaining (of session estimate): {approx}${remaining_usd:.{dp}f}\n"
+        f"{tools_line}"
         f"Tier: {tier}\n"
         f"{TIER_GUIDANCE[tier]}\n"
+        f"{lag_line}"
         "</budget>"
     )
     checklist = render_checklist(plan_rows)

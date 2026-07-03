@@ -1,5 +1,15 @@
 # Real-adapter experiment — does budget injection work in actual Claude Code?
 
+> **Superseded 2026-07-03 by `../real_cli/`** — which runs real HotpotQA questions
+> through real Claude Code AND real OpenCode with the production adapters, a
+> held-out-calibrated budget, and the daemon's on_change injection policy (added
+> in response to the +44% injection-tax finding below). Two framing corrections
+> to this doc, found in audit: (1) the ON arm here was a **static CRITICAL tier**
+> throughout (tight preset budget + in-session spend lag), so what this measured
+> is a constant frugality nudge, not escalating depleting-budget pressure;
+> (2) the overview "coverage" metric is near-tautological (module-name substring —
+> the ON arm's Glob-only trajectory trivially scores 1.0 by echoing filenames).
+
 **Run completed:** 2026-07-03 13:27 (local).
 **Model:** Claude Sonnet via the real `claude -p` CLI (Claude Code runs its own
 agent loop + native tools).

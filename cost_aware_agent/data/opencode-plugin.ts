@@ -67,7 +67,11 @@ export const CostAwareAgentPlugin: Plugin = async ({ $ }) => {
         if (res?.additionalContext) output.system.push(res.additionalContext);
         return;
       }
-      const res = await post("/tool/pre", { session_id: sessionID, tool_name: "" });
+      // channel "rebuilt": the system array is reconstructed on every LLM call,
+      // so the tracker must be present each time — the daemon's on_change
+      // suppression (an anti-tax measure for accumulating channels like Claude
+      // Code's additionalContext) must not apply here.
+      const res = await post("/tool/pre", { session_id: sessionID, tool_name: "", channel: "rebuilt" });
       if (res?.additionalContext) output.system.push(res.additionalContext);
     },
 

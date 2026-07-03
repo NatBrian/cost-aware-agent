@@ -109,15 +109,75 @@ def _gate(context):
     return context if _config.get("inject_enabled", True) else None
 
 
-def _tracker_context(conn, session_id: str) -> str:
+def _deliver(conn, session_id: str, endpoint: str, context):
+    """Gate + audit-log in one step. Every context actually handed to an
+    adapter lands in the `injections` table, so a run can be replayed/debugged
+    from the daemon DB alone (which text, which endpoint, when) without relying
+    on client-side logs."""
+    delivered = _gate(context)
+    if delivered:
+        db.insert_injection(conn, session_id, endpoint, delivered)
+    return delivered
+
+
+def _spend_bucket(spent: float, budget: float) -> int:
+    """Which inject_spend_bucket_pct slice of the budget spend sits in. Past
+    100% the cadence coarsens to one bucket per HALF-budget overspent: the
+    session still gets periodic over-budget reminders, but not one per tiny
+    slice (a $0.10 budget would otherwise re-inject every extra cent —
+    reintroducing the per-call token tax exactly when spend is already high)."""
+    if budget <= 0:
+        return 0
+    pct_spent = (spent / budget) * 100
+    pct = max(1, int(_config.get("inject_spend_bucket_pct", 10)))
+    if pct_spent <= 100:
+        return int(pct_spent / pct)
+    return int(100 / pct) + int((pct_spent - 100) / 50)
+
+
+def _tracker_context(conn, session_id: str, channel: str = "accumulating",
+                     lagging: bool = False) -> Optional[str]:
     # Budget is ALWAYS money: the real dollar cost of LLM API calls this session
     # versus the session's dollar budget. There is no tool-call budget mode —
     # cost is money, not a count of actions.
     spent, tool_calls_used = db.spent_usd(conn, session_id)
     plan_rows = db.get_plan(conn, session_id)
-    tier, _ = cost.compute_tier(spent, _config["session_budget_estimate_usd"])
+    budget = _config["session_budget_estimate_usd"]
+    tier, _ = cost.compute_tier(spent, budget)
+
+    # Injection policy — both branches exist to stop the harness taxing the
+    # session it meters (both taxes were MEASURED, not hypothetical):
+    #
+    # Accumulating channels (Claude Code additionalContext — every injection
+    # persists in the conversation and taxes all later turns; +44% session cost
+    # when fired per-tool-call): inject only when the signal CHANGED — new
+    # tier, or spend crossed another budget slice.
+    #
+    # Rebuilt channels (OpenCode's system array is reconstructed per LLM call):
+    # the tracker must be PRESENT every call (suppression would delete the
+    # budget from context), but its BYTES must not change per call — an exact
+    # running total invalidates the provider's prompt cache from that point,
+    # which on deepseek halved the cache-hit rate and cost +92%. So spend is
+    # quantized to the current injection bucket's floor and the per-call tool
+    # counter is omitted: text mutates only on bucket/tier transitions.
+    if channel == "rebuilt":
+        bucket = _spend_bucket(spent, budget)
+        pct = max(1, int(_config.get("inject_spend_bucket_pct", 10)))
+        spent_display = (bucket * pct / 100.0) * budget if budget > 0 else spent
+        return prompts.render_budget_tracker(
+            spent_display, budget, None, tier, plan_rows, lagging=lagging,
+            approximate=True,
+        )
+
+    if _config.get("inject_mode", "on_change") == "on_change":
+        bucket = _spend_bucket(spent, budget)
+        last_tier, last_bucket = db.get_inject_state(conn, session_id)
+        if tier == last_tier and bucket == last_bucket:
+            return None
+        db.set_inject_state(conn, session_id, tier, bucket)
+
     return prompts.render_budget_tracker(
-        spent, _config["session_budget_estimate_usd"], tool_calls_used, tier, plan_rows,
+        spent, budget, tool_calls_used, tier, plan_rows, lagging=lagging,
     )
 
 
@@ -135,6 +195,11 @@ class ToolPreReq(BaseModel):
     session_id: str
     tool_name: str
     transcript_path: Optional[str] = None
+    # "accumulating" (default): injected text persists in the conversation
+    # (Claude Code additionalContext) — subject to on_change suppression.
+    # "rebuilt": the channel is reconstructed every LLM call (OpenCode system
+    # transform) — always receives the current tracker.
+    channel: str = "accumulating"
 
 
 class ToolPostReq(BaseModel):
@@ -179,7 +244,8 @@ def session_start(req: SessionStartReq):
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, req.cli, req.task, req.model)
         _ingest_transcript(conn, req.session_id, req.transcript_path)
-    return {"additionalContext": _gate(prompts.PLANNING_PROMPT)}
+        context = _deliver(conn, req.session_id, "session/start", prompts.PLANNING_PROMPT)
+    return {"additionalContext": context}
 
 
 @app.post("/tool/pre")
@@ -187,8 +253,13 @@ def tool_pre(req: ToolPreReq):
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, "", "", "")
         _ingest_transcript(conn, req.session_id, req.transcript_path)
-        context = _tracker_context(conn, req.session_id)
-    return {"additionalContext": _gate(context)}
+        # transcript_path == pull-based capture: spend lags the current turn
+        # (Claude Code has no per-turn usage hook), so the tracker must say so
+        # rather than present a stale number as current.
+        context = _tracker_context(conn, req.session_id, channel=req.channel,
+                                   lagging=bool(req.transcript_path))
+        context = _deliver(conn, req.session_id, "tool/pre", context)
+    return {"additionalContext": context}
 
 
 @app.post("/tool/post")
@@ -202,8 +273,9 @@ def tool_post(req: ToolPostReq):
             cost.cost_tool_call(_config),
         )
         milestone = prompts.is_milestone(req.tool_name, req.tool_input, _config)
-    context = prompts.SELF_VERIFICATION_PROMPT if milestone else None
-    return {"additionalContext": _gate(context)}
+        context = prompts.SELF_VERIFICATION_PROMPT if milestone else None
+        context = _deliver(conn, req.session_id, "tool/post", context)
+    return {"additionalContext": context}
 
 
 @app.post("/verification/result")
@@ -211,10 +283,11 @@ def verification_result(req: VerificationResultReq):
     with db.get_conn() as conn:
         db.insert_session(conn, req.session_id, "", "", "")
         context = _handle_verification(conn, req.session_id, req.raw_response)
-    # Must go through _gate like every other endpoint: when inject_enabled is
-    # False (the A/B OFF arm) this streak nudge must be suppressed too, else the
-    # OFF control leaks injected [STREAK] text on the OpenCode push path.
-    return {"additionalContext": _gate(context)}
+        # Must gate like every other endpoint: when inject_enabled is False (the
+        # A/B OFF arm) this streak nudge must be suppressed too, else the OFF
+        # control leaks injected [STREAK] text on the OpenCode push path.
+        context = _deliver(conn, req.session_id, "verification/result", context)
+    return {"additionalContext": context}
 
 
 @app.post("/plan/seed")
@@ -260,6 +333,29 @@ def session_stop(req: SessionStopReq):
         _ingest_transcript(conn, req.session_id, req.transcript_path)
         db.mark_session_ended(conn, req.session_id)
     return {"additionalContext": None}
+
+
+@app.get("/session/{session_id}/dump")
+def session_dump(session_id: str):
+    """Full per-session export for experiment archival / debugging: every
+    llm_usage row, tool call, delivered injection, plan item, and the session
+    row itself. This is the 'all events retrievable' contract."""
+    with db.get_conn() as conn:
+        def rows(sql):
+            return [dict(r) for r in conn.execute(sql, (session_id,)).fetchall()]
+        session = db.get_session(conn, session_id)
+        spent, tool_calls_used = db.spent_usd(conn, session_id)
+        tier, _ = cost.compute_tier(spent, _config["session_budget_estimate_usd"])
+        dump = {
+            "session": dict(session) if session else None,
+            "spent_usd": spent,
+            "tier": tier,
+            "llm_usage": rows("SELECT * FROM llm_usage WHERE session_id = ? ORDER BY id"),
+            "tool_calls": rows("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY id"),
+            "injections": rows("SELECT * FROM injections WHERE session_id = ? ORDER BY id"),
+            "plan": rows("SELECT * FROM plan WHERE session_id = ? ORDER BY id"),
+        }
+    return dump
 
 
 @app.get("/status/{session_id}")

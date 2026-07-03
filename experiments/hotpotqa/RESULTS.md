@@ -32,30 +32,43 @@ legitimate `SEARCH`. Every reported run is audit-clean (`web_requests=0`,
 verbs (the CLI rejects `SEARCH` as "No such tool" and the model re-emits it as
 text) — only real filesystem/web tools count as cheats.
 
-## Claude arm (Sonnet) — the money result
+## Claude arm (Sonnet) — what the data does and does not show
 
 10 paired questions, 3 seeds/tier, all audit-clean. `$/q` is real Anthropic dollars.
 
-| tier | budget | $/q | tool calls | F1 | EM |
-|---|---|---|---|---|---|
-| OFF | — | 0.24842 | 2.83 | 0.556 | 0.467 |
-| **usd30** | **$0.30** | **0.17889** | 2.20 | 0.550 | 0.467 |
-| usd60 | $0.60 | 0.22330 | 2.83 | 0.586 | 0.467 |
-| usd120 | $1.20 | 0.22397 | 2.57 | 0.586 | 0.467 |
+| tier | budget | $/q | tool calls | F1 | EM | paired t vs OFF | significant? |
+|---|---|---|---|---|---|---|---|
+| OFF | — | 0.24842 | 2.83 | 0.556 | 0.467 | — | — |
+| usd30 | $0.30 | 0.17889 | 2.20 | 0.550 | 0.467 | 0.85 | no |
+| usd60 | $0.60 | 0.22330 | 2.83 | 0.586 | 0.467 | 0.35 | no |
+| usd120 | $1.20 | 0.22397 | 2.57 | 0.586 | 0.467 | 0.75 | no |
 
-vs OFF:
+**Honest read (this section replaces an earlier overclaim).** The headline-looking
+"28% cheaper at $0.30" is **not statistically significant at n=10** (paired t=0.85,
+95% CI of the per-question saving [−$0.12, +$0.25]) and is **concentrated in one
+question (q5)**: OFF over-explores it on every seed (8/12/20 tool calls, the worst
+seed running to $1.91 and the safety cap) while $0.30 stops at 5/5/6 calls. Drop q5
+and the saving disappears. The other tiers' ~10% savings are noise (t≤0.75), and
+there is no monotonic budget→savings gradient in this data.
 
-| tier | $ saved | % cheaper | ΔF1 | ΔEM |
-|---|---|---|---|---|
-| **usd30 ($0.30)** | 0.06953 | **28.0%** | −0.006 | **+0.000** |
-| usd60 ($0.60) | 0.02512 | 10.1% | +0.030 | +0.000 |
-| usd120 ($1.20) | 0.02445 | 9.8% | +0.030 | +0.000 |
+What IS supported:
 
-**The tightest budget ($0.30) cuts real spend 28% with zero EM loss and F1 within
-noise.** The mechanism is visible in the tool-call column: under pressure the model
-commits earlier (2.2 vs 2.83 calls) instead of over-exploring. Looser budgets exert
-less pressure and save less — a monotonic budget→savings gradient. Money is the
-metric, and money drops.
+- **The mechanism, on the question that needed it.** q5 is where an unbudgeted
+  agent burns money without converging, and the budget consistently (3/3 seeds)
+  truncated that spiral. This is exactly the behavior the harness exists to cause —
+  observed reliably, but on a sample of one such question.
+- **Accuracy flat is partly an artifact, not a guarantee.** q5 is answerable with
+  deep exploration (usd120-s0 solved it: EM=1.0 after 15 calls / $1.48; OFF never
+  did in 3 tries). A tight budget forecloses that rare win. "ΔEM 0.000" holds in
+  this sample because the win is rare — do not read it as "budget never costs
+  accuracy."
+- **Budget-selection caveat.** The $0.30 tier was chosen after seeing OFF pilot
+  costs on these same questions. The follow-up real-CLI experiment
+  (`../real_cli`) fixes this with a pre-registered rule computed on a held-out
+  calibration set.
+
+Run `analyze.py` for the full table with paired t and CIs — the significance
+column is now printed by default so this class of overclaim self-flags.
 
 ## OpenCode arm (deepseek-v4-flash-free) — cross-agent, but capability-gated
 
@@ -71,7 +84,10 @@ at that scale, so budgets are scaled to deepseek's own cost ($0.006 / $0.012).
 | oc6 | $0.006 | 0.01670 | 5.20 | 0.631 | 0.500 |
 | oc12 | $0.012 | 0.01637 | 5.00 | 0.706 | 0.533 |
 
-vs OFF: oc6 1.7% cheaper (ΔF1 −0.019), oc12 3.6% cheaper (ΔF1 +0.056). All clean.
+vs OFF: oc6 1.7% cheaper (ΔF1 −0.019, t=0.74), oc12 3.6% cheaper (ΔF1 +0.056,
+t=1.21) — neither significant. "All clean" here is by construction (`--pure`
+disables OpenCode's tool/plugin channel entirely), not an audited claim like the
+Claude arm's.
 
 **What this proves and doesn't.** The daemon's money-tracking and budget-injection
 paths work **cross-agent** — retail cost is computed from OpenCode's token stream

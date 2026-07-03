@@ -21,9 +21,33 @@ labelled correctly. Seed labels (`off-s0`, ...) collapse to their base tier.
 """
 import glob
 import json
+import math
 import os
 import re
 from collections import defaultdict
+
+# two-sided 95% critical values of Student's t, df 1..30 — dependency-free
+_T95 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
+        2.201, 2.179, 2.160, 2.145, 2.131, 2.120, 2.110, 2.101, 2.093, 2.086,
+        2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052, 2.048, 2.045, 2.042]
+
+
+def paired_stats(diffs):
+    """Paired mean diff with t statistic and 95% CI. Returns None when n < 2.
+    This is the self-policing layer: a '% cheaper' headline without a
+    significant paired diff is noise, and the table now says so itself."""
+    n = len(diffs)
+    if n < 2:
+        return None
+    mean = sum(diffs) / n
+    var = sum((d - mean) ** 2 for d in diffs) / (n - 1)
+    sd = math.sqrt(var)
+    se = sd / math.sqrt(n)
+    t = mean / se if se > 0 else float("inf")
+    tcrit = _T95[min(n - 2, len(_T95) - 1)]
+    ci = (mean - tcrit * se, mean + tcrit * se)
+    return {"n": n, "mean": mean, "sd": sd, "t": t, "tcrit": tcrit,
+            "ci": ci, "significant": abs(t) > tcrit}
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUNS = os.path.join(HERE, "runs")
@@ -132,16 +156,29 @@ def analyze_gateway(gw, recs):
 
     if off_tier:
         off = stats[off_tier]
-        print(f"\nvs OFF (money is the metric):")
-        print(f"{'tier':8} {'$ saved':>10} {'% cheaper':>10} {'ΔF1':>8} {'ΔEM':>8}")
+
+        def qmean(t, q, k):  # per-question mean over seeds
+            return sum(r.get(k, 0) for r in tier_q[t][q]) / len(tier_q[t][q])
+
+        print(f"\nvs OFF (money is the metric; paired per-question, "
+              f"95% CI over n={len(common)} questions):")
+        print(f"{'tier':8} {'$ saved':>10} {'% cheaper':>10} {'ΔF1':>8} {'ΔEM':>8} "
+              f"{'t':>6} {'95% CI of $ saved':>22} {'sig?':>5}")
         for t in tiers:
             if t == off_tier:
                 continue
             s = stats[t]
             saved = off["cost"] - s["cost"]
             pct = 100 * saved / off["cost"] if off["cost"] else 0
+            diffs = [qmean(off_tier, q, "cost_usd") - qmean(t, q, "cost_usd")
+                     for q in common]
+            ps = paired_stats(diffs)
+            sig = "YES" if ps and ps["significant"] else "no"
+            ci = f"[{ps['ci'][0]:+.4f}, {ps['ci'][1]:+.4f}]" if ps else "—"
             print(f"{t:8} {saved:10.5f} {pct:9.1f}% {s['f1']-off['f1']:+8.3f} "
-                  f"{s['em']-off['em']:+8.3f}")
+                  f"{s['em']-off['em']:+8.3f} {ps['t'] if ps else 0:6.2f} {ci:>22} {sig:>5}")
+        print("(sig? = paired t exceeds the two-sided 95% critical value; "
+              "a 'no' means the $ saving is within noise at this sample size)")
 
     dirty = [(t, q) for t in tiers for q in common
              for r in tier_q[t][q] if not row_clean(r)]

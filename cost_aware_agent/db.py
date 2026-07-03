@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     start_time INTEGER,
     state TEXT DEFAULT 'active',
     low_tier_continue_streak INTEGER DEFAULT 0,
+    last_inject_tier TEXT,
+    last_inject_bucket INTEGER,
     created_at INTEGER
 );
 
@@ -51,6 +53,17 @@ CREATE TABLE IF NOT EXISTS tool_calls (
     created_at INTEGER
 );
 
+-- Injection audit log: every additionalContext actually DELIVERED (post-gate).
+-- Makes runs replayable/debuggable from the daemon side alone: what text was
+-- injected, on which endpoint, when — independent of any client-side logging.
+CREATE TABLE IF NOT EXISTS injections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT REFERENCES sessions(session_id),
+    endpoint TEXT,
+    context TEXT,
+    created_at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS plan (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT REFERENCES sessions(session_id),
@@ -75,6 +88,13 @@ def init_db() -> None:
     conn = _connect()
     try:
         conn.executescript(SCHEMA)
+        # migrate pre-existing DBs created before the on_change injection state
+        # columns existed (CREATE TABLE IF NOT EXISTS won't add them)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
+        if "last_inject_tier" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN last_inject_tier TEXT")
+        if "last_inject_bucket" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN last_inject_bucket INTEGER")
         conn.commit()
     finally:
         conn.close()
@@ -113,6 +133,23 @@ def get_session(conn, session_id: str):
 def mark_session_ended(conn, session_id: str) -> None:
     conn.execute(
         "UPDATE sessions SET state = 'ended' WHERE session_id = ?", (session_id,)
+    )
+
+
+def get_inject_state(conn, session_id: str) -> tuple[str | None, int | None]:
+    row = conn.execute(
+        "SELECT last_inject_tier, last_inject_bucket FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    if row is None:
+        return None, None
+    return row["last_inject_tier"], row["last_inject_bucket"]
+
+
+def set_inject_state(conn, session_id: str, tier: str, bucket: int) -> None:
+    conn.execute(
+        "UPDATE sessions SET last_inject_tier = ?, last_inject_bucket = ? WHERE session_id = ?",
+        (tier, bucket, session_id),
     )
 
 
@@ -163,6 +200,22 @@ def insert_tool_call(
         "VALUES (?, ?, ?, ?, ?, ?)",
         (session_id, tool_name, tool_input, tool_result_excerpt, cost_usd, now()),
     )
+
+
+# --- injections ---
+
+def insert_injection(conn, session_id: str, endpoint: str, context: str) -> None:
+    conn.execute(
+        "INSERT INTO injections (session_id, endpoint, context, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (session_id, endpoint, context, now()),
+    )
+
+
+def get_injections(conn, session_id: str):
+    return conn.execute(
+        "SELECT * FROM injections WHERE session_id = ? ORDER BY id", (session_id,)
+    ).fetchall()
 
 
 # --- plan ---

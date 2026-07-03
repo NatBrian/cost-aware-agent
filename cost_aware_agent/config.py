@@ -25,6 +25,20 @@ DEFAULTS = {
     # synthetic price. Kept as a config knob (recorded on each tool_call row) but
     # default 0 so it never contaminates the injected 'LLM cost used' pressure.
     "tool_call_price_usd": 0.0,
+    # Injection policy for ACCUMULATING context channels (Claude Code's
+    # additionalContext persists in the conversation, so every injection is a
+    # permanent token tax on all later turns — measured +44% session cost when
+    # the tracker fired on all 22 hook calls of a tool-heavy task).
+    #   on_change  re-inject only when the tier changes or spend crosses another
+    #              inject_spend_bucket_pct slice of the budget (default)
+    #   every      inject on every /tool/pre (for stateless harnesses that
+    #              rebuild the prompt each step and need the tracker present)
+    # Rebuilt channels (OpenCode's system-transform array is reconstructed on
+    # every LLM call, nothing accumulates) always receive the current tracker
+    # regardless of this setting — suppressing there would DELETE the budget
+    # from context, not save tokens.
+    "inject_mode": "on_change",
+    "inject_spend_bucket_pct": 10,
     "streak_warning_threshold": 3,
     "context_mask_threshold_chars": 640000,
     "milestone_tool_patterns": ["Edit", "Write", "edit", "write"],

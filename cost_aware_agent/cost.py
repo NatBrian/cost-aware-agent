@@ -91,11 +91,14 @@ def compute_tier(spent: float, session_budget_estimate_usd: float) -> tuple[str,
         0.0,
         (session_budget_estimate_usd - spent) / session_budget_estimate_usd,
     ) * 100
-    if pct_remaining < 10:
+    # epsilon so an exact boundary ((1.00-0.90)/1.00 -> 9.999...8 in floats)
+    # lands in the documented tier (LOW is >=10%), not one tier tighter
+    eps = 1e-9
+    if pct_remaining < 10 - eps:
         tier = "CRITICAL"
-    elif pct_remaining < 30:
+    elif pct_remaining < 30 - eps:
         tier = "LOW"
-    elif pct_remaining < 70:
+    elif pct_remaining < 70 - eps:
         tier = "MEDIUM"
     else:
         tier = "HIGH"
