@@ -266,14 +266,20 @@ none in the daemon):
 
 ## Follow-ups worth doing (ranked)
 
-1. **Cut the rebuilt-channel cache tax** (highest value — the one place the
-   harness actively *loses* money). The entire OpenCode +336% is the injected
-   tracker busting deepseek's prompt cache. Two fixes: (a) place the volatile
-   budget line at the *end* of context, after the cached prefix, so a changed
-   tracker doesn't invalidate the prefix; (b) inject only on tier change, not on
-   every bucket step (13–29 injections/run is the killer). Success target: turn
-   the OpenCode "+336% tax" into "≈neutral," making the budget safe on weak
-   models too. This is a daemon change, not methodology.
+1. **Cut the rebuilt-channel cache tax — DONE + validated** (`ee8724c`). The
+   entire OpenCode +336% was the tracker in the system prompt (prefix), rebuilt
+   every call, busting deepseek's prompt cache. Fix: keep the system prefix
+   byte-stable and deliver the live tracker at the *end* of context (appended to
+   the tool result via `tool.execute.after`, `channel:"rebuilt"`) — the tail
+   extends the cache instead of invalidating it, and the model still sees the
+   current spend after every tool call (freshness preserved; rejected the
+   "inject less often" alternative because the model reasons fresh every turn
+   and should see the current number every turn). Claude Code path unchanged.
+   **Measured on sympy-24213 ON: cache-hit 40% → 87% (OFF is 82–93%), cost
+   $0.014–0.029 → $0.0061 (OFF ~$0.005), 9 injections/run kept.** The +336% tax
+   drops to ~+20% — near break-even, making the budget safe to run on weak
+   models too. (Validated on one instance; a full OpenCode arm re-run would
+   confirm across all six.)
 2. **Deterministic OpenCode session capture.** Timeout recovery currently uses a
    "newest opencode session in the daemon" heuristic — safe only because runs
    are sequential. Have the plugin write its `session_id` to a known file at
