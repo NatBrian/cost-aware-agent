@@ -166,57 +166,46 @@ Experiment docs: [`swe_ab`](experiments/swe_ab/EXPERIMENT_RESULTS_2026-07-03_225
 
 ## Installation
 
-```bash
-pip install -e .
-
-# install the adapter for your agent (per-project, or --global)
-cost-aware-agent install --for claude-code --project-dir .
-#   or: cost-aware-agent install --for opencode --project-dir .
-
-cost-aware-agent init --budget 10   # a $10 wallet for this project
-cost-aware-agent budget show        # budget / spent / remaining
-```
-
-Re-run `install` after upgrading the package — it rewrites the hook script the
-adapters depend on. Run the test suite with `python3 -m pytest tests/`.
-
-### Installing via a coding agent
-
-If a coding agent (e.g. Claude Code) is installing this itself, the steps are
-fully scriptable. Run from the repository root:
+**Requirements:** Python 3.11+, and the CLI you want to meter (Claude Code or
+OpenCode) already installed. Four commands, from the project you want metered:
 
 ```bash
-# 1. install the package
-pip install -e .
-
-# 2. install the adapter into the target project (use the project you want metered)
-cost-aware-agent install --for claude-code --project-dir /path/to/project
-#    OpenCode instead:  --for opencode
-
-# 3. set the project's wallet
-cost-aware-agent init --budget 10 --project-dir /path/to/project
-
-# 4. verify
-cost-aware-agent daemon status     # -> "running" (auto-spawns if needed)
-cost-aware-agent budget show --project-dir /path/to/project   # -> budget / spent / remaining
+pip install -e .                                              # 1. the package
+cost-aware-agent install --for claude-code --project-dir .    # 2. the adapter (or --for opencode)
+cost-aware-agent init --budget 10 --project-dir .             # 3. a $10 project wallet
+cost-aware-agent budget show --project-dir .                  # 4. verify: budget / spent / remaining
 ```
 
-What `install --for claude-code` changes, so the agent can confirm it:
+Then **start a new agent session** in that project — Claude Code loads hooks at
+session start, so tracking begins on the next session, not the current one.
 
-- writes the hook script to `~/.cost-aware-agent/hooks/claude-code.sh`
+Re-run `install` after upgrading the package (it rewrites the hook script), and
+run the test suite with `python3 -m pytest tests/`.
+
+### If a coding agent is installing this
+
+The sequence above is fully scriptable, but an installing agent should know what
+`install` changes so it can verify, and one caveat that will otherwise trip it up.
+
+`install --for claude-code`:
+- writes the hook script to `~/.cost-aware-agent/hooks/claude-code.sh`;
 - merges five hook entries (`SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`,
   `SessionEnd`) into `<project>/.claude/settings.json` (or `~/.claude/settings.json`
-  with `--global`). It merges idempotently — re-running does not duplicate entries.
+  with `--global`) — idempotently, so re-running never duplicates entries.
 
 `install --for opencode` copies the plugin to
 `<project>/.opencode/plugins/cost-aware-agent.ts`.
 
+**Verify:** `cost-aware-agent daemon status` prints `running`; `budget show`
+prints the wallet; and `.claude/settings.json` contains a hook command pointing
+at `claude-code.sh`.
+
 > [!IMPORTANT]
-> Claude Code loads hooks at **session start**. The session that runs `install`
-> will not have the hooks active — the agent (or user) must start a **new**
-> `claude` session in that project for cost tracking to begin. Verify success by
-> confirming `.claude/settings.json` contains a hook whose command points at
-> `claude-code.sh`, and that `cost-aware-agent budget show` prints the wallet.
+> The session that runs `install` will **not** have tracking active — Claude Code
+> reads hooks only at session start. Do not report the install as working by
+> checking the current session; start a new `claude` session in the project, then
+> confirm the Budget Tracker appears. (OpenCode likewise loads the plugin when a
+> new `opencode` session starts.)
 
 ---
 
