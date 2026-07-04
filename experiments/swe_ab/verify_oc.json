@@ -23,7 +23,7 @@
   [
    "tier signal: ON injections carry Tier labels",
    true,
-   "tiers seen: ['CRITICAL']"
+   "tiers seen: ['CRITICAL', 'HIGH', 'LOW', 'MEDIUM']"
   ],
   [
    "rebuilt channel: Budget Tracker block delivered",
@@ -48,7 +48,7 @@
   [
    "audit: every run with a net attempt is flagged (not silent)",
    true,
-   "4 runs had net attempts, all flagged"
+   "3 runs had net attempts, all flagged"
   ],
   [
    "subagent capture: 'task' subagent calls ingested to daemon",

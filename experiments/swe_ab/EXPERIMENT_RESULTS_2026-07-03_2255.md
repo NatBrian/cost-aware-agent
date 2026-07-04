@@ -281,22 +281,29 @@ none in the daemon):
    current spend after every tool call (freshness preserved; rejected the
    "inject less often" alternative because the model reasons fresh every turn
    and should see the current number every turn). Claude Code path unchanged.
-   **Validated across the full OpenCode arm (12 OFF + 12 Fix-1 ON runs):**
+   **Validated across the full OpenCode arm with FRESH wallets (12 OFF + 12
+   Fix-1 ON runs):**
 
    | paired mean (n=7) | cost/task | vs OFF |
    |---|---|---|
    | OFF | $0.0082 | 1.0× |
-   | old ON (tracker in system prompt) | $0.0202 | **2.5×** |
-   | Fix-1 ON (tracker at end of context) | $0.0075 | **0.9×** |
+   | old ON (tracker in system prompt) | $0.0202 | **2.4×** |
+   | Fix-1 ON (tracker at end of context) | $0.0063 | **0.76×** |
 
-   Per-instance the old-plugin multipliers (0.6×, 8.2×, 1.2×, 3.9×, 8.1×, 2.8×,
-   2.7×, 2.3×, 2.4×, 6.6×) all collapse to ≈1.0× (0.6×, 1.5×, 1.0×, 1.1×, 0.6×,
-   1.1×, 1.0×, 1.0×, 0.8×, 1.2×). Worst case pytest-11148: 8.1× → 0.6×.
-   Aggregate paired result flips from **+336% (old) to −8.4% (Fix-1, n.s.,
-   ≈break-even)**, success unchanged (0.71), 12/12 feature checks still green,
-   13 injections/run retained (full per-turn freshness). **The cache tax is
-   eliminated — the budget is now free to run on OpenCode too**, not just
-   Claude Code.
+   Aggregate paired result flips from **+336% (old, tax) to −23.7% (Fix-1,
+   n.s. — ≈break-even, ON if anything slightly cheaper)**, success unchanged
+   (0.71), 12/12 feature checks green, 13.9 injections/run (full per-turn
+   freshness), and all four tiers (HIGH/MEDIUM/LOW/CRITICAL) progress normally.
+   **The cache tax is eliminated — the budget is now free to run on OpenCode
+   too**, not just Claude Code.
+
+   *Rigor note:* the first Fix-1 run reused the old-ON project paths, so the
+   daemon's persistent project wallet carried over the old runs' spend and the
+   Fix-1 wallets started drained (stuck at CRITICAL — fewer unique injection
+   texts, which partly flatters cache retention). That confound was caught in a
+   trajectory review, the ON-path wallets were reset, and the arm was re-run
+   with fresh wallets (tiers now progressing, MORE text churn). Result held —
+   the fix is not an artifact of the drained wallet.
 2. **Deterministic OpenCode session capture.** Timeout recovery currently uses a
    "newest opencode session in the daemon" heuristic — safe only because runs
    are sequential. Have the plugin write its `session_id` to a known file at
