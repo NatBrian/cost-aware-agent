@@ -1,0 +1,86 @@
+{
+ "pytest-dev__pytest-11143_s1": {
+  "cost": 0.015113492800000001,
+  "tools": 8,
+  "inj": 8,
+  "succ": true,
+  "to": false
+ },
+ "pytest-dev__pytest-11148_s1": {
+  "cost": 0.0382869704,
+  "tools": 13,
+  "inj": 13,
+  "succ": false,
+  "to": true
+ },
+ "pylint-dev__pylint-6506_s1": {
+  "cost": 0.059009311200000004,
+  "tools": 19,
+  "inj": 19,
+  "succ": false,
+  "to": false
+ },
+ "sympy__sympy-24213_s1": {
+  "cost": 0.029420053600000003,
+  "tools": 14,
+  "inj": 15,
+  "succ": true,
+  "to": false
+ },
+ "sympy__sympy-22714_s1": {
+  "cost": 0.033340367200000005,
+  "tools": 9,
+  "inj": 9,
+  "succ": true,
+  "to": false
+ },
+ "sympy__sympy-21612_s1": {
+  "cost": 0.053911922400000006,
+  "tools": 19,
+  "inj": 24,
+  "succ": false,
+  "to": true
+ },
+ "pytest-dev__pytest-11143_s0": {
+  "cost": 0.0053489128,
+  "tools": 5,
+  "inj": 6,
+  "succ": false,
+  "to": false
+ },
+ "pytest-dev__pytest-11148_s0": {
+  "cost": 0.1540198352,
+  "tools": 30,
+  "inj": 29,
+  "succ": true,
+  "to": false
+ },
+ "pylint-dev__pylint-6506_s0": {
+  "cost": 0.0061610808000000005,
+  "tools": 5,
+  "inj": 4,
+  "succ": false,
+  "to": true
+ },
+ "sympy__sympy-24213_s0": {
+  "cost": 0.013578404,
+  "tools": 5,
+  "inj": 6,
+  "succ": true,
+  "to": false
+ },
+ "sympy__sympy-22714_s0": {
+  "cost": 0.036491868000000004,
+  "tools": 17,
+  "inj": 16,
+  "succ": true,
+  "to": false
+ },
+ "sympy__sympy-21612_s0": {
+  "cost": 0.0351013936,
+  "tools": 14,
+  "inj": 15,
+  "succ": false,
+  "to": false
+ }
+}

@@ -23,7 +23,7 @@
   [
    "tier signal: ON injections carry Tier labels",
    true,
-   "tiers seen: ['CRITICAL', 'HIGH', 'LOW', 'MEDIUM']"
+   "tiers seen: ['CRITICAL']"
   ],
   [
    "rebuilt channel: Budget Tracker block delivered",

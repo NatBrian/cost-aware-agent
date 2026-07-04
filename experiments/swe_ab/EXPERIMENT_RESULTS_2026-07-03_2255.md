@@ -190,9 +190,15 @@ network attempt flagged (not silent), **subagent capture** (deepseek spawned
 Claude Code subagents), and session tracking. Every OpenCode harness feature
 works end-to-end on real coding tasks.
 
-**Cost result — the opposite of Claude Code.** Full arm complete (12 OFF + 12 ON
-runs). Every one of the 7 clean OFF/ON pairs is *more* expensive under budget —
-the direction is unanimous:
+> **Update:** the cost penalty below was the *old* plugin (tracker in the system
+> prompt). It has since been fixed — Follow-up #1, validated: delivering the
+> tracker at the end of context instead flips the full-arm result from +336% to
+> −8.4% (≈break-even), with per-turn freshness kept. The analysis below is the
+> pre-fix diagnosis that motivated the fix.
+
+**Cost result (pre-fix) — the opposite of Claude Code.** Full arm complete
+(12 OFF + 12 ON runs). Every one of the 7 clean OFF/ON pairs is *more* expensive
+under budget — the direction is unanimous:
 
 | metric (7 clean pairs) | OFF | ON | delta |
 |---|---|---|---|
@@ -275,11 +281,22 @@ none in the daemon):
    current spend after every tool call (freshness preserved; rejected the
    "inject less often" alternative because the model reasons fresh every turn
    and should see the current number every turn). Claude Code path unchanged.
-   **Measured on sympy-24213 ON: cache-hit 40% → 87% (OFF is 82–93%), cost
-   $0.014–0.029 → $0.0061 (OFF ~$0.005), 9 injections/run kept.** The +336% tax
-   drops to ~+20% — near break-even, making the budget safe to run on weak
-   models too. (Validated on one instance; a full OpenCode arm re-run would
-   confirm across all six.)
+   **Validated across the full OpenCode arm (12 OFF + 12 Fix-1 ON runs):**
+
+   | paired mean (n=7) | cost/task | vs OFF |
+   |---|---|---|
+   | OFF | $0.0082 | 1.0× |
+   | old ON (tracker in system prompt) | $0.0202 | **2.5×** |
+   | Fix-1 ON (tracker at end of context) | $0.0075 | **0.9×** |
+
+   Per-instance the old-plugin multipliers (0.6×, 8.2×, 1.2×, 3.9×, 8.1×, 2.8×,
+   2.7×, 2.3×, 2.4×, 6.6×) all collapse to ≈1.0× (0.6×, 1.5×, 1.0×, 1.1×, 0.6×,
+   1.1×, 1.0×, 1.0×, 0.8×, 1.2×). Worst case pytest-11148: 8.1× → 0.6×.
+   Aggregate paired result flips from **+336% (old) to −8.4% (Fix-1, n.s.,
+   ≈break-even)**, success unchanged (0.71), 12/12 feature checks still green,
+   13 injections/run retained (full per-turn freshness). **The cache tax is
+   eliminated — the budget is now free to run on OpenCode too**, not just
+   Claude Code.
 2. **Deterministic OpenCode session capture.** Timeout recovery currently uses a
    "newest opencode session in the daemon" heuristic — safe only because runs
    are sequential. Have the plugin write its `session_id` to a known file at
