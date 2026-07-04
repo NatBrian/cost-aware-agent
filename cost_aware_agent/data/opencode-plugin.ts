@@ -67,23 +67,28 @@ export const CostAwareAgentPlugin: Plugin = async ({ $ }) => {
           // PWD env var, not the real cwd (verified live 2026-07-03 handoff §8)
           project_dir: process.env["PWD"] ?? process.cwd(),
         });
-        if (res?.additionalContext) output.system.push(res.additionalContext);
+        // NOTE: session/start registration only. The live Budget Tracker is
+        // deliberately NOT pushed into output.system on every call — see below.
         return;
       }
-      // channel "rebuilt": the system array is reconstructed on every LLM call,
-      // so the tracker must be present each time — the daemon's on_change
-      // suppression (an anti-tax measure for accumulating channels like Claude
-      // Code's additionalContext) must not apply here.
-      const res = await post("/tool/pre", { session_id: sessionID, tool_name: "", channel: "rebuilt" });
-      if (res?.additionalContext) output.system.push(res.additionalContext);
+      // The system array is reconstructed on every LLM call and sits at the
+      // PREFIX of the prompt. Pushing a changing tracker here invalidates the
+      // provider's prompt cache from the top down every call — measured at
+      // +336% retail cost on deepseek (experiments/swe_ab). We keep the system
+      // prefix byte-stable and deliver the tracker at the END of context via
+      // tool.execute.after (below), which extends the cache instead of busting
+      // it while preserving per-turn dollar visibility.
     },
 
     "tool.execute.after": async (input, output) => {
+      // channel:"rebuilt" -> the daemon returns the live Budget Tracker here so
+      // it lands at the end of context (cache-preserving), not the system prefix.
       const res = await post("/tool/post", {
         session_id: input.sessionID,
         tool_name: input.tool,
         tool_input: input.args ?? {},
         tool_result: String(output.output ?? ""),
+        channel: "rebuilt",
       });
       if (res?.additionalContext) {
         output.output = `${output.output}\n\n[cost-aware-agent]\n${res.additionalContext}`;

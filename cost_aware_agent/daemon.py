@@ -285,6 +285,12 @@ class ToolPostReq(BaseModel):
     tool_input: dict = {}
     tool_result: str = ""
     transcript_path: Optional[str] = None
+    # "rebuilt" callers (OpenCode) deliver the tracker at the END of context by
+    # appending it to the tool result, instead of into the every-call-rebuilt
+    # system prompt. Appending to the tail extends the prompt cache; rewriting
+    # the system prefix invalidates it (measured: +336% retail cost). See
+    # experiments/swe_ab Follow-up #1.
+    channel: str = "accumulating"
 
 
 class VerificationResultReq(BaseModel):
@@ -395,6 +401,14 @@ def tool_post(req: ToolPostReq):
         milestone = (_config.get("enable_plan_verification", False)
                      and prompts.is_milestone(req.tool_name, req.tool_input, _config))
         context = prompts.SELF_VERIFICATION_PROMPT if milestone else None
+        # Rebuilt-channel (OpenCode) tracker delivery: append the live Budget
+        # Tracker to the tool result (end of context) rather than the system
+        # prompt (prefix). Keeps the model's per-turn dollar visibility while
+        # preserving the prompt cache. The tracker is generated AFTER the tool
+        # call's own cost is recorded above, so its numbers are current.
+        if req.channel == "rebuilt":
+            tracker = _tracker_context(conn, req.session_id, channel="rebuilt")
+            context = "\n\n".join(x for x in (tracker, context) if x) or None
         context = _deliver(conn, req.session_id, "tool/post", context)
     return {"additionalContext": context}
 
