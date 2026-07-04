@@ -243,6 +243,30 @@ none in the daemon):
    a truncated subset (`reaudit_oc.py` backfills earlier runs).
 4. deepseek free-tier stream errors → retry once on empty/zero-work timeouts.
 
+## Follow-ups worth doing (ranked)
+
+1. **Cut the rebuilt-channel cache tax** (highest value — the one place the
+   harness actively *loses* money). The entire OpenCode +336% is the injected
+   tracker busting deepseek's prompt cache. Two fixes: (a) place the volatile
+   budget line at the *end* of context, after the cached prefix, so a changed
+   tracker doesn't invalidate the prefix; (b) inject only on tier change, not on
+   every bucket step (13–29 injections/run is the killer). Success target: turn
+   the OpenCode "+336% tax" into "≈neutral," making the budget safe on weak
+   models too. This is a daemon change, not methodology.
+2. **Deterministic OpenCode session capture.** Timeout recovery currently uses a
+   "newest opencode session in the daemon" heuristic — safe only because runs
+   are sequential. Have the plugin write its `session_id` to a known file at
+   `/session/start` and read that instead. Removes the fragile heuristic.
+3. **Budget-size sweep** (methodology, costs money). 0.5× median cost one Claude
+   Code success (cut needed work). Try 0.3/0.5/0.7× to find the max-saving,
+   min-accuracy-loss point.
+4. **More n** (methodology). Claude Code n=10 is significant; OpenCode n=7 is
+   directionally unanimous but not significant. Doubling instances/seeds tightens
+   both CIs.
+
+Not worth it: making deepseek respond to the budget (model limitation, not a
+harness fix); the timeout-confounds-cost nuance (already excluded from pairs).
+
 ## Reproduce / debug
 
 ```bash

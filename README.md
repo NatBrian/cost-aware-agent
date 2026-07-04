@@ -235,7 +235,16 @@ pressure that OFF solved. The audit also caught a real contamination —
 bash `pip download` reached PyPI and one run read the fixed source (bash
 network egress was not sandboxed; fixed with a subprocess proxy black-hole,
 Anthropic whitelisted); the run was flagged, archived, and re-run clean.
-OpenCode arm deferred (free-tier quota exhausted). Details:
+
+**OpenCode / deepseek-v4-flash-free (complete): the opposite result.** All 12
+harness-feature checks pass (plumbing fully verified), but the budget makes the
+weak model **+336% more expensive** (all 7 clean pairs same direction, success
+unchanged) — the rebuilt-channel cache tax (13–29 injections/run bust deepseek's
+prompt cache) with no offsetting behavioral saving, because deepseek ignores the
+budget. **Combined conclusion: a money budget saves money only on a model
+capable enough to act on it (Claude Code −29%); on a weak model that ignores it,
+the injection tax dominates (+336%). Task slack is necessary but not
+sufficient.** Details:
 [`experiments/swe_ab/EXPERIMENT_RESULTS_2026-07-03_2255.md`](experiments/swe_ab/EXPERIMENT_RESULTS_2026-07-03_2255.md).
 
 ## Status
