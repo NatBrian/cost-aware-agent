@@ -6,11 +6,11 @@
 - **Dataset**: SWE-bench Lite — 6 real GitHub issues, graded by each project's
   own FAIL_TO_PASS / PASS_TO_PASS tests
 - **Money spent**: **$14.65 real Anthropic billing** (OFF $9.16 + ON $5.49)
-- **OpenCode arm**: run 2026-07-04 (quota returned) — see the OpenCode section
-  below. Plumbing fully verified (12/12 feature checks); cost result is the
-  OPPOSITE of Claude Code (budget makes the weak model *more* expensive via the
-  rebuilt-channel cache tax). Full paired arm partially blocked by a deepseek
-  free-tier degradation window.
+- **OpenCode arm**: complete (2026-07-04, quota returned) — see the OpenCode
+  section below. Plumbing fully verified (12/12 feature checks); cost result is
+  the OPPOSITE of Claude Code — budget makes the weak deepseek model *more*
+  expensive (+336%, all 7 clean pairs) via the rebuilt-channel cache tax, with
+  no behavioral saving (success unchanged). $0 billed (free tier).
 
 ## Headline
 
@@ -190,35 +190,46 @@ network attempt flagged (not silent), **subagent capture** (deepseek spawned
 Claude Code subagents), and session tracking. Every OpenCode harness feature
 works end-to-end on real coding tasks.
 
-**Cost result — the opposite of Claude Code.** On the clean OFF/ON pairs the
-budget makes OpenCode *more* expensive, not less:
+**Cost result — the opposite of Claude Code.** Full arm complete (12 OFF + 12 ON
+runs). Every one of the 7 clean OFF/ON pairs is *more* expensive under budget —
+the direction is unanimous:
 
-| instance | OFF $ | ON $ | ON injections | note |
-|---|---|---|---|---|
-| pytest-11143 | 0.0044 | 0.0053 | 6 | +20%, mild cache tax |
-| pytest-11148 | 0.0189 | 0.1540 | 29 | **+8×**, cache tax blowup |
+| metric (7 clean pairs) | OFF | ON | delta |
+|---|---|---|---|
+| cost/task | $0.0095 | $0.0413 | **+336% (4.3×), t=−1.82, not significant** |
+| tools/task | 16.1 | 13.3 | −2.8 |
+| success | 0.71 | 0.71 | unchanged |
+| injections/run | 0 | 13.6 | rebuilt channel |
+
+Per-instance (paired cells): pytest-11143 $0.0044→$0.0053 and $0.0039→$0.0151;
+pytest-11148 $0.0189→**$0.1540** (29 injections, the worst blowup);
+sympy-24213 $0.0057→$0.0136 and $0.0045→$0.0294; sympy-22714 $0.0157→$0.0365;
+sympy-21612 $0.0132→$0.0351. Retail totals: OFF $0.0975 → ON $0.4798 ($0 billed,
+free tier). The −336% is not statistically significant at n=7 (t=−1.82; high
+variance from the pytest-11148 outlier), but **all 7 pairs point the same way**,
+so the direction is not in doubt — only its exact size.
 
 The mechanism is the documented rebuilt-channel cache tax: OpenCode rebuilds the
 system prompt every call, so each injected Budget Tracker update (tier/bucket
-transition) invalidates deepseek's prompt cache from that point. At 29
-injections in one run, nearly every call reprocesses full context fresh →
-retail cost balloons. Behaviorally deepseek does not respond to the budget
-(consistent with the prior HotpotQA finding), so there is no offsetting saving —
-only the tax. This is the honest limit of the approach: **the budget saves money
-on a capable model that acts on it (Claude Code, −29%) and costs money on a weak
-model that ignores it while paying the injection tax (OpenCode).**
+transition) invalidates deepseek's prompt cache from that point. At 13–29
+injections per run, most calls reprocess full context fresh → retail cost
+balloons. Behaviorally deepseek does not respond to the budget (tools flat/down
+but no early finalization, success unchanged) — consistent with the prior
+HotpotQA finding — so there is no offsetting saving, only the tax. This is the
+honest limit of the approach: **the budget saves money on a capable model that
+acts on it (Claude Code, −29% significant) and costs money on a weak model that
+ignores it while paying the injection tax (OpenCode, +336%).** Task slack alone
+is not enough — the model must also be capable enough to act on the signal.
 
 **Reliability caveats (external, not harness bugs):**
 - deepseek is weak: it solves the easy instances (sympy/pytest small patches,
   ~$0.004–0.016) and loops/times out on the hard ones — the same instances
-  Claude Code also failed.
-- The free tier hit a degradation window mid-ON-arm (timing out even on a
-  trivial "reply OK"), producing total-loss timeout runs (no session, no spend).
-  The runner now recovers spend from the daemon when the CLI is killed, and
-  retries transient stream-error timeouts once; runs that still yield nothing
-  are recorded as losses and excluded from the cost stats. The full paired ON
-  arm was not completed in this window — the 2 clean pairs above show the
-  direction; more pairs would tighten it.
+  Claude Code also failed. Success is identical across arms (0.71).
+- The free tier hit a ~2-hour degradation window mid-experiment (timing out even
+  on a trivial "reply OK"). The runner recovers spend from the daemon when the
+  CLI is killed, and retries transient stream-error timeouts once; the few runs
+  that still yielded nothing were re-run after the tier recovered. All 12 ON
+  runs are now captured; 7 form clean (non-timeout, both-arm-valid) pairs.
 
 **Bugs found and fixed during this arm** (all in the experiment scaffolding,
 none in the daemon):

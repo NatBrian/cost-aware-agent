@@ -8,7 +8,7 @@
   [
    "ON delivery: every ON run with work got >=1 injection",
    true,
-   "3/3 runs"
+   "12/12 runs"
   ],
   [
    "retail cost: cost_usd == daemon_spent for all runs",
@@ -23,7 +23,7 @@
   [
    "tier signal: ON injections carry Tier labels",
    true,
-   "tiers seen: ['CRITICAL', 'HIGH', 'MEDIUM']"
+   "tiers seen: ['CRITICAL', 'HIGH', 'LOW', 'MEDIUM']"
   ],
   [
    "rebuilt channel: Budget Tracker block delivered",
@@ -48,12 +48,12 @@
   [
    "audit: every run with a net attempt is flagged (not silent)",
    true,
-   "1 runs had net attempts, all flagged"
+   "4 runs had net attempts, all flagged"
   ],
   [
    "subagent capture: 'task' subagent calls ingested to daemon",
    true,
-   "4 run(s) used a task subagent, all captured"
+   "6 run(s) used a task subagent, all captured"
   ],
   [
    "session tracking: non-loss runs have daemon usage rows",
