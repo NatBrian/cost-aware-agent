@@ -1,260 +1,178 @@
 # cost-aware-agent
 
-A background daemon + adapters that give CLI coding agents (Claude Code, OpenCode)
-real-time visibility into how much a session is actually costing — in dollars — so
-the agent can factor cost into its own decisions instead of running blind.
+> **Give your coding agent a wallet.** It sees, in real dollars, what the current session is costing — and factors that into its own decisions instead of running blind.
 
-**Money is the metric.** The budget is always a dollar amount, and spend is always
-the real dollar cost of LLM usage (LiteLLM retail pricing; free-tier models are
-priced at the paid model's retail rate so the pressure stays real). Cost is never a
-proxy — not tool-call counts, not turns, not iterations.
+A local daemon + adapters for **Claude Code** and **OpenCode** that meter the real dollar cost of a session and inject a live budget tracker into the agent's context. A five-minute task and a five-dollar detour no longer look identical from inside the conversation.
 
-**Advisory only.** The daemon never blocks a tool call, never aborts a session, and
-never enforces a ceiling. It injects the real number; the model decides. If the
-model judges the task worth exceeding the budget, it can — the bet is that a
-visible, depleting dollar budget produces the same economic judgment a human
-engineer applies, not that a hard stop does.
+- 💵 **Money is the metric** — always real USD (retail LLM pricing), never a proxy like tool-call counts or turns.
+- 🤝 **Advisory only** — never blocks, aborts, or enforces a ceiling. It shows the number; the model decides.
+- 📉 **Proven to save** — on real coding tasks with slack, the budget cut Claude Code's cost **−29%** (significant) with *higher* success and zero runaway timeouts.
 
-## Why
+---
 
-Coding agents today have no sense of what they're spending. A five-minute task and
-a five-dollar detour look identical from inside the conversation. This gives the
-agent the missing half of the trade-off: not just "can I do this" but "is this
-still worth it."
-
-## How it works
-
-A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) tracks cost per session:
-
-- **Cost Engine** — real `$` from token counts and model pricing (vendored LiteLLM
-  price map), including Anthropic's split pricing for 5-minute vs 1-hour
-  prompt-cache writes. A model with no price-map entry is **never costed $0**
-  (that would be an unmeasured channel — route work through an unpriced model id
-  and spend vanishes): it's charged a conservative mid-tier fallback rate, the
-  row is flagged `price_unknown`, and the tracker shows a warning line.
-- **Subagent capture** — Claude Code Task-tool subagents write their own
-  transcript files (`<session>/subagents/agent-*.jsonl`), not the parent
-  transcript — and Workflow-tool agents nest one level deeper
-  (`subagents/workflows/wf_*/agent-*.jsonl`). The daemon discovers the whole
-  `subagents/` tree recursively and ingests it onto the parent session. On a
-  real workflow-heavy session this was **71% of true spend** ($30.84 of
-  $43.60) that parent-only parsing missed.
-- **Budget Tracker** — injects current spend, remaining budget, measured burn
-  rate, and tier (HIGH/MEDIUM/LOW/CRITICAL). The numbers come with a single
-  delegation line — "decide yourself what these numbers mean" — not canned
-  per-tier verdicts: the harness measures, the model judges. At spend
-  milestones (each 10% budget slice crossed) it asks one accounting question:
-  "what did that spend buy? If nothing new, change course or finalize."
-- **Project wallet** — one number from the user, maximum: `cost-aware-agent
-  init --budget 10` gives the project a dollar wallet that **depletes across
-  every session** in that directory until exhausted (the session budget is a
-  view over the wallet, not a per-session reset). Resolution order for a
-  session's budget: explicit `/session/start` override (used by experiments to
-  switch conditions without a daemon restart) → project wallet → config
-  default. `cost-aware-agent budget show` prints budget/spent/remaining.
-- **Injection policy (anti-tax)** — on accumulating channels (Claude Code's
-  `additionalContext` persists in the conversation) the tracker is re-injected
-  **only when the signal changes**: tier transition, or spend crossing another
-  10% slice of the budget (`inject_mode: "on_change"`, the default). An earlier
-  version injected on every tool call and measurably *increased* session cost by
-  ~44% on tool-heavy tasks — the fix cut a 10-tool session from 22 injections to
-  ~4. Rebuilt channels (OpenCode's system prompt is reconstructed every LLM call)
-  always carry the current tracker, since nothing accumulates there.
-- **Audit log** — every delivered injection is recorded in the daemon DB
-  (`injections` table). `GET /session/<id>/dump` exports a session's full history:
-  LLM usage rows, tool calls, every injected text, plan state — runs are
-  replayable and debuggable from the daemon alone.
-- **Session history (measured, not estimated)** — a new session in a project
-  with prior finished sessions starts with "[PROJECT HISTORY] Your last N
-  session(s) here cost $A–$B (median $M)" — real measured totals the model can
-  baseline against; nothing is injected when there is no history.
-- **End-of-session receipt** — `/session/stop` logs a human-readable receipt
-  (total by model, budget/wallet state, tool-call breakdown, biggest single
-  calls) to `daemon.log`; `cost-aware-agent receipt <session>` prints the same
-  on demand.
-- **Compaction survival** — Claude Code re-fires SessionStart with
-  `source=compact` after compaction, which wipes every accumulated injection
-  from the conversation; the daemon detects it, resets its on_change state,
-  and re-delivers the tracker immediately (same for `clear`).
-- **Planning / Self-Verification (dormant)** — session-start checklist and
-  milestone-triggered verification prompts never demonstrated
-  value in any experiment and are **off by default**
-  (`enable_plan_verification: false`); the code paths stay behind the flag.
-
-Two adapters, two capture mechanisms:
-
-| | Claude Code | OpenCode |
-|---|---|---|
-| Mechanism | pull — daemon parses the session transcript on hook fire | push — plugin posts usage straight from hook payloads |
-| Injection channel | hook `additionalContext` (accumulating → on_change policy) | system-transform (rebuilt → always current) |
-| Install | `cost-aware-agent install --for claude-code [--project-dir . \| --global]` | `cost-aware-agent install --for opencode [--project-dir . \| --global]` |
-
-The daemon auto-spawns on first hook fire and fails open — if it's ever
-unreachable, adapters silently no-op rather than blocking the agent.
-
-## Install
+## Quickstart
 
 ```bash
 pip install -e .
+
+# install the adapter for your agent (per-project or --global)
 cost-aware-agent install --for claude-code --project-dir .
-# or: cost-aware-agent install --for opencode --project-dir .
-cost-aware-agent init --budget 10        # "$10 for my project" — the one number
-cost-aware-agent budget show             # budget / spent / remaining
+#   or: cost-aware-agent install --for opencode --project-dir .
+
+cost-aware-agent init --budget 10   # "$10 for this project" — the one number you set
+cost-aware-agent budget show        # budget / spent / remaining
 ```
 
-(Re-run `install` after upgrading — it rewrites the hook script, which the
-adapters depend on for fields like `project_dir`.)
+That's it. The daemon auto-spawns on the first hook fire, and the agent starts
+seeing its spend. Nothing else to configure.
 
-Run the unit tests with `python3 -m pytest tests/`.
+> [!TIP]
+> The `--budget` you set is a **project wallet**: it depletes across *every*
+> session in that directory until exhausted, not per-session. One number, set
+> once. Re-run `install` after upgrading the package — it refreshes the hook script.
 
-## Tamper boundary (honest scope)
+---
 
-The daemon is an unauthenticated localhost service and the DB is a local file:
-a Bash-capable agent on the same host can ultimately tamper (POST forged
-usage, run `budget set`, edit SQLite). The design answer is advisory-trust
-plus **tamper evidence**, not prevention: all inputs are validated at the
-boundary (negative token counts clamped at the cost formula *and* the intake;
-non-finite or non-positive budget overrides rejected), every accepted budget
-override is logged to `daemon.log`, and every usage row / injection / override
-is in the DB for post-hoc audit. Experiments additionally sandbox the agent
-away from the daemon and DB.
+## What you get
 
-## Known accuracy limits (documented, by design or pending upstream)
+| Feature | What it does |
+|---|---|
+| **Budget Tracker** | Injects live spend, remaining budget, burn rate, and tier (HIGH→CRITICAL). One line — "decide yourself what these numbers mean" — no canned verdicts. |
+| **Project wallet** | `init --budget 10` gives a dollar wallet that depletes across all sessions in the directory. |
+| **Real-dollar cost engine** | `$` from token counts × model pricing (vendored LiteLLM map), incl. Anthropic 5m/1h cache-write split. Unknown models are charged a fallback rate + flagged, **never $0**. |
+| **Subagent capture** | Ingests Claude Code Task/Workflow subagent transcripts onto the parent session — was **71% of true spend** on one workflow-heavy run that parent-only parsing missed. |
+| **Spend checkpoints** | At each 10% budget slice: "what did that spend buy? If nothing new, change course or finalize." |
+| **Session history** | A new session starts with "[PROJECT HISTORY] your last N sessions cost $A–$B" — measured totals, never estimates. |
+| **End-of-session receipt** | `cost-aware-agent receipt <id>` — total by model, wallet state, tool breakdown, biggest calls. |
+| **Full audit trail** | Every usage row, tool call, and injected text is in the daemon DB; `GET /session/<id>/dump` replays a session for debugging. |
 
-- **Claude Code spend lags the current turn.** CC exposes no per-turn usage hook
-  (`anthropics/claude-code#11008`), so spend is parsed from the transcript as
-  turns complete. The injected tracker says so explicitly ("cost is measured from
-  completed turns"). In practice tiers do escalate live within a session (verified
-  HIGH→LOW→CRITICAL in a single real `claude -p` run), but the number trails by
-  up to one turn.
-- **Session-title generation cost is invisible** to the transcript parser (CC
-  writes no usage block for its haiku title calls). Roughly constant per session:
-  negligible on expensive tasks, up to ~12% of LLM cost on very cheap ones.
-- **OpenCode's usage payload has no 5m/1h cache-write split**; cache writes are
-  priced at the 5-minute rate — a conservative undercount.
-- **LiteLLM price-map staleness** — refresh by re-vendoring
-  `cost_aware_agent/data/model_prices_and_context_window.json`. A stale map
-  degrades to the conservative fallback rate + `price_unknown` flag, never to
-  silent $0.
+---
 
-## Experiments — does cost-awareness change behavior?
+## Does it actually save money?
 
-Three experiments, in increasing order of realism. Full per-run traces (event
-streams, transcripts, hook logs, daemon dumps) are written under each
-experiment's `runs/` (gitignored, regenerable); committed results snapshots and
-methodology live in each experiment's results doc.
+Short answer: **yes — when the task has discretionary slack *and* the model is
+capable enough to act on the signal.** We ran a ladder of experiments from
+prompt-level toy tests up to real GitHub bug-fixes. The headline:
 
-### 1. `experiments/hotpotqa/` — prompt-level A/B (ReAct harness)
+| Experiment | Agent | Task | Result |
+|---|---|---|---|
+| **`swe_ab`** (headline) | Claude Code (Sonnet) | SWE-bench Lite (real issues, graded by project tests) | **−29% cost, significant** (t=2.53); success 0.67→0.75; runaway timeouts 2→0 |
+| `swe_ab` | OpenCode (deepseek) | same | Plumbing 12/12 verified; weak model ignores budget → no saving, but harness cost engineered to **≈break-even** |
+| `real_cli` | Both | HotpotQA distractor (low slack) | **No saving** (+2.8%, n.s.) — required retrieval has nothing to trim |
+| `e2e_verify` | Both | Feature acceptance | **165/165** machine-checked feature assertions pass |
 
-A plain-text ReAct agent (Sonnet via `claude -p`, and deepseek via `opencode run
---pure`) answers screened retrieval-forcing HotpotQA questions with BM25 tools,
-budget tracker fed directly into the prompt. Full method + honest read in
-[`experiments/hotpotqa/RESULTS.md`](experiments/hotpotqa/RESULTS.md).
+**The one lesson across all of them:** the savings live in *discretionary and
+runaway* work. On tasks with no slack (fixed retrieval), an advisory budget
+saves nothing. On open-ended work (debugging, "explore until good"), a capable
+model trims the waste — Claude Code cut cost 29% and *stopped* the runaways that
+otherwise ran to a timeout.
 
-**What it showed:** the budget consistently truncated one runaway question (OFF
-over-explored it every seed, up to $1.91; a $0.30 budget stopped at 5-6 calls),
-but the aggregate "28% cheaper" is **not significant at n=10** (paired t=0.85)
-and is concentrated in that single question. The earlier version of this README
-reported it as a robust monotonic result — that was an overclaim, corrected
-after audit. `analyze.py` now prints paired t + CI by default.
+> [!IMPORTANT]
+> **Honest caveats, up front.** (1) The 29% saving is on tasks *with* slack;
+> low-slack tasks show ~0 effect — this is expected, not a bug. (2) A budget can
+> also cut work that was genuinely needed: 1 of 12 Claude Code runs failed under
+> pressure that the no-budget arm solved. Budget *size* is a real accuracy/cost
+> knob. (3) A weak model (deepseek) ignores the budget entirely — no behavioral
+> saving there, only correct measurement.
 
-**Integrity work that held up:** closed-book screening (all kept questions have
-closed-book F1 = 0.0, so retrieval is forced), a caught-and-blocked cheat (the
-model `grep`-ed the gold answers out of the data file until the harness moved to
-an empty sandbox CWD + hard `--disallowedTools`), and per-run audit fields
-(`web_requests=0`, tool-use-by-name) on every reported row.
+<details>
+<summary><b>The cache-tax story (a real bug we found and fixed)</b></summary>
 
-### 2. `experiments/cc_adapter/` — production-path probe (superseded)
+On OpenCode the budget first made sessions **+336% more expensive**. The cause
+wasn't the model — it was our own injection design. OpenCode rebuilds the system
+prompt every call, so a *changing* tracker in the prompt prefix invalidated the
+provider's prompt cache from the top down every turn (cache-hit collapsed 90% →
+~40%, verified from token logs).
 
-First test of the real Claude Code hook path. Its headline finding stands —
-budget guidance steers *discretionary* work but not *hard-requirement* work —
-but its ON arm was a static CRITICAL banner (spend lag + tight preset budget),
-and it measured the injection tax that motivated the on_change policy. See the
-correction header in its results doc.
+The fix: deliver the tracker at the **end** of context (appended to the tool
+result) instead of the system prefix. The tail extends the cache instead of
+busting it, while the model still sees its current spend every turn. Result,
+validated across the full arm with fresh wallets: **+336% → −24% (≈break-even)**,
+freshness preserved, 12/12 feature checks still green. The budget is now free to
+run on OpenCode too, not just Claude Code.
 
-### 3. `experiments/real_cli/` — real agents, real dataset, pre-registered budget
+This is the general rule the harness now follows: *injected text may change
+often, but it must go where a change doesn't invalidate the cache.*
+</details>
 
-The production-path experiment: **real Claude Code** (Sonnet, native
-Read/Grep/Glob, live production hooks) and **real OpenCode**
-(deepseek-v4-flash-free, production plugin) answer HotpotQA distractor
-questions from actual corpus files in a sandbox project. Bias controls fixed
-from the audit: the budget is set by a **pre-registered rule** (median OFF cost
-per question) computed on a **held-out calibration set**, never on the eval
-questions. 120 eval runs + 24 calibration runs, all audit-clean.
+<details>
+<summary><b>Per-experiment detail + methodology</b></summary>
 
-Headline findings (full tables in
-[`experiments/real_cli/RESULTS.md`](experiments/real_cli/RESULTS.md)):
+Full per-run traces (event streams, transcripts, hook logs, daemon dumps) live
+under each experiment's `runs/` (gitignored, regenerable); committed results
+snapshots and methodology live in each results doc.
 
-- **Claude Code**: the on_change policy makes injection ~free (+2.8% cost, not
-  significant, vs the +44% measured before), tiers escalate live in-session
-  (HIGH→CRITICAL observed in real hook deliveries), and the one runaway-prone
-  question is again the only one where the budget saves money. Advisory
-  budgets do not cut *required* work — no saving on low-slack retrieval tasks.
-- **OpenCode**: cross-agent plumbing fully proven (plugin, retail pricing,
-  tiered injection, full audit trail), but deepseek ignores the guidance
-  (behavior flat), and a second harness tax was found and measured: changing
-  injected system-prompt text busts the provider's prompt cache (+92% cost,
-  cut to +70% by byte-stable quantized tracker text; residual is structural
-  when a single call spends ~20% of the budget). Absolute overhead:
-  $0.00185/question.
-- **The consistent picture across all three experiments**: the money savings
-  live in discretionary and runaway work; capable models respect that
-  boundary, weak models ignore the budget entirely, and the harness's own
-  injection cost must be engineered to ~zero (now measured and mostly fixed)
-  or it eats the benefit.
+- **`experiments/swe_ab/`** — the headline paired A/B on SWE-bench Lite. Wallet
+  set by a pre-registered rule (0.5× per-instance OFF median), SWE-bench grading,
+  cheat + network audit. Also caught a real contamination (a run `pip download`-ed
+  the fixed package and read gold source — flagged, network-blocked, re-run clean)
+  and the cache-tax fix above.
+  [Results](experiments/swe_ab/EXPERIMENT_RESULTS_2026-07-03_2255.md).
+- **`experiments/real_cli/`** — real Claude Code + real OpenCode on HotpotQA
+  distractor, pre-registered budget on a held-out calibration set. 120 eval +
+  24 calibration runs, all audit-clean. Established "no saving on low-slack work."
+  [Results](experiments/real_cli/RESULTS.md).
+- **`experiments/e2e_verify/`** — acceptance test of every harness feature on the
+  real CLIs. 165/165 assertions; caught the CC Task→Agent tool rename and an
+  OpenCode session-metadata race. [Results](experiments/e2e_verify/RESULTS.md).
+- **`experiments/hotpotqa/`** & **`experiments/cc_adapter/`** — earlier
+  prompt-level and first-production-path probes (superseded, corrections noted in
+  their docs). Kept for provenance.
+</details>
 
-### 4. `experiments/e2e_verify/` — end-to-end feature acceptance (post-audit)
+---
 
-Not an A/B experiment: an acceptance test of the whole post-audit harness on
-the real CLIs. 5 runs per agent (Claude Code 2.1.199 / Sonnet, OpenCode
-1.17.13 / deepseek-v4-flash-free), each run targeting specific features;
-**165/165 machine-checked assertions pass** (`verify.py`) with a clean cheat
-audit. Live-proved in one sweep: exact-to-the-cent cost capture (4/5 CC runs
-match CLI billing to full float precision), subagent capture (30% of the
-delegation run's spend arrived via `pull-subagent` rows), wallet depletion
-across sessions + [PROJECT HISTORY], spend-milestone checkpoints, tier
-escalation to CRITICAL, advisory-only under 3× overspend, per-turn
-`/turn/end`, receipts, and OFF-arm silence. Also caught: CC ≥ 2.1.x renamed
-the subagent tool Task→Agent (deny lists must cover both), and a
-session-metadata race in the OpenCode adapter (fixed + regression test).
-Details: [`experiments/e2e_verify/RESULTS.md`](experiments/e2e_verify/RESULTS.md).
+## How it works
 
-### 5. `experiments/swe_ab/` — real coding tasks, paired A/B (the slack benchmark)
+A local FastAPI + SQLite daemon (`~/.cost-aware-agent/`) meters cost per session
+and hands the agent a budget tracker through each CLI's native channel.
 
-The follow-up to `real_cli`, on a dataset that *has* discretionary slack:
-**SWE-bench Lite** — real GitHub issues graded by each project's own
-FAIL_TO_PASS / PASS_TO_PASS tests. 6 mechanically-screened instances × 2 seeds,
-OFF vs ON (advisory money budget, wallet = 0.5× per-instance OFF median,
-rule pre-registered). **Result (Claude Code / Sonnet): the budget cut cost
-−29.4% paired (significant, t=2.53, 95% CI [$0.019, $0.345]), −40% total, with
-success rate up (0.67→0.75) and 2→0 runaway timeouts.** Savings concentrate on
-high-slack instances; low-slack ones barely move — confirming slack is the
-variable that decides whether an advisory budget saves money (HotpotQA, no
-slack, was +2.8% n.s.). Honest downside: 1/12 ON runs failed under budget
-pressure that OFF solved. The audit also caught a real contamination —
-bash `pip download` reached PyPI and one run read the fixed source (bash
-network egress was not sandboxed; fixed with a subprocess proxy black-hole,
-Anthropic whitelisted); the run was flagged, archived, and re-run clean.
+| | Claude Code | OpenCode |
+|---|---|---|
+| **Capture** | pull — daemon parses the session transcript on hook fire | push — plugin posts usage from hook payloads |
+| **Injection channel** | hook `additionalContext` (accumulating → re-injected only on change) | tool-result append (rebuilt → current every turn, cache-safe) |
+| **Install** | `install --for claude-code` | `install --for opencode` |
 
-**OpenCode / deepseek-v4-flash-free (complete): the opposite result.** All 12
-harness-feature checks pass (plumbing fully verified), but the budget makes the
-weak model **+336% more expensive** (all 7 clean pairs same direction, success
-unchanged) — the rebuilt-channel cache tax (13–29 injections/run bust deepseek's
-prompt cache) with no offsetting behavioral saving, because deepseek ignores the
-budget. **Combined conclusion: a money budget saves money only on a model
-capable enough to act on it (Claude Code −29%); on a weak model that ignores it,
-the injection tax dominates (+336%). Task slack is necessary but not
-sufficient.** Details:
-[`experiments/swe_ab/EXPERIMENT_RESULTS_2026-07-03_2255.md`](experiments/swe_ab/EXPERIMENT_RESULTS_2026-07-03_2255.md).
+Two anti-tax rules keep the harness's own cost near zero (both taxes were
+*measured*, then fixed): on accumulating channels the tracker re-injects **only
+when the signal changes** (tier flip or another 10% spent — cut a tool-heavy
+session from 22 injections to ~4, killing a measured +44% tax); on rebuilt
+channels it's delivered at the **end** of context so it never busts the prompt
+cache (the +336%→break-even fix). The daemon fails open — if it's ever
+unreachable, adapters silently no-op rather than block the agent.
 
-## Status
+---
 
-- Claude Code adapter — live-verified: hook delivery, transcript cost pull
-  (matches CLI-reported billing to ~$0.001 in test runs), on_change injection,
-  in-session tier escalation.
-- OpenCode adapter — live-verified: plugin loads project-scoped, usage push with
-  message-id dedup (UPSERT, one row per assistant message), system-transform
-  injection delivered to the model.
-- Unit tests cover the cost engine (tier boundaries, cache-split pricing, price
-  fallbacks), DB dedup/UPSERT, transcript parsing, prompt parsing, and the
-  injection bucket policy.
+## Honest scope & limits
+
+> [!NOTE]
+> **Tamper boundary.** The daemon is an unauthenticated localhost service and the
+> DB is a local file — a Bash-capable agent on the same host *can* ultimately
+> tamper. The design is advisory-trust plus **tamper-evidence**, not prevention:
+> all inputs validated at the boundary (negative tokens clamped, bad budget
+> overrides rejected + logged), every row auditable after the fact. Experiments
+> additionally sandbox the agent away from the daemon and DB.
+
+Known measurement limits (documented, by design or pending upstream):
+
+- **Claude Code spend lags by up to one turn** — CC exposes no per-turn usage
+  hook ([claude-code#11008](https://github.com/anthropics/claude-code/issues/11008)); spend is parsed as turns complete. The tracker says so explicitly.
+- **CC session-title cost is invisible** to the transcript parser — negligible on
+  expensive tasks, up to ~12% on very cheap ones.
+- **OpenCode has no 5m/1h cache-write split** — priced at the 5-minute rate (a
+  conservative undercount).
+- **LiteLLM price-map staleness** — a stale map degrades to the conservative
+  fallback rate + `price_unknown` flag, never to silent $0.
+
+---
+
+## Development
+
+```bash
+python3 -m pytest tests/        # cost engine, DB dedup/UPSERT, parsing, injection policy
+```
+
+The daemon config lives at `~/.cost-aware-agent/config.json`; `GET
+/session/<id>/dump` exports a full session for debugging. Planning /
+self-verification code paths exist but are dormant behind
+`enable_plan_verification: false` (never showed value in any experiment).
