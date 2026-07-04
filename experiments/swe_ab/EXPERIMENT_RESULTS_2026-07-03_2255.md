@@ -209,13 +209,34 @@ free tier). The −336% is not statistically significant at n=7 (t=−1.82; high
 variance from the pytest-11148 outlier), but **all 7 pairs point the same way**,
 so the direction is not in doubt — only its exact size.
 
-The mechanism is the documented rebuilt-channel cache tax: OpenCode rebuilds the
-system prompt every call, so each injected Budget Tracker update (tier/bucket
-transition) invalidates deepseek's prompt cache from that point. At 13–29
-injections per run, most calls reprocess full context fresh → retail cost
-balloons. Behaviorally deepseek does not respond to the budget (tools flat/down
-but no early finalization, success unchanged) — consistent with the prior
-HotpotQA finding — so there is no offsetting saving, only the tax. This is the
+**Mechanism, verified from the daemon token logs (not asserted):**
+- It is *not* a cost bug: per-call costs sum exactly to the daemon's spend
+  (e.g. pytest-11148 ON: 29 rows sum to $0.1540 = spent), so cost is
+  tokens×price with no double-count.
+- It is *not* the model doing more work: ON made *fewer* calls than OFF in 3 of
+  4 sampled pairs (16→6, 33→16) with less output — each call is simply pricier.
+- It *is* the rebuilt-channel cache tax: cache-hit rate collapses from 93–96%
+  (OFF) to 23–44% (ON), and fresh input tokens multiply 3.6×–30×. Root cause:
+  all 29 injections in the worst run are byte-*unique* (spend $0.0000→$0.0236,
+  tier HIGH→MEDIUM→CRITICAL, burn line appearing) — each change is a new
+  system-prompt prefix, so deepseek's prompt cache invalidates from that point
+  and everything after is reprocessed fresh.
+
+So the extra cost is real and correctly measured, caused by **our harness's
+injection design** (a *changing* signal in OpenCode's every-call-rebuilt system
+prompt) — a design weakness to fix (Follow-up #1), not a measurement bug and not
+the model's fault. Behaviorally deepseek does not respond to the budget (tools
+flat/down, success unchanged) — consistent with the prior HotpotQA finding — so
+there is no offsetting saving, only the tax.
+
+**Honest scale caveat:** the +336% is a worst case for the *sub-cent budget
+regime*, not a steady-state number. deepseek is so cheap the wallet is ~$0.008,
+so the 10%-bucket quantization step (~$0.0008) is finer than one call's spend —
+nearly every call crosses a bucket and re-changes the text, maximizing the tax.
+At realistic dollar-scale budgets a single call is a tiny fraction of the
+wallet, the tracker text stays byte-stable for many calls, and the tax is far
+smaller. The direction (budget costs more on a weak model that ignores it) holds
+regardless; the magnitude is inflated by the tiny-budget scale. This is the
 honest limit of the approach: **the budget saves money on a capable model that
 acts on it (Claude Code, −29% significant) and costs money on a weak model that
 ignores it while paying the injection tax (OpenCode, +336%).** Task slack alone
