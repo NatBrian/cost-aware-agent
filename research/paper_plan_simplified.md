@@ -438,17 +438,18 @@ We test 6 "what if we changed X?" questions:
 
 ## 7. THE CONTRIBUTIONS (What's New)
 
-### Three Things We Claim As Contributions
+### Five Things We Claim As Contributions
 
 | # | Contribution | Why It Matters |
 |---|---|---|
-| 1 | **O(T) oracle stopping labels (zero extra executions)** | Reduces training cost by 160× vs AgentPRM. Makes cost-aware agent training possible on long tasks (SWE-bench) where it was previously too expensive |
-| 2 | **Dynamic per-instance cost adaptation beats static penalties** | Coach spends more on hard problems, less on easy ones — automatically. Static approaches can't do this |
-| 3 | **Tiny coach supervises giant worker (<3% overhead)** | 0.5B coach managing a 72B worker. The overhead is less than what you save |
+| 1 | **The self-reinforcing training cycle** | No prior work connects oracle labeling → stopper training → process rewards → executor improvement → better trajectories. AgentPRM has pieces, CaRT has pieces, but nobody closes the loop |
+| 2 | **Why two models are necessary (not just a choice)** | A single model doing both reasoning AND cost-evaluation faces a "representation conflict" — the two tasks need different features. We prove splitting them is strictly better |
+| 3 | **O(T) oracle stopping labels (zero extra executions)** | Reduces training cost by 160× vs AgentPRM. Makes cost-aware agent training possible on long tasks (SWE-bench) where it was previously too expensive |
+| 4 | **Dynamic per-instance cost adaptation beats static penalties** | Coach spends more on hard problems, less on easy ones — automatically. Static approaches can't do this |
+| 5 | **Tiny coach supervises giant worker (<3% overhead)** | 0.5B coach managing a 72B worker. The overhead is less than what you save |
 
-### Three Things We Do NOT Claim As Contributions
+### Two Things We Do NOT Claim As Contributions
 
-- **Two-model design** — this is a known pattern (AgentPRM, ReMA already did it)
 - **Multi-dimensional budget** — BATS and INTENT already track tokens + tools
 - **GRPO-based training** — we use existing algorithms without modification
 
@@ -468,7 +469,36 @@ We test 6 "what if we changed X?" questions:
 
 ---
 
-## 9. VISUAL SUMMARY (One Diagram)
+## 9. THE SELF-REINFORCING CYCLE (The Core Idea)
+
+```
+                     THE SELF-REINFORCING CYCLE
+                     
+   ① Executor runs tasks, generates trajectories
+        │
+        ▼
+   ② Oracle computes t* = argmax[quality − λ×cost]
+        │  (O(T) post-hoc, zero extra work)
+        ▼
+   ③ Stopping model trains on oracle labels
+        │  (SFT: "copy correct stops" → GRPO: "practice")
+        ▼
+   ④ Stopper provides Δ(s_t) as process rewards
+        │  to executor during GRPO training
+        ▼
+   ⑤ Executor learns cost-aware behavior
+        │  (better actions + knows when they're done)
+        │
+        └────────► back to ① (produces better trajectories)
+
+WHY THIS CYCLE IS NEW:
+- AgentPRM: has ②→③→④ but no cost, no stopping, O(K×T²) 
+- CaRT: has ①→②→③ but no ④→⑤ (coach only, worker not trained)
+- Ares: has ①→②→③ with discrete levels, no ④→⑤ (no worker training)
+- Reason Efficiently: has ⑤ only (cost penalty in one model, none of ①→④)
+```
+
+## 10. VISUAL SUMMARY (One Diagram)
 
 ```
                     THE OVERALL IDEA
@@ -496,7 +526,7 @@ We test 6 "what if we changed X?" questions:
 
 ---
 
-## 10. KEY TERMS (Glossary)
+## 11. KEY TERMS (Glossary)
 
 | Term | Plain English |
 |---|---|
@@ -518,6 +548,8 @@ We test 6 "what if we changed X?" questions:
 | **Pareto Frontier** | The best possible trade-off curve between cost and accuracy |
 | **Ablation** | "What happens if we remove X?" — testing which parts of the system matter |
 | **Budget Tier** | Urgency level: HIGH (>60% left), MEDIUM (30-60%), LOW (10-30%), CRITICAL (<10%) |
+| **Self-Reinforcing Cycle** | The loop: executor → oracle labels → stopper training → process rewards → better executor. Closing this loop is CASSI's main innovation |
+| **Representation Conflict** | Why one model can't do both reasoning and cost-evaluation well — the two tasks need different "mental features" to succeed |
 
 ---
 

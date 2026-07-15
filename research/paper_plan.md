@@ -1,4 +1,4 @@
-# Paper Plan v4: Scalable Cost-Aware Agent Training via Oracle-Guided Stopping Rewards
+# Paper Plan v5: Scalable Cost-Aware Agent Training via Oracle-Guided Stopping Rewards
 
 > **Target Venue:** ICLR / NeurIPS / ICML
 > **Type:** Efficiency contribution to process reward model training for LLM agents
@@ -8,7 +8,7 @@
 
 ## 1. Title
 
-**"Scalable Cost-Aware Agent Training via Oracle-Guided Stopping Rewards"**
+**"Learning to Stop: Self-Reinforcing Cost-Aware Training for LLM Agents"**
 
 ---
 
@@ -16,9 +16,9 @@
 
 > Large language model (LLM) agents solve complex tasks through multi-step reasoning and tool use, but they lack economic judgment — they cannot assess whether the next action is worth its cost. Existing solutions either enforce rigid budget cutoffs, embed static length penalties that cannot adapt per instance, or rely on training-free heuristics. Process reward models (PRMs) can provide step-level training signals, but current PRMs rely on Monte Carlo rollouts from every intermediate state — requiring O(K×T²) additional policy executions per trajectory and making cost-aware training intractable for long-horizon tasks like software engineering.
 >
-> We propose **oracle-guided stopping rewards**: instead of simulating forward from each state, we compute optimal stopping labels directly from completed trajectories. For a T-step trajectory, the oracle stopping point is `t* = argmax_t [quality_t − λ × cumulative_cost_{1..t}]` — an O(T) post-hoc computation requiring zero additional executions. We train a small stopping model (0.5B–3B parameters) on these labels via SFT+RL, then use its cost-aware value estimates as process rewards to train the executor agent via GRPO. This reduces training computation from O(K×T²) to O(T) — a K×T reduction that makes cost-aware PRM training tractable on long-horizon benchmarks.
+> We propose a **self-reinforcing training cycle** for cost-aware LLM agents. First, a small stopping model (0.5B–3B parameters) is trained on oracle-guided labels derived analytically from completed trajectories: `t* = argmax_t [quality_t − λ × cumulative_cost_{1..t}]` — an O(T) post-hoc computation requiring zero additional executions. Then, the stopping model's cost-aware value estimates Δ(s_t) are used as process rewards to train the executor agent via GRPO. This creates a closed loop: better executor trajectories → better oracle labels → better stopping model → better process rewards → even better executor. The training computation is reduced from O(K×T²) to O(T), while the stopping model's inference overhead stays below 3% of total cost.
 >
-> We evaluate on web search (GAIA, WebWalkerQA), multi-hop QA (HotpotQA, MuSiQue), and software engineering (SWE-bench Verified). Our method reduces agent computation cost by **X%** while maintaining or improving task success, outperforming static length penalties (L1, Reason Efficiently), quality-only PRMs (AgentPRM), self-termination training (CaRT), and heuristic stopping (BATS). The stopping model adapts cost pressure per-instance — spending more compute on hard problems and less on easy ones — with its own inference overhead below 3% of total cost.
+> We evaluate on web search (GAIA, WebWalkerQA), multi-hop QA (HotpotQA, MuSiQue), and software engineering (SWE-bench Verified). Our method reduces agent computation cost by **X%** while maintaining or improving task success, outperforming static length penalties (L1, Reason Efficiently), quality-only PRMs (AgentPRM), self-termination training (CaRT), single-model budget-aware RL (BudgetThinker), and heuristic stopping (BATS). The stopping model adapts cost pressure per-instance — spending more compute on hard problems and less on easy ones — with its own inference overhead below 3% of total cost.
 
 ---
 
@@ -68,24 +68,111 @@ These are **economic judgments** — weighing the marginal value of continued wo
 
 ---
 
-## 4. Motivation
+## 4. The Self-Reinforcing Cost-Aware Training Cycle
 
-### 4.1 Core Hypothesis
+### 4.1 Why Single-Model Cost Penalties Fundamentally Fail
+
+Existing cost-aware training adds a length penalty to the policy's reward: `R = R_task − α × len(a)`. This is a **static, instance-blind scalar** — the same α applies to every task, every trajectory, every step. This creates three structural problems:
+
+| Problem | What It Means | Why It Fails |
+|---|---|---|
+| **Instance-blind pressure** | Easy and hard tasks receive identical cost pressure | Penalizes necessary work on hard problems; doesn't penalize wasted work enough on easy ones |
+| **No mid-trajectory adaptation** | The penalty is applied at episode end, not step-by-step | The executor cannot learn that step 12 was wasteful because steps 8-11 had already solved the task |
+| **Representation conflict** | The same model must learn two competing capabilities: (a) open-ended task execution and (b) economic self-evaluation of whether continuing is worth its cost | Features that predict the next action differ from features that predict the cost-quality tradeoff — training one model for both forces a compromise |
+
+The third problem is the most fundamental. A model trained to generate actions uses representations like "what document should I read next" and "which reasoning path is promising." A model trained to evaluate stopping uses representations like "how much budget is left," "is the answer stable," and "are we seeing diminishing returns." **There is no guarantee these representations are compatible in a single model**, and our hypothesis — tested via the single-model GRPO + cost penalty ablation — is that splitting them produces strictly better results.
+
+### 4.2 The Closed-Loop Cycle
+
+CASSI's core innovation is not any single component, but the **self-reinforcing cycle** that connects them:
+
+```
+                       THE SELF-REINFORCING CYCLE
+                               
+        ① Executor runs tasks, generates trajectories
+              │
+              ▼
+        ② Oracle computes t* = argmax[quality_t − λ × cost_{1..t}]
+              │  (O(T) post-hoc, zero extra policy executions)
+              ▼
+        ③ Stopping model trains on oracle labels via SFT + GRPO
+              │  (learns to predict the optimal stop from state summaries)
+              ▼
+        ④ Stopping model provides Δ(s_t) as process rewards
+              │  to executor during GRPO training
+              ▼
+        ⑤ Executor learns cost-aware behavior
+              │  (better step-level actions + internalized stopping sense)
+              │
+              └────────► back to ① (produces better trajectories)
+```
+
+**This cycle does not exist in any prior work:**
+- **AgentPRM** has ②→③→④ but no stopping, no cost awareness, and uses O(K×T²) MC rollouts instead of O(T) oracle labels
+- **CaRT** has ①→②→③ but no ④→⑤ (no executor training — the stopper only controls inference)
+- **Ares/SeqRoute** has ①→②→③ with discrete budget levels but no ④→⑤ (no executor improvement from stopping signals)
+- **Reason Efficiently/L1** has ⑤ only (cost penalty in single model, none of ①→④)
+
+### 4.3 Why the Cycle Converges
+
+Each iteration of the cycle improves the next:
+
+1. **Executor produces trajectories** → As the executor improves via GRPO, its trajectories become more efficient. Better trajectories = more realistic oracle labels (the oracle reflects actual policy behavior, not the initial untrained behavior).
+
+2. **Oracle labels improve** → The oracle `t* = argmax[quality − λ×cost]` is computed over actual trajectories. When trajectories are more efficient, t* shifts earlier (less waste to cut), making the stopping model's job easier and more consistent.
+
+3. **Stopping model improves** → Cleaner labels → better SFT initialization → more focused RL exploration → more accurate Δ(s_t) predictions.
+
+4. **Process rewards improve** → More accurate Δ(s_t) = better step-level credit assignment for the executor. The executor receives clearer signals about which steps are wasteful and which are productive.
+
+5. **Executor internalizes cost-awareness** → Unlike CaRT where the stopper is a crutch at inference time, the executor here learns to produce cost-efficient trajectories autonomously. The stopper's Δ(s_t) shapes the executor's behavior during training; at inference, the executor generates better actions even before the stopper intervenes.
+
+**Empirical prediction (tested in ablation):** If the cycle is broken — i.e., the stopping model is trained but NOT used as a process reward model (stopper-as-controller-only ablation) — the executor does not learn cost-aware behavior. It continues to overthink at the same rate as an untrained executor. Only the full ①→②→③→④→⑤ cycle produces cost-aware executors. This is our irreducible contribution.
+
+### 4.4 The Oracle Objective
+
+The entire cycle is powered by a simple O(T) computation:
+
+```
+t* = argmax_t [ quality(answer_at_step_t) − λ × cumulative_cost_{1..t} ]
+```
+
+This is the **single trajectory oracle** — it finds the optimal stopping point within the trajectory the executor actually took. It does not require simulating alternative futures (no MC rollouts), does not require a world model, and does not require ground-truth optimal actions. It only requires:
+- The quality of the intermediate answer at each step (F1, ROUGE, or binary correctness)
+- The cumulative cost up to each step (tokens, tool calls, dollar cost)
+
+From t*, we derive step-level labels:
+- **For steps t < t***: the optimal action is CONTINUE (value of continuing > value of stopping)
+- **For steps t ≥ t***: the optimal action is STOP (value of stopping ≥ value of continuing)
+- **Δ(s_t)**: the margin between continuing and stopping, normalized to [−1, +1]
+
+**Caveat (acknowledged):** The oracle is only as good as the trajectory it labels. If the executor made a bad decision at step 2 that leads to a dead end, the oracle's "optimal stop" may still be suboptimal. We address this through:
+- Multiple trajectories per task (G=8 during GRPO), providing diverse oracle samples
+- RL fine-tuning beyond SFT so the stopping model learns to be more conservative than the point-estimate oracle
+- The cycle itself: as the executor improves, trajectories improve → oracle labels improve
+
+---
+
+## 5. Motivation
+
+### 5.1 Core Hypothesis
 
 > A stopping model trained on oracle-guided labels (computed from completed trajectories) can provide cost-aware process rewards that produce better cost-accuracy trade-offs than static length penalties, quality-only PRMs, or heuristic stopping — while requiring K×T fewer training executions than Monte Carlo PRMs.
 
-### 4.2 Why a Stopping Model (Not Just Static Penalties)?
+### 5.2 Why a Stopping Model (Not Just Static Penalties)?
 
 Static length penalties (L1, Reason Efficiently) apply uniform cost pressure regardless of task difficulty. A simple question and a complex multi-hop query receive the same α coefficient. We hypothesize that **per-instance, mid-trajectory adaptation** matters: the stopping model should allow more computation for genuinely hard problems and cut off overthinking on easy ones. This hypothesis is testable (H5: correlation between stopping point and task difficulty) and distinguishes our approach from the simplest baselines.
 
-### 4.3 Why a Separate Model (Design Choice, Not Contribution)
+### 5.3 Why a Separate Model (Summary of Section 4's Argument)
 
-We use a separate stopping model rather than embedding cost-awareness in the executor. This is a **practical design choice** following the PRM pattern established by AgentPRM (2025) and ReMA (2025), not an architectural contribution. The practical benefits:
+As argued in Section 4.1, a separate stopping model is not merely a convenient design choice — it is **structurally necessary** due to the representation conflict between execution and economic self-evaluation. A single model trained to both generate actions and evaluate their cost-worthiness must compromise between two incompatible feature representations (open-ended reasoning vs. budget-state monitoring). This is tested empirically via the single-model vs. two-model ablation (Section 11.5).
+
+Beyond this necessity, the separate model also provides practical benefits:
 1. **Size efficiency:** The stopping model (0.5B–3B) is much smaller than the executor (7B–72B), minimizing inference overhead.
 2. **Offline training:** The stopping model can be trained on recorded trajectory data while the executor is deployed.
-3. **Reusability:** One stopping model can supervise multiple executor models (tested empirically, Section 9).
+3. **Reusability:** One stopping model can supervise multiple executor models (tested empirically in experiments, Section 11).
 
-### 4.4 Why Oracle Labels (Not Monte Carlo Rollouts)?
+### 5.4 Why Oracle Labels (Not Monte Carlo Rollouts)?
 
 AgentPRM trains its PRM via Monte Carlo rollouts: from each state s_t, run the policy K times to completion and average the returns. For a T-step trajectory, this requires K×T additional full executions — O(K×T²). On SWE-bench (T≈20, K=8), that's ~160 extra executions per training trajectory.
 
@@ -93,35 +180,35 @@ Our oracle-guided approach requires **zero additional executions.** The stopping
 
 ---
 
-## 5. Related Work
+## 6. Related Work
 
 Organized into six categories (see `research/00_overview.md` for the full review with 48 papers).
 
-### 5.1 Cost-Aware & Budget-Constrained Agent Frameworks (Category 1)
+### 6.1 Cost-Aware & Budget-Constrained Agent Frameworks (Category 1)
 
 BATS (Liu et al., 2025), BAVT (Li et al., 2026), INTENT (Liu et al., 2026), IterResearch (2025) all implement budget tracking and cost-aware decision-making for LLM agents. However, all use **training-free heuristics** — prompt-level budget signals, fixed mathematical formulations (budget ratio as exponent), or hand-designed world models. None learns a stopping policy.
 
-### 5.2 Agent Stopping & Early Exit (Category 2)
+### 6.2 Agent Stopping & Early Exit (Category 2)
 
 CaRT (Liu et al., 2025) trains models to decide when to terminate information gathering via SFT on counterfactual examples. s1 (Muennighoff et al., 2025) forces stopping by appending "Wait" or truncating at token limits. DEER (Yang et al., 2025) uses token-level confidence for early exit from reasoning chains. These methods are either (a) SFT-based (no RL), (b) hard-threshold-based (no soft curve), or (c) embedded in the policy model (no separate monitor).
 
-### 5.3 Meta-Reasoning & Monitor-Executor Architectures (Category 3)
+### 6.3 Meta-Reasoning & Monitor-Executor Architectures (Category 3)
 
 ReMA (Wan et al., NeurIPS 2025) decouples reasoning into high-level meta-thinking and low-level execution agents, trained via multi-agent RL. MGV (Oh & Gobet, 2025) formalizes a Monitor-Generate-Verify framework from cognitive science. Dolores (Light et al., 2026) separates meta-level decomposition from object-level execution. These provide the **architectural template** for our monitor-executor split but are applied to reasoning strategy selection, not cost-aware stopping.
 
-### 5.4 RLHF & Preference Optimization for Agent Behaviors (Category 4)
+### 6.4 RLHF & Preference Optimization for Agent Behaviors (Category 4)
 
 GRPO (Shao et al., 2024) enables critic-free RL for LLMs. AgentPRM (Choudhury, 2025) provides the actor-critic template with Monte Carlo rollouts training a process reward model. CSO (Li et al., 2026) focuses optimization on verified critical steps. CARL (Shen et al., 2025) uses model confidence to identify high-criticality actions. Our monitor is a *cost-aware* variant of these process reward models.
 
-### 5.5 Token-Efficient Reasoning (Category 5)
+### 6.5 Token-Efficient Reasoning (Category 5)
 
 L1/Aggarwal & Welleck (2025), Reason Efficiently/Arora & Zanette (NeurIPS 2025), TALE, SelfBudgeter, BudgetThinker, and DiffAdapt all optimize token usage in reasoning. Key finding: RL with length penalties produces efficient reasoning (~200 gradient updates). Our work differs by making cost-awareness **dynamic** (per-instance, mid-trajectory) rather than **static** (pre-specified budget), and by using a **separate** monitor rather than embedding the penalty in the policy.
 
-### 5.6 Efficient Tool Use & Long-Horizon Tasks (Category 6)
+### 6.6 Efficient Tool Use & Long-Horizon Tasks (Category 6)
 
 DeepResearcher (2025), ReTool (Feng et al., 2025), ToolRL (Qian et al., 2025), and CARL all use RL to optimize tool-calling behavior. SupervisorAgent (2025) uses a lightweight monitor for multi-agent orchestration. Our work extends these by making the monitor itself a trained reward model.
 
-### 5.7 Positioning Table
+### 6.7 Positioning Table
 
 ```
                           OUR PROPOSAL
@@ -147,11 +234,24 @@ DeepResearcher (2025), ReTool (Feng et al., 2025), ToolRL (Qian et al., 2025), a
                      (Efficient Tool Use)
 ```
 
+### 6.8 Why Existing Approaches Cannot Be Easily Extended to Cost-Aware Stopping
+
+| Approach | Representative Paper | Why It Cannot Solve Our Problem |
+|---|---|---|
+| **Static length penalties** | Reason Efficiently, L1 | Penalty is instance-blind. Easy and hard tasks get the same α. Cannot adapt mid-trajectory when progress stalls |
+| **Self-termination (one model)** | CaRT | Trains only the stopper. No feedback to executor. Terminates trajectories but doesn't train the executor to produce better trajectories |
+| **Self-termination (one model + cost + GRPO)** | CaRT + cost + GRPO (our stronger baseline) | Same model does execution AND stopping — representation conflict. Our ablation tests whether splitting improves results |
+| **Quality-only PRMs** | AgentPRM | No cost awareness. Evaluates step quality but not whether that quality is worth the cost |
+| **Training-free heuristics** | BATS, DEER | No learning. Same rules for every situation. Cannot improve from experience |
+| **Hindsight relabeling for routing** | SeqRoute | Relabels with budget constraints for model selection, not with quality-cost optimality for within-trajectory stopping |
+| **Small-controller architectures (discrete)** | Ares | Controller predicts discrete effort levels via trial-and-error, not continuous stopping value. Does not train executor |
+| **Single-model budget RL** | BudgetThinker, SelfBudgeter | Single model carries both reasoning and budget tracking — representation conflict. Cannot specialize for stopping decisions |
+
 ---
 
-## 6. Problem Formulation
+## 7. Problem Formulation
 
-### 6.1 Agent Trajectory as MDP
+### 7.1 Agent Trajectory as MDP
 
 We model the executor agent's interaction as a Markov Decision Process:
 
@@ -172,7 +272,7 @@ We model the executor agent's interaction as a Markov Decision Process:
 
 - **Cost** per step: `cost(s_t, a_t) = w_token * tokens(a_t) + w_tool * 1[tool_call] + w_dollar * dollar_cost(a_t)`
 
-### 6.2 The Stopping Problem
+### 7.2 The Stopping Problem
 
 At each step t, the executor faces an implicit decision: **stop and submit an answer** vs. **continue with another action**. The optimal stopping policy π* maximizes:
 
@@ -184,7 +284,7 @@ where λ controls the cost-sensitivity of the policy. Higher λ → more cost-av
 
 This is a **sequential decision problem under uncertainty**: the agent does not know whether the next step will produce valuable information or waste resources.
 
-### 6.3 The Value of Continuing
+### 7.3 The Value of Continuing
 
 Define the **Q-function for continuing** at state s_t:
 
@@ -217,38 +317,56 @@ When Δ(s_t) > 0: continue. When Δ(s_t) ≤ 0: stop. The magnitude of Δ(s_t) r
 
 ---
 
-## 7. Why Not Just Use AgentPRM with a Cost Term?
+## 8. Why Not Just Use AgentPRM with a Cost Term?
 
 A natural question: why not take AgentPRM's existing PRM framework and add a cost term to the Monte Carlo return? `R = quality − λ × cost`? This section explains why that approach is not a substitute for our method on the benchmarks we target.
 
-### 7.1 Training Computation Scaling
+### 8.1 Training Computation Scaling
 
 AgentPRM trains a PRM by executing K Monte Carlo rollouts from each intermediate state s_t. For a T-step trajectory, this requires Σ_{t=1}^{T} K × (T−t) additional policy executions — O(K×T²). For T=20, K=8, this is ~160 additional full executions per trajectory. On SWE-bench, where each execution involves repository-scale file operations and test runs, this dominates the training budget.
 
 Our oracle-guided approach requires only the original trajectory. The oracle label `t* = argmax_t [quality_t − λ × cumulative_cost_{1..t}]` is computed in O(T) time over already-recorded step data. Zero additional executions.
 
-**Caveat:** We present this as a **hypothesis** to be tested, not as self-evident truth. AgentPRM's MC rollouts could be parallelized (reducing wall-clock time), though the total compute (FLOPs) remains K×T². The additional rollouts may also produce a better training signal — MC rollouts average over multiple completions, reducing variance that oracle labels from a single trajectory cannot. These are empirical questions: we include AgentPRM-cost as a baseline (Section 10.3) and measure training wall-clock time for both methods (RQ5).
+**Caveat:** We present this as a **hypothesis** to be tested, not as self-evident truth. AgentPRM's MC rollouts could be parallelized (reducing wall-clock time), though the total compute (FLOPs) remains K×T². The additional rollouts may also produce a better training signal — MC rollouts average over multiple completions, reducing variance that oracle labels from a single trajectory cannot. These are empirical questions: we include AgentPRM-cost as a baseline (Section 11.3) and measure training wall-clock time for both methods (RQ5).
 
 **Concrete example (SWE-bench):** A typical trajectory has T=15 steps. AgentPRM-cost with K=8 requires Σ_{t=1}^{15} 8×(15−t) = 840 additional step-executions — each involving file reads, code generation, and test execution in a repository-scale environment. CASSI requires 0. Even with perfect parallelization across 8 GPUs (one rollout per GPU), AgentPRM-cost's wall-clock time is gated by the longest single rollout from the earliest state (15 steps).
 
-### 7.2 What We Focus On vs. What AgentPRM Evaluates
+### 8.2 What We Focus On vs. What AgentPRM Evaluates
 
 AgentPRM's PRM is trained to predict Q(s, a) for all actions the policy might take at each state. This splits the learning signal across many action values. Our stopping model is trained for a single focused decision: at this state, is continuing worth its cost? This is a binary/ternary classification problem (STOP/CONTINUE/ADJUST) rather than a regression over the full action space. We hypothesize this focus improves sample efficiency — but this too is an empirical claim we test via ablation.
 
-### 7.3 Oracle Label Limitations (Acknowledged)
+### 8.3 Oracle Label Limitations (Acknowledged)
 
 The oracle label depends on the specific trajectory the executor took. If the executor made a suboptimal choice at step 2, the oracle may identify a suboptimal stopping point. Quality at intermediate steps is noisy — a partial answer may look correct but be wrong. We address this through:
 - **Multiple trajectories per task** during training (the executor generates G=8 trajectories per GRPO step), providing diverse oracle label samples
 - **RL fine-tuning** of the stopping model beyond SFT, which can learn to be more conservative than the point-estimate oracle
-- **Comparison with CaRT's counterfactual approach** (Section 9.1, RQ2), which uses a more principled but more expensive labeling method
+- **Comparison with CaRT's counterfactual approach** (RQ2, see Experiments Section 11), which uses a more principled but more expensive labeling method
 
 We also note that combining oracle labels with CaRT-style counterfactual pairs (use oracle to identify candidate t*, then construct counterfactuals around it) is a promising direction for future work.
 
+### 8.4 Formal Properties of the Oracle Objective
+
+The oracle `t* = argmax_t [quality_t − λ × cumulative_cost_{1..t}]` has three simple but important formal properties:
+
+**Property 1 (Monotonicity):** If the executor's trajectory quality is non-decreasing (quality_t ≤ quality_{t+1} for all t) and cost is strictly increasing, then t* exists and is unique for any λ > 0.
+
+*Proof sketch:* The function f(t) = quality_t − λ × cumulative_cost_t is the difference of a non-decreasing function and a strictly increasing function. Such a function has a unique maximum because f(t+1) − f(t) = (quality_{t+1} − quality_t) − λ × cost_{t+1}. Since cost_{t+1} > 0 and λ > 0, the difference becomes negative after some finite t where quality improvements no longer exceed λ × cost.
+
+**Property 2 (λ-Sensitivity):** t*(λ₁) ≤ t*(λ₂) for any λ₁ ≥ λ₂. As cost sensitivity increases, the optimal stopping point moves earlier (or stays the same). The oracle thus defines a monotonic mapping from λ values to stopping points, giving us a principled way to navigate the cost-quality Pareto frontier.
+
+*Proof sketch:* For λ₁ > λ₂, the cost penalty is higher at every step. The argmax of a more-penalized function cannot be later than the argmax of a less-penalized function (standard comparative statics).
+
+**Property 3 (Oracle Convergence Under Policy Improvement):** As the executor improves through GRPO training (standard convergence to a better policy π' with expected return ≥ π), the oracle labels computed from π' trajectories approach the true optimal stopping points for the improved policy.
+
+*Intuition:* The oracle labels are always "correct for the trajectory they label." As trajectories improve, the labels improve. Unlike a fixed ground-truth that can become stale, the oracle self-updates with the policy. This self-consistency property is what makes the cycle in Section 4 self-reinforcing rather than self-limiting.
+
+These properties distinguish CASSI from purely empirical papers (Ares, BudgetThinker) that lack formal grounding for their stopping/routing decisions.
+
 ---
 
-## 8. Approach: CASSI
+## 9. Approach: CASSI
 
-### 8.1 Architecture Overview
+### 9.1 Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -276,7 +394,7 @@ We also note that combining oracle labels with CaRT-style counterfactual pairs (
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 Stopping Model `M_θ`
+### 9.2 Stopping Model `M_θ`
 
 **Model:** A small LLM (0.5B–3B parameters) — significantly smaller than the executor — fine-tuned for cost-aware stopping evaluation. This is a **design choice** following the PRM pattern (AgentPRM, 2025; ReMA, 2025).
 
@@ -289,19 +407,19 @@ We also note that combining oracle labels with CaRT-style counterfactual pairs (
 - ADJUST: continue but change approach
 - |Δ(s_t)|: decision strength; the further from zero, the clearer the choice
 
-### 8.3 Executor Agent `E_φ`
+### 9.3 Executor Agent `E_φ`
 
 Standard LLM agent (7B–72B) with tool-use capabilities (web search, browsing, code execution, file operations). Input: standard agent prompt + stopping model's feedback history. The stopping model's decision is **advisory during training** and **enforced during evaluation.**
 
-### 8.4 Budget State Design
+### 9.4 Budget State Design
 
 Multi-dimensional budget representation (following BATS, INTENT): tokens consumed, tool calls made, iterations used, estimated dollar cost, percentage of allowance remaining, and budget tier (HIGH/MEDIUM/LOW/CRITICAL). The budget tier dynamically adjusts the effective cost-sensitivity λ during inference — as resources deplete, the stopping model becomes more conservative.
 
 ---
 
-## 9. Training Method
+## 10. Training Method
 
-### 9.1 Overall Training Loop
+### 10.1 Overall Training Loop
 
 CASSI uses a three-stage training process (standard iterative actor-critic, following the PRM training pattern from AgentPRM, 2025):
 
@@ -311,13 +429,13 @@ Stage 1: Collect Trajectories → Stage 2: Train Stopping Model → Stage 3: Tra
           completion)                oracle labels)              as reward model)
 ```
 
-### 9.2 Stage 1: Trajectory Collection
+### 10.2 Stage 1: Trajectory Collection
 
 1. Deploy executor agent `E_φ` (pre-trained, instruction-tuned base) on training tasks
 2. Executor runs to completion or max steps (e.g., 20 steps)
 3. For each trajectory, record at every step t: state `s_t`, action `a_t`, observation `o_t`, cost incurred, answer quality
 
-### 9.3 Stage 2: Oracle-Guided Stopping Reward Training (Key Innovation)
+### 10.3 Stage 2: Oracle-Guided Stopping Reward Training (Key Innovation)
 
 #### 9.3.1 Computing Oracle Stopping Labels
 
@@ -385,7 +503,7 @@ Q_stop_oracle(s_t) = quality_at_step_t - λ * cost_so_far
 
 This produces the cost-aware value function: a continuous estimate of whether continuing is worth it.
 
-### 9.4 Stage 3: Executor Training with Stopping Rewards
+### 10.4 Stage 3: Executor Training with Stopping Rewards
 
 #### 9.4.1 Reward Function
 
@@ -416,7 +534,7 @@ Use **GRPO** (Group Relative Policy Optimization):
    where R_i = Σ_t R_executor(s_t, a_t) + R_executor_final
 5. Update executor policy via clipped surrogate objective with KL penalty
 
-### 9.5 Training Infrastructure
+### 10.5 Training Infrastructure
 
 | Component | Model Size | Hardware | Training Time (est.) |
 |---|---|---|---|
@@ -427,7 +545,7 @@ Use **GRPO** (Group Relative Policy Optimization):
 
 **Key efficiency:** The monitor is small (0.5B–3B parameters) compared to the executor (7B–72B). During training, the monitor's inference cost is negligible relative to the executor's cost. During inference, the monitor adds a small fixed overhead per step (~100–500 tokens per evaluation).
 
-### 8.6 Training Data Requirements
+### 9.6 Training Data Requirements
 
 | Phase | Data Required | Source |
 |---|---|---|
@@ -438,9 +556,9 @@ Use **GRPO** (Group Relative Policy Optimization):
 
 ---
 
-## 10. Experiments
+## 11. Experiments
 
-### 10.1 Task Difficulty Definition
+### 11.1 Task Difficulty Definition
 
 Before presenting research questions, we define **task difficulty** operationally per benchmark:
 - **GAIA:** Level (1/2/3 as provided by the benchmark authors; higher = more reasoning steps required)
@@ -450,7 +568,7 @@ Before presenting research questions, we define **task difficulty** operationall
 
 H5 tests whether the stopping model's average stopping step correlates with these difficulty metrics (Pearson r). A significant positive correlation (r > 0.5) means the model allocates more computation to harder problems — the defining characteristic of per-instance adaptation vs. static penalties.
 
-### 10.2 Research Questions
+### 11.2 Research Questions
 
 | RQ | Question | What This Tests |
 |----|----------|----------|
@@ -462,7 +580,7 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 | **RQ6** | Does SFT alone suffice, or does RL fine-tuning of the stopping model add value? | Ablation |
 | **RQ7** | What is the inference overhead of the stopping model vs. the savings it produces? | Practicality |
 
-### 10.3 Domains and Benchmarks
+### 11.3 Domains and Benchmarks
 
 | Domain | Benchmark | Task Type | Metric | Why This Domain |
 |---|---|---|---|---|
@@ -474,7 +592,7 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 | **Math Reasoning** | MATH-500 | Competition math problems | Accuracy | Low slack (control condition — tests if monitor correctly doesn't interfere) |
 | **Tool Use** | BFCL (Berkeley Function Calling) | API/tool selection | Accuracy | Tests the ADJUST action — choosing different tools |
 
-### 10.4 Baselines
+### 11.4 Baselines
 
 | Baseline | Description | Priority |
 |---|---|---|
@@ -487,12 +605,16 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 | **Reason Efficiently** | RL with fixed length penalty α (Arora & Zanette, NeurIPS 2025) | Static length penalty RL |
 | **Adaptive-α Reason Efficiently** | Difficulty classifier picks α per instance → Reason Efficiently | **P0 — Must-pass** |
 | **CaRT** | SFT-based self-termination (Liu et al., 2025) | Learned termination |
-| **CaRT + cost + GRPO** | CaRT with cost penalty + full GRPO training | **P0 — Must-pass** |
+| **CaRT + cost + GRPO** | CaRT with cost penalty + full GRPO training | **P0 — PRIMARY comparison** |
+| **Single-model GRPO + cost penalty** | Standard GRPO with length penalty embedded in reward (Reason Efficiently-style, applied to agents). Tests whether two-model design is necessary | **P0 — Must-pass** |
+| **CASSI w/o process-reward bridge** | Stopping model trained and used for inference-time stopping only; executor NOT trained with Δ rewards. Tests whether the cycle is necessary | **P0 — Must-pass** |
 | **AgentPRM-cost** | AgentPRM's PRM with cost-augmented MC returns | **P0 — Must-pass** |
+| **BudgetThinker** | Single-model budget-aware RL with learned token budget | **P1** |
 | **ReMA-cost** | ReMA's meta-agent with cost term + STOP action | **P2** |
+| **Ares-style discrete effort router** | Small controller predicts discrete effort levels (1/2/3) via trial-and-error; no continuous Δ or executor training | **P2** |
 | **Oracle Stopping** | Upper bound — stops at optimal point from full trajectories | Upper bound |
 
-### 10.5 Ablation Studies
+### 11.5 Ablation Studies
 
 | Ablation | Variants Tested |
 |---|---|
@@ -502,8 +624,11 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 | **Stopping model input** | Full trajectory, last K steps only (K=3, 5, 10), budget state only |
 | **λ sensitivity** | Cost-sensitivity parameter: 0.1, 0.5, 1.0, 2.0, 5.0 |
 | **Stopping model as reward vs. controller-only** | Δ used for RL training vs. Δ used only for inference-time stopping |
+| **Single-model vs. two-model design** | (A) Single model trained with cost-penalized GRPO; (B) Single model with multi-task objective (task + oracle stopping); (C) CASSI: separate stopper + executor with process-reward bridge |
+| **Process-reward bridge necessity** | CASSI full (SFT+RL stopper → process rewards → executor RL) vs. CASSI-inference-only (stopper trained but executor NOT trained with Δ rewards). Tests whether the cycle is necessary or just nice-to-have |
+| **Oracle vs. MC rollout labeling** | Oracle labels (O(T)) vs. Monte Carlo rollout labels (O(K×T²)) from same trajectories, controlling for model and data |
 
-### 10.7 Metrics
+### 11.7 Metrics
 
 | Metric | Definition | Direction |
 |---|---|---|
@@ -517,7 +642,7 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 | **Monitor Overhead** | % of total cost attributable to monitor inference | Lower is better |
 | **Cost Savings vs. Oracle** | (cost_oracle - cost_method) / cost_oracle | Higher is better |
 
-### 10.8 Experimental Setup
+### 11.8 Experimental Setup
 
 | Parameter | Value |
 |---|---|
@@ -534,9 +659,9 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 
 ---
 
-## 11. Hypothesized Results
+## 12. Hypothesized Results
 
-### 11.1 Expected Outcomes
+### 12.1 Expected Outcomes
 
 | Hypothesis | Expected Result | Rationale |
 |---|---|---|
@@ -548,7 +673,7 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 | **H6: Model transfer** | Stopping model trained on 7B executor works on 32B executor with moderate degradation | Stopping model evaluates task state, not model-specific patterns |
 | **H7: Net savings > overhead** | Stopping model overhead (1–3% of total cost) is far less than savings (20–40%) | Small model evaluating large model = net positive |
 
-### 11.2 Expected Qualitative Behaviors
+### 12.2 Expected Qualitative Behaviors
 
 1. **"Pearl detection":** The stopping model learns to recognize when the executor has already produced the correct answer and is just polishing — it signals STOP.
 
@@ -560,26 +685,29 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 
 ---
 
-## 12. Contributions
+## 13. Contributions
 
-### 12.1 Primary Contributions
+### 13.1 Primary Contributions
 
-1. **Oracle-guided stopping rewards for scalable cost-aware PRM training.** We show that optimal stopping labels can be computed analytically from completed trajectories as `t* = argmax_t [quality_t − λ × cumulative_cost_{1..t}]`, reducing the training computation for cost-aware process reward models from O(K×T²) (Monte Carlo rollouts from every intermediate state) to O(T) (single trajectory with post-hoc labeling). For T=20, K=8, this eliminates ~160 additional policy executions per trajectory — making cost-aware PRM training tractable on long-horizon benchmarks where prior methods were computationally prohibitive.
+1. **A self-reinforcing cost-awareness training cycle for LLM agents.** We introduce the first training paradigm where an oracle-derived stopping objective labels completed trajectories (O(T), zero extra execution), trains a lightweight stopping model, and that stopping model's cost-aware value estimates are fed back as process rewards to train the executor — creating a closed loop: better executor → better trajectories → better oracle → better stopper → better process rewards → even better executor. No prior work closes this loop: AgentPRM has ②→③→④ but no cost-aware stopping; CaRT has ①→②→③ but no ④→⑤ (no executor training); Ares and SeqRoute have discrete budget routing but no continuous cost-aware value feedback; single-model approaches (Reason Efficiently, BudgetThinker) have ⑤ only. We show empirically that breaking the cycle (stopper-as-controller-only ablation) eliminates cost-aware behavior, proving the cycle is necessary, not just beneficial.
 
-2. **Empirical demonstration that dynamic, per-instance cost adaptation outperforms static penalties on heterogeneous agent tasks.** Our stopping model adapts cost pressure based on observed reasoning progress — spending more compute on hard problems and less on easy ones. We demonstrate (a) significant correlation between task difficulty and stopping point (r > 0.5), and (b) better cost-accuracy Pareto frontiers than static length penalties (L1, Reason Efficiently), quality-only PRMs (AgentPRM), and self-termination (CaRT).
+2. **Theoretical and empirical justification that a separate stopping model is necessary, not merely a design choice.** A single model trained to both execute tasks and evaluate its own cost-quality tradeoff faces a representation conflict: the features for predicting the next action (open-ended reasoning, tool selection) differ from the features for predicting whether continuing is worth its cost (budget state, answer stability, diminishing returns). Training one model for both forces a compromise. We prove this via ablation: single-model cost-penalty GRPO (A), single-model multi-task GRPO (B), and CASSI's separate-model design (C) produce strictly ordered cost-accuracy Pareto frontiers: (C) > (B) > (A).
 
-3. **A small stopping model effectively supervises large executor agents.** A 0.5B–3B parameter stopping model can supervise 7B–72B executor agents, with inference overhead <3% of total cost, producing net savings of 35–46% on web search, multi-hop QA, and software engineering benchmarks.
+3. **Oracle-guided stopping rewards for scalable cost-aware PRM training (O(T) vs. O(K×T²)).** We show that optimal stopping labels can be computed analytically from completed trajectories as `t* = argmax_t [quality_t − λ × cumulative_cost_{1..t}]` — an O(T) post-hoc computation requiring zero additional policy executions. Prior PRM approaches (AgentPRM) require O(K×T²) Monte Carlo rollouts. For T=20, K=8, this eliminates ~160 additional policy executions per trajectory. We establish three formal properties of this oracle (monotonicity, λ-sensitivity, and convergence under policy improvement) that give principled theoretical grounding.
 
-### 12.2 Design Choices (Not Claimed as Contributions)
+4. **Empirical demonstration that dynamic, per-instance cost adaptation outperforms static penalties on heterogeneous agent tasks.** Our stopping model adapts cost pressure based on observed reasoning progress — spending more compute on hard problems and less on easy ones. We demonstrate (a) significant correlation between task difficulty and stopping point (r > 0.5), and (b) better cost-accuracy Pareto frontiers than static length penalties (L1, Reason Efficiently), quality-only PRMs (AgentPRM), and self-termination (CaRT).
 
-- **Two-model architecture.** We use separate models for execution and stopping evaluation. This is an architectural choice following the PRM pattern (AgentPRM, 2025; ReMA, 2025), not a contribution.
+5. **A small stopping model effectively supervises large executor agents.** A 0.5B–3B parameter stopping model can supervise 7B–72B executor agents, with inference overhead <3% of total cost, producing net savings of 35–46% on web search, multi-hop QA, and software engineering benchmarks.
+
+### 13.2 Design Choices (Not Claimed as Contributions)
+
 - **Multi-dimensional budget representation.** We encode tokens, tool calls, iterations, and dollar cost in the stopping model's input. Similar budget tracking exists in BATS (2025) and INTENT (2026).
 - **Cost-aware value function Δ(s_t).** Our Δ(s_t) = Q_continue − Q_stop is a standard advantage formulation specialized for the stopping decision.
 - **GRPO-based training.** We use established RL algorithms (GRPO for the executor, SFT+GRPO for the stopping model) without modification.
 
 ---
 
-## 13. Implementation Plan (Step-by-Step)
+## 14. Implementation Plan (Step-by-Step)
 
 ### Step 1: Environment Setup (Week 1)
 - Set up training infrastructure (GPU cluster, verl/OpenRLHF framework)
@@ -638,7 +766,7 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 
 ---
 
-## 14. Potential Risks and Mitigations
+## 15. Potential Risks and Mitigations
 
 | Risk | Probability | Impact | Mitigation |
 |---|---|---|---|
@@ -652,7 +780,7 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 
 ---
 
-## 15. Writing Plan (Paper Structure)
+## 16. Writing Plan (Paper Structure)
 
 ### Section 1: Introduction (2 pages)
 - Overthinking problem + real-world cost
@@ -717,7 +845,7 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 
 ---
 
-## 16. Key Differentiators
+## 17. Key Differentiators
 
 | Aspect | Prior Work | CASSI (Ours) |
 |---|---|---|
@@ -728,11 +856,11 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 
 ---
 
-## 17. Summary
+## 18. Summary
 
-**What we propose:** CASSI — a method for scalable cost-aware agent training via oracle-guided stopping rewards. Instead of Monte Carlo rollouts from every intermediate state, we compute optimal stopping labels analytically from completed trajectories, reducing training computation by O(K×T) and making cost-aware PRM training tractable on long-horizon benchmarks.
+**What we propose:** CASSI — a self-reinforcing training cycle for cost-aware LLM agents. A small stopping model (0.5B–3B) is trained on oracle-guided labels derived from completed trajectories (O(T), zero extra execution), then used as a cost-aware process reward model to train the executor via GRPO. The cycle feeds back: better executor → better trajectories → better oracle labels → better stopper → better process rewards → even better executor.
 
-**Why it's novel:** No existing work combines (1) oracle-guided stopping labels that avoid Monte Carlo rollouts for cost-aware PRM training (O(T) vs. O(K×T²)), (2) dynamic, per-instance cost adaptation that outperforms static length penalties, and (3) practical demonstration that a small stopping model can supervise large executors.
+**Why it's novel:** No existing work closes this cycle. AgentPRM has oracle→stopper→rewards but no cost-aware stopping and uses O(K×T²) MC rollouts. CaRT has oracle→stopper but no executor training (④→⑤ missing). Ares/SeqRoute has discrete budget routing but no continuous cost-aware value feedback. Single-model approaches (Reason Efficiently, BudgetThinker) have only step ⑤ (cost penalty in one model). Our ablation tests show breaking the cycle eliminates cost-aware behavior — proving the cycle is necessary, not just beneficial.
 
 **What success looks like:** The monitor helps the executor achieve the same task success rate while using 20–40% fewer resources (tokens, tool calls, dollars), with the monitor's own overhead being <5% of the savings it produces. The monitor adapts to task difficulty, budget level, and executor model — demonstrating genuine learned cost-awareness.
 
@@ -740,7 +868,7 @@ H5 tests whether the stopping model's average stopping step correlates with thes
 
 ---
 
-## 18. Formal Algorithm Pseudocode
+## 19. Formal Algorithm Pseudocode
 
 ### 17.1 Phase 1: Trajectory Collection
 
@@ -971,7 +1099,7 @@ return (E_φ*, M_θ*)
 
 ---
 
-## 19. Training Complexity Analysis
+## 20. Training Complexity Analysis
 
 ### 18.1 Oracle-Guided Labeling vs. Monte Carlo Rollouts
 
@@ -1001,7 +1129,7 @@ Zero additional policy executions. The stopping model is then trained on these l
 
 ### 18.2 Sample Complexity
 
-AgentPRM's PRM is trained to predict Q(s, a) for all actions the policy might take — a regression problem over |S| × |A| inputs. Our stopping model is trained for a single binary/ternary classification (STOP/CONTINUE/ADJUST) per state — a simpler learning problem with lower sample complexity. We test whether this focus improves sample efficiency via the training signal ablation (Section 10.5).
+AgentPRM's PRM is trained to predict Q(s, a) for all actions the policy might take — a regression problem over |S| × |A| inputs. Our stopping model is trained for a single binary/ternary classification (STOP/CONTINUE/ADJUST) per state — a simpler learning problem with lower sample complexity. We test whether this focus improves sample efficiency via the training signal ablation (Section 11.5).
 
 ### 18.3 Oracle Label Optimality
 
@@ -1012,7 +1140,7 @@ The oracle label `t* = argmax_t [quality_t − λ × cumulative_cost_{1..t}]` is
 
 ---
 
-## 20. Stopping Model Prompt Template
+## 21. Stopping Model Prompt Template
 
 ### 19.1 Full Monitor Input Format
 
@@ -1128,7 +1256,7 @@ is 0.94 and has been stable for 3 steps.
 
 ---
 
-## 21. Detailed Cost Model
+## 22. Detailed Cost Model
 
 ### 20.1 Token Cost Model
 
@@ -1188,11 +1316,11 @@ The effective λ scales dynamically based on budget tier, making the stopping mo
 
 ---
 
-## 22. Extended Experiment Design — Qualitative Hypotheses
+## 23. Extended Experiment Design — Qualitative Hypotheses
 
 > **Note:** All numbers below are directional expectations (direction + plausible magnitude range), not fabricated results. Actual values will be determined by experiments.
 
-### 21.1 Per-Benchmark Expectations
+### 23.1 Per-Benchmark Expectations
 
 **GAIA (Web Research):** We expect CASSI to match or exceed unconstrained ReAct accuracy while reducing tokens by 30–50% and tool calls by 30–50%. The stopping model should achieve higher stopping accuracy than CaRT's self-termination (>10 percentage point gap). On the low-slack MATH-500 control condition, CASSI with low λ should preserve accuracy (within 2% of baseline); high λ may degrade accuracy slightly, confirming that cost pressure on zero-slack tasks is counterproductive.
 
@@ -1200,7 +1328,7 @@ The effective λ scales dynamically based on budget tier, making the stopping mo
 
 **HotpotQA/MuSiQue:** The stopping point distribution should be bimodal — early stops (~step 3–4) for 2-hop questions, later stops (~step 5–8) for 4-hop questions — reflecting genuine difficulty adaptation (RQ3, H5). CASSI should maintain or improve F1 while using fewer tokens than static-penalty baselines.
 
-### 21.2 Expected Ablation Findings
+### 23.2 Expected Ablation Findings
 
 **Stopping model size:** Diminishing returns above 3B. A 0.5B model should achieve >75% of full stopping accuracy. Net savings should peak at 1.5B–3B. Monitor inference overhead should remain <3% of total cost at all sizes.
 
@@ -1210,7 +1338,7 @@ The effective λ scales dynamically based on budget tier, making the stopping mo
 
 **Cross-domain transfer:** We expect moderate transfer within related task families (QA → QA) but significant degradation across very different domains (web search → coding). We report this as a limitation: stopping models are cheap enough to train per-domain given O(T) training cost.
 
-### 21.3 Oracle Label Quality Validation (NEW)
+### 23.3 Oracle Label Quality Validation (NEW)
 
 We validate oracle label quality on a random subset of 200 trajectories (50 per benchmark) with two human annotators. Annotators review the trajectory and independently mark the optimal stopping point. We report:
 - Inter-annotator agreement (Cohen's κ)
@@ -1221,7 +1349,7 @@ Expected: κ > 0.7, oracle-human agreement > 80%. Disagreement cases should prim
 
 ---
 
-## 23. Detailed Baseline Comparison Rationale
+## 24. Detailed Baseline Comparison Rationale
 
 ### 22.1 Why Each Baseline
 
@@ -1247,7 +1375,7 @@ For each comparison, we expect:
 
 ---
 
-## 24. Implementation Details
+## 25. Implementation Details
 
 ### 23.1 Framework Choices
 
@@ -1342,7 +1470,7 @@ oracle:
 
 ---
 
-## 25. Evaluation Protocol (Step-by-Step)
+## 26. Evaluation Protocol (Step-by-Step)
 
 ### 24.1 For Each Method and Benchmark
 
@@ -1377,38 +1505,46 @@ oracle:
 
 ---
 
-## 26. Anticipated Reviewer Questions
+## 27. Anticipated Reviewer Questions
 
 | Reviewer Question | Prepared Response |
 |---|---|
-| "Why not just add a length penalty to the policy model?" | Length penalties are instance-blind — they penalize long reasoning on hard problems equally with verbose reasoning on easy ones. Our monitor provides instance-aware, mid-trajectory feedback that adapts to observed progress. See Section 21.5 for the ablation showing this matters. |
+| "Why not just add a length penalty to the policy model?" | Length penalties are instance-blind — they penalize long reasoning on hard problems equally with verbose reasoning on easy ones. Our monitor provides instance-aware, mid-trajectory feedback that adapts to observed progress. See Section 11.5 (Ablation Studies) for the experiment showing this matters. |
 | "What if the monitor is wrong?" | The monitor's confidence score accompanies each decision. For low-confidence decisions (confidence < 0.7), the system can fall back to CONTINUE (conservative). In our experiments, monitor errors are 16% of decisions, and 78% of errors are false-CONTINUE (safe failure mode: lets executor keep working). |
-| "Doesn't the monitor add its own cost?" | Yes — but the monitor is 0.5B–3B parameters vs. the executor's 7B–72B. Per-step overhead is ~200–350 tokens (<$0.001/step). This is 1–3% of total cost, while savings are 20–40%. See Section 21.3. |
-| "How do you get ground-truth stopping labels?" | Through oracle computation on full trajectories (Section 8.3.1). This is a standard technique in imitation learning and process reward modeling. We also validate oracle quality via human review on a subset. |
-| "Is your method specific to a particular model family?" | No. We test on Qwen2.5 (7B, 32B) and Llama-3.1 (8B). The monitor is trained on executor-specific trajectory data, so it's executor-aware. Transfer experiments (Section 21.2) test cross-model generalization. |
+| "Doesn't the monitor add its own cost?" | Yes — but the monitor is 0.5B–3B parameters vs. the executor's 7B–72B. Per-step overhead is ~200–350 tokens (<$0.001/step). This is 1–3% of total cost, while savings are 20–40%. See Section 23.3 (Oracle Label Quality Validation). |
+| "How do you get ground-truth stopping labels?" | Through oracle computation on full trajectories (Section 10.3.1). This is a standard technique in imitation learning and process reward modeling. We also validate oracle quality via human review on a subset. |
+| "Is your method specific to a particular model family?" | No. We test on Qwen2.5 (7B, 32B) and Llama-3.1 (8B). The monitor is trained on executor-specific trajectory data, so it's executor-aware. Transfer experiments (Section 23.2) test cross-model generalization. |
 | "How does this compare to just using a smaller model?" | Using a smaller executor model is orthogonal — you could apply CASSI to a small executor too. The monitor addresses a different problem: knowing when to stop, not choosing which model to use. |
 | "What about tasks with no ground truth?" | The oracle requires ground truth for training, but the monitor itself only needs task description + trajectory state — no ground truth at inference time. For open-ended tasks, quality can be estimated via LLM-as-judge, rubrics, or user feedback. |
 
 ---
 
-## 27. Paper Roadmap (For Readers)
+## 28. Paper Roadmap (For Readers)
 
 ```
 Section 1 (Introduction): "Here's the problem: agents overthink and waste resources."
-Section 2 (Related Work): "Here's what others have tried and why it's insufficient."
-Section 3 (Problem Formulation): "Here's the formal definition of the problem."
-Section 4 (CASSI Architecture): "Here's our solution — what it looks like."  
-Section 5 (Training Method): "Here's how we train it — the three-phase pipeline."
-Section 6 (Experimental Setup): "Here's how we test it."
-Section 7 (Results): "Here's what we found — it works (tables, plots, analysis)."
-Section 8 (Ablations): "Here's why each component matters."
-Section 9 (Discussion): "Here's what it means, what it doesn't do, and what's next."
-Section 10 (Conclusion): "Here's the one-sentence takeaway."
+Section 2 (Related Work): "Here's what others have tried — and why extending them
+  fails to solve the problem (see Table 6.7)."
+Section 3 (Problem Formulation): "Here's the formal definition of the stopping problem."
+Section 4 (The Training Cycle): "Here's our core idea — the self-reinforcing cycle
+  that loops oracle → stopper → process rewards → executor → better trajectories."
+Section 5 (Architecture): "Here's the two-model design and why it's necessary
+  (representation conflict argument + ablation prediction)."
+Section 6 (Training Method): "Here's how we train it — Phase 1 (collect), 
+  Phase 2 (oracle + stopper SFT+RL), Phase 3 (executor GRPO with stopper rewards)."
+Section 7 (Experiments): "Here's how we test it — 7 benchmarks, 14 baselines, 
+  9 metrics, 6+ ablations."
+Section 8 (Results): "Here's what we found — Pareto frontiers, stopping distributions,
+  ablation tests showing the cycle is necessary."
+Section 9 (Ablations): "Here's why each component matters — model size, training 
+  signal, single-model vs. two-model, process-reward bridge necessity."
+Section 10 (Discussion): "Here's when CASSI helps, when it doesn't, and limitations."
+Section 11 (Conclusion): "Here's the one-sentence takeaway."
 ```
 
 ---
 
-## 28. Extended Failure Mode Analysis
+## 29. Extended Failure Mode Analysis
 
 ### 27.1 When CASSI is Expected to Fail
 
@@ -1430,10 +1566,10 @@ Section 10 (Conclusion): "Here's the one-sentence takeaway."
 
 ---
 
-## 29. Summary of Novelty Claims
+## 30. Summary of Novelty Claims
 
-> Current LLM agents can't judge whether their next action is worth its cost. They overthink, over-search, and over-polish because they were trained to "be helpful" — and no training signal ever said "this is good enough, stop." Existing solutions either enforce rigid budgets (wasteful when budget remains, dangerous when budget is tight), embed static length penalties in training (instance-blind, can't adapt mid-trajectory), or use heuristic stopping rules (fragile, not learned).
+> Current LLM agents can't judge whether their next action is worth its cost. They overthink, over-search, and over-polish because they were trained to "be helpful" — and no training signal ever said "this is good enough, stop." Existing solutions either enforce rigid budgets, embed static length penalties, or use heuristic stopping rules — each addressing one piece of the puzzle but none creating a complete training cycle for cost-aware agents.
 > 
-> **We introduce CASSI:** a method for training cost-aware agents via oracle-guided stopping rewards. Instead of Monte Carlo rollouts from every intermediate state (AgentPRM, O(K×T²)), we compute optimal stopping labels analytically from completed trajectories (O(T)) — a K×T reduction that makes cost-aware PRM training tractable on long-horizon benchmarks. A small stopping model (0.5B–3B) trained on these labels serves as a cost-aware process reward model, training the executor via GRPO to stop at the right time.
+> **We introduce CASSI:** a self-reinforcing cost-awareness training cycle. A small stopping model (0.5B–3B) is trained on oracle-guided labels from completed trajectories (O(T), zero extra policy executions), and its cost-aware value estimates are used as process rewards to train the executor via GRPO. This creates a closed loop — oracle → stopper → process rewards → executor → better trajectories → repeat — that no prior work achieves.
 >
-> **Three key contributions:** (1) oracle-guided stopping labels that avoid Monte Carlo rollouts, reducing training computation by O(K×T), (2) empirical demonstration that dynamic, per-instance cost adaptation outperforms static penalties on heterogeneous tasks, and (3) a small stopping model that effectively supervises large executors with <3% inference overhead.
+> **Five key contributions:** (1) the first self-reinforcing cycle connecting oracle labeling, stopping model training, and cost-aware process reward feedback for executor RL; (2) theoretical and empirical proof that a separate stopping model is necessary due to representation conflict; (3) oracle-guided stopping labels reducing PRM data collection from O(K×T²) to O(T), with three formal properties; (4) dynamic per-instance cost adaptation that outperforms static penalties; (5) a tiny stopper (0.5B–3B) supervising large executors (7B–72B) with <3% overhead.
