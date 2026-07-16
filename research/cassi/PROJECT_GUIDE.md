@@ -6,7 +6,9 @@ relate, what's done, what's next, and what must never be changed. Reading order:
 this file → `HANDOFF.md` (operational status + next commands) → `../paper_plan_v2.md`
 (the authoritative spec) as needed.
 
-**Hard rule inherited from the user:** never read `research/archived*` (stale outputs).
+**Hard rule inherited from the user:** never read anything under the directory
+`research/archived/` (stale pre-rewrite outputs; that one directory is the entire ban —
+`research/lit_review/`, `research/novelty_check/`, `research/papers/` are all fine).
 
 **Contents:** §1 what the research is · §2 glossary · §3 pipeline · §4 repo map ·
 §5 document map · §6 status · §7 verification · §8 invariants · §9 worked example
@@ -67,7 +69,7 @@ Target: ICLR 2027 (submission ~Sept 2026). Fallback venues NeurIPS/ICML 2027.
 | Term | Meaning (plain) | In code |
 |---|---|---|
 | `q_t` | how good the agent's current draft answer is at step t (F1 vs gold; ALFWorld: fraction of subgoals done). Ground-truth-derived → label machinery ONLY | `labels/quality.py`; stored on `Step.q` (0.0 during live rollouts by design — filled at collection scoring) |
-| `c_t`, tier, wallet | dollar cost of step t; budget tier = how much of the wallet (allowance) REMAINS — tier names describe remaining budget, not urgency: HIGH = >60% left (m=0.5), MEDIUM = 30–60% (m=1.0), LOW = 10–30% (m=2.0), CRITICAL = <10% (m=5.0). m(tier) multiplies the cost penalty, so spending when nearly broke hurts 10× more than when flush. Wallet drawn per (task, GRPO group) | `budget/cost.py` (`tier_from_remaining`, `TIER_MULTIPLIERS`, `draw_wallet`) |
+| `c_t`, tier, wallet | dollar cost of step t; budget tier = how much of the wallet (allowance) REMAINS — tier names describe remaining budget, not urgency: HIGH = >60% left (m=0.5), MEDIUM = 30–60% (m=1.0), LOW = 10–30% (m=2.0), CRITICAL = <10% (m=5.0). m(tier) multiplies the cost penalty, so spending when nearly broke hurts 10× more than when flush. Wallet drawn per (task, GRPO group), UNIFORMLY at random over {small, medium, large} with a seeded rng | `budget/cost.py` (`tier_from_remaining`, `TIER_MULTIPLIERS`, `draw_wallet`) |
 | `U_t` | stopping utility = quality so far minus tier-scaled, normalized, λ-weighted spend: `q_t − Σ λ·m(tier_i)·c̃_i` | `budget/cost.py: stopping_utilities` |
 | λ (lambda) | the cost-sensitivity dial. Higher λ = cost matters more = stop earlier. The stopper is λ-CONDITIONED (λ is in its input text), so one model serves the whole dial | config `label.lambda_values`; `stopper/features.py: serialize` |
 | Snell envelope | the mathematically correct "should I stop now?" value computed backward over collected trajectories (max of stop-now vs expected-value-of-continuing). Avoids the "prophet bias" of just taking the best-in-hindsight step | `labels/snell.py: snell_labels` (Algorithm 1); prophet version kept only as E4 comparison |
@@ -185,13 +187,19 @@ exact-103 filter. The full sanctioned no-GPU work queue: HANDOFF §6.
 
 ```bash
 cd research/cassi && source .venv/bin/activate     # manual shells must activate; scripts self-activate
-python -m pytest tests/ -q                                    # expect 114 passed, 1 skipped
+python -m pytest tests/ -q                                    # expect 115 passed (canonical, in .venv)
 python -m cassi.executor.train_grpo --dry-run \
     --config configs/cassi.yaml --domain qa                   # expect "[dry-run] OK"
 (cd paper && make)                                            # expect main.pdf builds
 git config user.name                                          # expect: Nathanael Brian
 ```
 
+Count semantics: **in the .venv, expect 115 passed, 0 skipped.** Outside the venv you
+get "114 passed, 1 skipped" — the skip is `tests/test_executor_cpu.py`'s dry-run test,
+skipped when `verl` isn't importable; that signature means WRONG ENVIRONMENT, not rot.
+Per-file breakdown (for localizing a regression): core 19 · stopper 15 · executor 29
+(28 + the verl dry-run) · baselines 26 · eval 20 · integration 2 · run_frontier 4 = 115.
+When sanctioned new code adds tests, update this count AND HANDOFF §5 in the same commit.
 Never "verify" by re-running `scripts/p0_setup.sh` — it is an installer, and P0 is done.
 
 ## 8. The ten commandments (violating these voids the paper)
@@ -224,7 +232,7 @@ rollouts. One rollout, forced-continuation mode, T_max=10:
 | 1 | search[eiffel tower country] | EMPTY_DRAFT | 0.00 | 0.002 | 0.002 | HIGH |
 | 2 | search[capital of France] | Paris | 1.00 | 0.002 | 0.004 | HIGH |
 | 3 | ANSWER "Paris" → logged, forced on | Paris | 1.00 | 0.001 | 0.005 | HIGH |
-| 4–10 | more searches (nothing new) | Paris | 1.00 | 0.002/ea | 0.019 | →LOW |
+| 4–10 | more searches (nothing new) | Paris | 1.00 | 0.002/ea | 0.019 | →LOW→CRITICAL |
 
 `answered_flag=True` at t=3 (free self-stop measurement). q_t is scored at collection
 time only (string compare vs gold) — it never enters x_t.

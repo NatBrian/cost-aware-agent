@@ -5,13 +5,13 @@
 what is already built/executed, what is pending, and the exact next commands. Read
 `research/paper_plan_v2.md` §0, §2, §12, §16, §17 before touching anything.
 
-**Per user instruction: never read `research/archived*` folders** (stale AI outputs).
+**Per user instruction: never read anything under `research/archived/`** (stale AI outputs; that single directory is the whole ban).
 
 ---
 
 ## 1. Current state, in one paragraph
 
-ALL code is written and verified (114 CPU tests pass in ~5 s: `python -m pytest tests/ -q`
+ALL code is written and verified (115 CPU tests pass in ~17 s in the venv: `python -m pytest tests/ -q`
 from this dir), **both** former wiring gaps are CLOSED, and phases **P0 and P1 are executed**:
 the §19 stack is cloned+pinned (hashes in `configs/cassi.yaml pins:`) into a dedicated venv
 (`.venv` — auto-activated by `scripts/common.sh`), all datasets are downloaded/decontaminated/
@@ -33,7 +33,7 @@ another user's training job; the user has said GPUs cannot be used for now).
 | `labels/quality.py`, `labels/drafts.py` | F1/EM/subgoal scoring; running-draft parse + stability features (§2.6/§18.2) | `tests/test_core.py` |
 | `stopper/features.py` | §18.1 serialization (λ-conditioning) + numeric vector for the label regressor | `tests/test_core.py` |
 | `stopper/dataset.py`, `model.py`, `train_sft.py`, `eval_regret.py` | SFT examples (pooled λ, split-by-task), 3-head model (Alg. 2), custom training loop (early-stop on held-out REGRET), regret eval + P4 gate baselines | `tests/test_stopper_cpu.py` (15) |
-| `executor/react_agent.py`, `collect.py`, `monitor.py`, `shaping.py`, `train_grpo.py`, `envs/`, `vllm_client.py` | Shared scaffold (both §2.1 rollout modes), forced-continuation collection + wallets per (task, group), Alg. 4 monitor (fixed Δ̂≤0 + A8 mode + internalization tracking), PBRS + step-level RTG advantages + min-cohort guard, verl config builder + adapter | `tests/test_executor_cpu.py` (27), `tests/test_integration.py` |
+| `executor/react_agent.py`, `collect.py`, `monitor.py`, `shaping.py`, `train_grpo.py`, `envs/`, `vllm_client.py` | Shared scaffold (both §2.1 rollout modes), forced-continuation collection + wallets per (task, group), Alg. 4 monitor (fixed Δ̂≤0 + A8 mode + internalization tracking), PBRS + step-level RTG advantages + min-cohort guard, verl config builder + adapter | `tests/test_executor_cpu.py` (29 incl. verl dry-run), `tests/test_integration.py` (2), `tests/test_run_frontier_cpu.py` (4) |
 | `baselines/` (b1–b9 + oracle) | One module per §5.2 row with registry, cost knobs, reward logic | `tests/test_baselines_cpu.py` (26) |
 | `eval/metrics.py`, `stats.py`, `overhead.py` | Frontier protocol + interpolation, regret, matched-risk, §5.6 stats (small-n guard ENFORCED), T4 ledger + serving regimes + billing symmetry (enforced) | `tests/test_eval_cpu.py` (20) |
 | `analysis/` + `Makefile` | One script per F1–F6/T1–T5, CSV→PDF/tex, CVD-safe | `make figures tables` (skips gracefully pre-P9) |
@@ -64,7 +64,10 @@ after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier pro
    Then `scripts/p2_pilot_and_collect.sh` for the full round-0 collection (G=8) — despite
    its name it SKIPS its pilot stage when calibration is already frozen in the config
    (verified: it checks `require_pilot_calibration` per domain), so it will not re-derive
-   different percentiles after smoke_and_pilot.sh.
+   different percentiles after smoke_and_pilot.sh. Running it FIRST (nulls still in
+   config) is also safe: its stage (a) runs the pilot itself, prints the values, and
+   stops before collection until you write them into the config — the scripts differ in
+   that smoke_and_pilot.sh additionally does the P0 smoke + server bring-up.
 4. **P3 — labels** (`scripts/p3_labels.sh`): Algorithm 1 per λ ∈ {0.1,0.5,1,2,5} + QC memo.
 5. **P4 — stopper v0** (`scripts/p4_stopper.sh`): SFT + the HARD GATE (beat majority-class AND
    the confidence probe on held-out regret, else STOP and fix features/labels).
@@ -74,12 +77,19 @@ after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier pro
    phase (ideal no-GPU work, see §6). K1 alone must NOT gate a GO** unless the user
    explicitly approves that scope cut. K1's shaped arm runs BOTH step-credit variants
    (per_step_rtg and shape_segment) as sub-arms; the GO test applies to the better one and
-   both results go in the log. Decision formula (as implemented in
-   `scripts/killswitch_decision.py`): GO iff shaped costs ≥3 percentage points LESS than
-   controller-only at iso-accuracy (frontier interpolation) AND shaped cost ≤ B9's at
-   iso-accuracy (tie passes). Decision appended to `GO_NO_GO.log` — never delete or rewrite
-   past entries (§5.6 no-cherry-picking). The log is CREATED at the first documented
-   decision, whatever phase that is (an early P2 wallet-recipe deviation entry is fine).
+   both results go in the log. Decision formula (exact arithmetic, as implemented in
+   `scripts/killswitch_decision.py`): GO iff RELATIVE cost reduction
+   `(cost_ctrl − cost_shaped)/cost_ctrl ≥ 0.03` at iso-accuracy AND
+   `cost_shaped ≤ cost_B9` at iso-accuracy (tie passes). Iso-accuracy costs come from
+   each arm's 3-point mini-frontier — every K1 arm is evaluated at inference λ-dial
+   ∈ {0.5, 1.0, 2.0} (training stays at λ=1.0) so interpolation is possible at
+   kill-switch scale. λ note: 1.0 is the PROVISIONAL headline; K1's GO stands even if
+   the dev-chosen headline λ later differs (K1 is a direction+magnitude test, not
+   λ-specific) — note any such difference in the log. Decision appended to
+   `GO_NO_GO.log` (freeform dated UTC entries, written by killswitch_decision.py and
+   by hand for later scope decisions) — never delete or rewrite past entries (§5.6
+   no-cherry-picking). The log is CREATED at the first documented decision, whatever
+   phase that is (an early P2 wallet-recipe deviation entry is fine).
 7. **P6–P9** per §16 (iteration 1, loop iteration 2 with frozen-coach control, baselines,
    full eval incl. 500-task regret replays, 3 seeds on headline points). **Before P8:**
    read `research/lit_review/` for the baseline papers' actual mechanisms (B4/B5/B8
@@ -149,7 +159,10 @@ scaffold and the economy are FAIRNESS INVARIANTS — see the "never change" list
   the model emits "BEST ANSWER SO FAR:" every step. Check `format_score` in the smoke JSONL —
   it lives in `Trajectory.outcome["format_score"]` (fraction of the episode's steps whose
   output contained a parseable draft line, 0.0–1.0); "compliance < 95%" means the mean
-  format_score across smoke episodes is below 0.95.
+  format_score across smoke episodes is below 0.95. FREEZE BOUNDARY: the template must be
+  final BEFORE the P2 pilot, not merely before collection — wallet dollars derive from
+  pilot spend, and a template change changes spend. If the template changes after a pilot
+  ran, the pilot MUST be rerun (cheap: 200 tasks) before its values are frozen.
   If compliance < ~95%, tune `SYSTEM_TEMPLATE` in `executor/react_agent.py` (add a few-shot
   example) BEFORE any collection — and then freeze it forever (all methods share it; changing
   it after any baseline has run invalidates the comparison).
@@ -196,7 +209,9 @@ scaffold and the economy are FAIRNESS INVARIANTS — see the "never change" list
   depends on exact step→token alignment; the round-trip test covers it, but ANY verl upgrade
   or tokenizer change requires rerunning `--dry-run` + `tests/test_executor_cpu.py` first.
 - Stopper V̂ serving is CPU by default (`CASSI_STOPPER_DEVICE`); if rollout throughput tanks,
-  co-locate it on a GPU or raise the A5 every-k.
+  co-locate it on a GPU or raise the A5 every-k. `cuda:N` indexes into the ACQUIRED visible
+  set (`CUDA_VISIBLE_DEVICES` remaps device ids) — `cuda:0` is the first acquired GPU, never
+  physical GPU 0; you cannot accidentally address a foreign GPU while the env var is set.
 - Watch `divergence.csv` (F6) from step 0: rising V̂-vs-reward divergence = the documented
   hacking channel — the §2.4 response is a stopper refresh, not a training restart.
 - `--step-credit shape_segment` vs `per_step_rtg`: K1 picks; if SHAPE-segment wins, its
@@ -225,7 +240,10 @@ OS-Pruner); if K1 passes, consider the workshop-preprint hedge (§8).
 
 ```bash
 cd research/cassi && source .venv/bin/activate
-python -m pytest tests/ -q                                    # expect: 114 passed, 1 skipped
+python -m pytest tests/ -q       # expect: 115 passed IN THE VENV ("114 passed, 1 skipped"
+                                 # = wrong env: outside the venv, verl is missing and the
+                                 # dry-run test skips). Update this count (and PROJECT_GUIDE
+                                 # §7's) in the same commit whenever new tests land.
 python -m cassi.executor.train_grpo --dry-run \
     --config configs/cassi.yaml --domain qa                   # expect: "[dry-run] OK"
 (cd paper && make)                                            # expect: main.pdf builds
@@ -233,7 +251,7 @@ git config user.name                                          # expect: Nathanae
 ```
 
 Do NOT re-run `scripts/p0_setup.sh` as a check — it is a network installer; P0 is DONE
-(§3.1). Re-running it against moved upstream repos risks silently disturbing the pinned
+(§3 queue item 1). Re-running it against moved upstream repos risks silently disturbing the pinned
 stack (the "accidental upgrade" failure mode in PROJECT_GUIDE §17). Re-pin only
 deliberately: update `pins:`, then rerun this whole ritual.
 
@@ -242,11 +260,17 @@ deliberately: update `pins:`, then rerun this whole ritual.
 The user has said GPUs cannot be used and must not be waited on. Useful work that is
 explicitly sanctioned meanwhile:
 1. **Close the K2 stub**: implement `--arm single_multitask` in `executor/train_grpo.py`
-   (9B one-model multi-task comparator, A2/K2 machinery) — P5 NEEDS it (see §3.6).
+   (9B one-model multi-task comparator, A2/K2 machinery) — P5 NEEDS it (see §3 queue item 6).
 2. Stage the dedicated ALFWorld env (verl-agent clashes with verl over the package
-   name — separate venv or PYTHONPATH staging; see §3.1 note).
+   name — separate venv or PYTHONPATH staging; see §3 queue item 1 note).
 3. BrowseComp-Plus corpus staging (network/disk only, no GPU — large download, fine).
-4. Resolve the GAIA exact-103 filter (annotator-metadata tool filter; needed before E2).
+4. Resolve the GAIA exact-103 filter. Definition: from the 165-question validation set,
+   keep text-only questions — no file attachment AND no annotator-metadata tool that
+   implies files/multimodality (image/video/audio recognition, file readers). We staged
+   127 (attachment filter only); the extra ~24 likely fail the tool filter. ACCEPTANCE:
+   exactly the 103-question subset used by the SupervisorAgent/ODS line (needed for the
+   direct ICLR'26 comparison in E2) — or, if irreproducible, a documented deviation note
+   in the dataset manifest + paper appendix.
 5. Safe refactors: unify the two MockStopper classes; add `--policy` to collect.py.
 6. Align the §18.1 serialization caps (see the decisions list below).
 Anything else GPU-shaped: don't. Don't poll for GPUs either.

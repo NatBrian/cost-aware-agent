@@ -26,7 +26,7 @@ This repository has TWO parts:
 
 ## Hard rules
 
-- **Never read `research/archived*` folders** (stale outputs kept for history only;
+- **Never read anything under `research/archived/`** (that single directory is the whole ban; stale outputs kept for history only —
   user instruction — they will bias you).
 - `research/paper_plan_v2.md` supersedes the archived `paper_plan.md` (v5). Where
   they disagree, v2 wins. Do not re-litigate decisions logged in its §14 changelog.

@@ -37,10 +37,14 @@ cassi/
 
 ## Quick start (CPU-only checks, no GPU needed)
 
+The dedicated venv ALREADY EXISTS with the pinned stack installed (P0 is done) —
+do NOT pip-install into it or into the system python; reinstalling can silently
+flip which `verl` package wins name resolution.
+
 ```bash
 cd research/cassi
-pip install -r requirements-cpu.txt
-python -m pytest tests/ -q
+source .venv/bin/activate
+python -m pytest tests/ -q        # expect 115 passed (canonical count: PROJECT_GUIDE §7)
 ```
 
 ## GPU phases
