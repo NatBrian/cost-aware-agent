@@ -63,10 +63,22 @@ clone_pin https://github.com/PeterGriffinJin/Search-R1    Search-R1     # retrie
 banner "P0.2 — pip install requirements-gpu.txt"
 pip install -r "${CASSI_ROOT}/requirements-gpu.txt" \
     || pending "pip install of requirements-gpu.txt failed (flash-attn usually needs 'pip install flash-attn --no-build-isolation' on this machine) — fix and rerun"
-# Editable installs of the cloned stack (kept unmodified internally — §19):
-pip install -e "${THIRD_PARTY}/verl"       --no-deps
+# Editable installs of the cloned stack (kept unmodified internally — §19).
+# ORDER MATTERS: verl-agent's fork ALSO claims the `verl` distribution name, so
+# it must NOT be pip-installed into this venv or it shadows the pin (P6 wiring
+# targets third_party/verl @ pins.verl). verl-agent is used via PYTHONPATH by
+# the ALFWorld phase instead.
 pip install -e "${THIRD_PARTY}/verl-tool"  --no-deps || echo "[pip] verl-tool editable install failed — check its README for extras"
-pip install -e "${THIRD_PARTY}/verl-agent" --no-deps || echo "[pip] verl-agent editable install failed — check its README for ALFWorld extras (alfworld, textworld)"
+pip install -e "${THIRD_PARTY}/verl"       --no-deps
+python3 - <<'PY' || pending "verl import does not resolve to third_party/verl — fix with: pip install --no-deps -e third_party/verl"
+import pathlib, verl
+assert "third_party/verl/" in str(pathlib.Path(verl.__file__).resolve()).replace("\\", "/"), verl.__file__
+PY
+# `import cassi.*` must resolve against research/ inside the venv even without
+# common.sh's PYTHONPATH export (verl's ray actors + `python -m cassi...`):
+SITE_PACKAGES="$(python3 -c 'import site; print(site.getsitepackages()[0])')"
+echo "${RESEARCH_DIR}" > "${SITE_PACKAGES}/cassi_research.pth"
+echo "[pth ] ${SITE_PACKAGES}/cassi_research.pth -> ${RESEARCH_DIR}"
 
 # ------------------------------------- 3. record pins into configs/cassi.yaml
 banner "P0.3 — write commit hashes + lib versions into configs/cassi.yaml pins:"

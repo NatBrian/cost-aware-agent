@@ -34,9 +34,10 @@ banner "P5 — kill-switch gate K1 + K2"
 require_file "${STOPPER}" "run scripts/p4_stopper.sh first (P4 gate must have passed)"
 require_file "${DEV}" "run scripts/p1_data.sh first (frozen dev subsample, §5.6)"
 require_impl executor/train_grpo.py "executor agent (Algorithm 3 shaped GRPO)"
-# NOTE: train_grpo currently exposes --config/--domain/--dry-run only; the flags
-# used below (--tasks/--seed/--lambda/--coach/--arm/--out) are the §16 contract
-# to be wired when the verl GRPO launch lands — the call fails loudly until then.
+# train_grpo exposes the full §16 CLI (verl wiring: executor/verl_hooks.py, P6).
+# Exception: --arm single_multitask (K2 arm 1) raises NotImplementedError — the
+# one-model task+stopping-heads machinery belongs to A2 (§5.5) and is not the
+# shaped bridge; wire it there before running K2's first arm.
 require_impl baselines/b9_direct_shaping.py "baselines agent (§5.2 B9)"
 require_module_cli cassi.baselines.b9_direct_shaping "baselines agent — b9 landed as a library; add a main() CLI (flags used in K1 arm 3 below)"
 require_impl eval/run_frontier.py "eval agent — frontier CLI runner over cassi.eval.metrics (landed as a library; the runner must roll out --policy on --tasks with billing symmetry and append arm,lambda_dial,accuracy,cost_dollars rows to --out-csv)"

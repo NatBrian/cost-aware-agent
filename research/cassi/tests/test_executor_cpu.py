@@ -6,6 +6,8 @@ Run from research/cassi/:  python -m pytest tests/test_executor_cpu.py -q
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pytest
 
@@ -367,6 +369,65 @@ class TestComputeCassiRewards:
         tr = _mk_traj("k5", 0, 4, q_tau=1.0)
         with pytest.raises(RuntimeError, match="median_pilot_spend"):
             adapter.compute_group_rewards([tr], [np.zeros(4)])
+
+
+# ======================================= (e) verl wiring (§16 P6, CPU-safe only)
+class TestVerlWiring:
+    """The P6 hooks, exercised WITHOUT GPUs. The dry-run runs in a subprocess so
+    this file's in-process no-torch/no-verl rule stays intact; the encode/decode
+    round trip importorskips the pinned verl stack (present in .venv per P0)."""
+
+    def test_dry_run_cli_is_cpu_safe_and_validates_hooks(self, tmp_path):
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        research_dir = str(Path(__file__).resolve().parent.parent.parent)
+        env = dict(os.environ, PYTHONPATH=research_dir)
+        proc = subprocess.run(
+            [sys.executable, "-m", "cassi.executor.train_grpo", "--dry-run",
+             "--domain", "qa", "--out", str(tmp_path)],
+            capture_output=True, text=True, env=env,
+            cwd=str(Path(__file__).resolve().parent.parent),
+        )
+        assert proc.returncode == 0, proc.stderr[-2000:]
+        assert "cassi_step_level" in proc.stdout          # adv estimator choice printed
+        assert "norm_adv_by_std_in_grpo" in proc.stdout   # Dr.GRPO hygiene visible
+
+    def test_advantage_encode_decode_round_trip(self):
+        """rm_scores difference-encoding on step-final tokens must decode to the
+        exact per-step advantages on every response token of that step (§2.4 —
+        the equivalence the verl_hooks docstring documents)."""
+        pytest.importorskip("verl")
+        torch = pytest.importorskip("torch")
+        from cassi.executor.verl_hooks import (
+            compute_cassi_step_level_advantage,
+            encode_step_values,
+        )
+
+        rng = np.random.default_rng(3)
+        width = 40
+        rows, masks, per_step = [], [], []
+        for ends in ([4, 11, 19, 33], [7, 39], [0]):      # variable lengths incl. edges
+            adv = rng.normal(size=len(ends))
+            rows.append(encode_step_values(adv, ends, width))
+            m = torch.zeros(width)
+            m[: ends[-1] + 1] = 1.0                        # response region incl. obs tokens
+            masks.append(m)
+            per_step.append((ends, adv))
+        token_level_rewards = torch.stack(rows)
+        response_mask = torch.stack(masks)
+
+        decoded, returns = compute_cassi_step_level_advantage(
+            token_level_rewards, response_mask, config=None, index=None)
+        assert torch.equal(decoded, returns)              # GRPO outcome convention
+        for i, (ends, adv) in enumerate(per_step):
+            start = 0
+            for t, end in enumerate(ends):
+                seg = decoded[i, start:end + 1].numpy()
+                np.testing.assert_allclose(seg, adv[t], atol=1e-6)
+                start = end + 1
+            assert float(decoded[i, ends[-1] + 1:].abs().sum()) == 0.0  # masked tail
 
 
 # ============================================== CPU import safety of lazy modules

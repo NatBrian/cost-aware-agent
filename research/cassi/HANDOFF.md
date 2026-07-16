@@ -1,8 +1,9 @@
 # CASSI Implementation — Handoff for the Next Agent
 
-**Written 2026-07-16.** The spec is `research/paper_plan_v2.md` (source of truth; §16 is the
-runbook). This document tells you what is already built, what is pending, and the exact next
-commands. Read `research/paper_plan_v2.md` §0, §2, §12, §16, §17 before touching anything.
+**Written 2026-07-16, updated same day after the execution session.** The spec is
+`research/paper_plan_v2.md` (source of truth; §16 is the runbook). This document tells you
+what is already built/executed, what is pending, and the exact next commands. Read
+`research/paper_plan_v2.md` §0, §2, §12, §16, §17 before touching anything.
 
 **Per user instruction: never read `research/archived*` folders** (stale AI outputs).
 
@@ -10,16 +11,17 @@ commands. Read `research/paper_plan_v2.md` §0, §2, §12, §16, §17 before tou
 
 ## 1. Current state, in one paragraph
 
-Everything that can be built and verified WITHOUT a GPU is built and verified: the full
-`cassi/` package (labels, stopper, executor, baselines, eval, analysis), the phase runner
-scripts P0–P9 including the kill-switch gate, the LaTeX paper skeleton (compiles to
-`paper/main.pdf`), and a 109-test CPU suite that passes in ~5 s
-(`cd research/cassi && python -m pytest tests/ -q`). The core math is validated on synthetic
-data: Snell recursion finds the hand-computable τ*, higher λ ⇒ earlier stopping (0 monotonicity
-violations), PBRS telescopes to −Φ(x₀), trajectory-level advantages are provably shaping-blind
-(hence step-level credit + min-cohort guard), and B9's advantages are bit-identical to CASSI's
-when V̂ ≡ V* (the designed control). **Nothing has touched a GPU yet. No real data is
-downloaded. No model is trained.** All experimental numbers do not exist yet.
+ALL code is written and verified (114 CPU tests pass in ~5 s: `python -m pytest tests/ -q`
+from this dir), **both** former wiring gaps are CLOSED, and phases **P0 and P1 are executed**:
+the §19 stack is cloned+pinned (hashes in `configs/cassi.yaml pins:`) into a dedicated venv
+(`.venv` — auto-activated by `scripts/common.sh`), all datasets are downloaded/decontaminated/
+manifested, the wiki-18 retrieval corpus + assembled 64GB E5 index sit in
+`data/searchr1_index/`, and Qwen3.5-9B/2B weights are prefetched in the HF cache. The verl
+integration (`executor/verl_hooks.py` + full `train_grpo` CLI) dry-runs green against the
+pinned verl commit. Core math is validated on synthetic data (hand-computable τ*;
+λ-monotonicity; PBRS telescoping; B9≡CASSI when V̂≡V*). **No model is trained and no
+experiment has run — every GPU step is still pending** (the machine's GPUs are fully held by
+another user's training job; the user has said GPUs cannot be used for now).
 
 ## 2. What is implemented (module map + test coverage)
 
@@ -44,16 +46,22 @@ Everything below needs GPUs and/or network downloads. **GPU protocol for this ma
 (CLAUDE.md):** `eval $(/mnt/src/zhanka/gpu_acquire.sh N)` before, `/mnt/src/zhanka/gpu_release.sh`
 after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier processes.
 
-1. **P0 — installs** (`scripts/p0_setup.sh`): clones verl/verl-tool/verl-agent/Search-R1 into
-   `third_party/` (gitignored), installs `requirements-gpu.txt`, pins commit hashes into
-   `configs/cassi.yaml pins:`. Done-criterion: one ReAct rollout on HotpotQA dev + one on
-   ALFWorld with the draft line in every step (`scripts/verify_smoke.py`).
-2. **P1 — data** (`scripts/p1_data.sh`): downloads NQ/HotpotQA/MuSiQue/Bamboogle/2Wiki/MATH-500/
-   AIME-2025, stages GAIA-103 + BrowseComp-Plus, builds the Search-R1 wiki index + retriever
-   server, runs `scripts/decontaminate.py`, emits the dataset manifest.
-3. **P2 — pilot + collection** (`scripts/p2_pilot_and_collect.sh`): 200-task unconstrained pilot
-   → **write the printed wallet/median values into `configs/cassi.yaml`** (they are `null` now;
-   later phases refuse to run until filled) → round-0 forced-continuation collection (G=8).
+1. ~~P0 — installs~~ **DONE** (2026-07-16) except the GPU smoke rollout. Stack pinned; venv
+   ready. NOTE: verl-agent and verl both claim the `verl` package name — the venv resolves to
+   the PINNED verl (enforced install order in p0_setup.sh); ALFWorld's verl-agent harness
+   therefore needs its own env or PYTHONPATH staging when that domain starts.
+2. ~~P1 — data~~ **DONE** (2026-07-16): datasets + frozen subsamples staged in `data/`,
+   decontamination ran (3 train items dropped), manifest committed, wiki-18 corpus + 64GB
+   E5 index assembled in `data/searchr1_index/`. Leftovers: BrowseComp-Plus corpus staging
+   (documented in p1_data.sh); GAIA text-only staged at 127 rows — the papers' 103-subset
+   needs the annotator-metadata tool filter, verify before E2 (SupervisorAgent comparability).
+3. **FIRST GPU SESSION → `scripts/smoke_and_pilot.sh`** (everything pre-staged): acquires 2
+   GPUs, launches retriever + vLLM servers, runs the P0 smoke rollout + verify, then the
+   200-task P2 pilot, and prints the wallet calibration → **write the printed values into
+   `configs/cassi.yaml`** (they are `null` now; later phases refuse to run until filled).
+   FOOTGUN: `gpu_acquire.sh` can grant locks while a foreign job still holds GPU memory —
+   the script checks actual memory and aborts safely (never kill other users' jobs).
+   Then `scripts/p2_pilot_and_collect.sh` for the full round-0 collection (G=8).
 4. **P3 — labels** (`scripts/p3_labels.sh`): Algorithm 1 per λ ∈ {0.1,0.5,1,2,5} + QC memo.
 5. **P4 — stopper v0** (`scripts/p4_stopper.sh`): SFT + the HARD GATE (beat majority-class AND
    the confidence probe on held-out regret, else STOP and fix features/labels).
@@ -65,23 +73,29 @@ after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier pro
 8. **P10–P11**: `make figures tables`, then write the paper into `paper/sections/`
    (writing order and claims-audit rule: §16 P11; every §14-dead-claim is banned).
 
-### Known wiring gaps (small, deliberate — finish before P5)
+### Former wiring gaps — BOTH CLOSED (2026-07-16)
 
-- **`cassi/eval/run_frontier.py` CLI does not exist yet.** Scripts p5/p9 call it to sweep a
-  method over its knob and emit `arm,lambda_dial,accuracy,cost_dollars` CSVs (contract
-  documented in `scripts/p5_killswitch.sh`). It's an aggregation runner over eval episodes —
-  build it against `eval/metrics.py`'s `Frontier`.
-- **`executor/train_grpo.py` exposes `--config/--domain/--dry-run` only.** The full §16 flag
-  contract used by p5/p6/p7 (`--tasks/--coach/--arm/--max-steps/...`) plus the actual verl
-  hookup is a documented 4-point TODO(P6) block in `VerlCassiAdapter` (reward tensor on
-  step-final tokens; bypass verl's trajectory-level GRPO advantage with our
-  `compute_cassi_rewards`; V̂ serving; SHAPE-segment variant). The reward/advantage SEMANTICS
-  are done and tested — only the verl plumbing remains, against whatever verl ≥0.8 API is
-  pinned at P0.
+- ~~run_frontier CLI~~ **DONE**: `eval/run_frontier.py` — full P5–P9 evaluation entry point
+  (frontier summary rows + per-instance CSVs for the stats layer, billing symmetry, dual-run
+  regret with the replay billed to the analysis line, `--regret-from-replays` offline mode).
+  Tested in `tests/test_run_frontier_cpu.py`.
+- ~~verl plumbing~~ **DONE**: `executor/verl_hooks.py` + full `train_grpo.py` CLI
+  (`--tasks/--coach/--arm/--lambda/--step-credit/--max-steps/--init/--out/--dry-run`, §16
+  contract) — custom `CassiAgentLoopManager` (group-level V̂ rewards), registered
+  `cassi_step_level` adv estimator (difference-encoding on step-final tokens; decode proof in
+  the module docstring), Dr.GRPO keys per the pinned commit, every touchpoint carrying a
+  `# pin:` file/line reference. `--dry-run` is the regression check after any verl change.
+  Known NotImplemented stubs (deliberate): `--arm single_multitask` (K2's A2 machinery) and
+  the ALFWorld agent loop (verl-agent fork is API-incompatible with the pinned AgentLoop —
+  needs its own env). Stopper V̂ serving defaults to CPU (`CASSI_STOPPER_DEVICE`).
+  Logging quirk: verl's batch "reward" metric shows A₁ per trajectory (encoding artifact);
+  TRUE economic rewards stream to `<out>/divergence.csv` (feeds F6); val batches carry the
+  real terminal reward.
 - `collect.py` re-collection with a trained policy: serve the checkpoint with vLLM and pass
   `--vllm-url` (no `--policy` flag; documented in p7/p9).
-- P9's eval emitters must log **per-instance results per knob/threshold point** — the stats
-  functions consume per-instance matrices, not aggregates.
+- P9's eval emitters log per-instance results per knob point — `run_frontier.py` already
+  writes `*_instances.csv`; keep it that way (the stats functions consume per-instance
+  matrices, not aggregates).
 
 ### Decisions made during implementation (so you don't re-litigate)
 
