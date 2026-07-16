@@ -8,6 +8,14 @@ this file → `HANDOFF.md` (operational status + next commands) → `../paper_pl
 
 **Hard rule inherited from the user:** never read `research/archived*` (stale outputs).
 
+**Contents:** §1 what the research is · §2 glossary · §3 pipeline · §4 repo map ·
+§5 document map · §6 status · §7 verification · §8 invariants · §9 worked example
+(numbers through the whole pipeline) · §10 experiments E1–E6 explained · §11 baselines
+B1–B9 explained · §12 ablations A1–A9 · §13 hypotheses & what to do when results
+disappoint · §14 config walkthrough · §15 data schema rationale · §16 how the verl
+integration works · §17 troubleshooting FAQ · §18 results→paper mapping ·
+§19 project history & why key decisions were made · §20 reviewer landmines.
+
 ---
 
 ## 1. What this research is (plain language)
@@ -194,3 +202,266 @@ cd paper && make && cd ..                                     # expect main.pdf 
 9. Kill-switches gate the expensive phases; a NO-GO is a documented pivot, not a failure.
 10. Git identity: NatBrian only (enforced by folder config); no AI co-author lines;
     GPUs only via acquire/release, never kill foreign jobs.
+
+---
+
+## 9. A worked example — one task through the entire pipeline, with numbers
+
+Follow ONE HotpotQA task through every stage. All numbers are illustrative but to scale.
+
+**Collection (P2).** Task: "What is the capital of the country where the Eiffel Tower
+is?" Gold: "Paris". The group draws wallet B = $0.02 (medium), shared by all G=8
+rollouts. One rollout, forced-continuation mode, T_max=10:
+
+| t | action | draft after step | q_t (F1 vs gold) | c_t ($) | spent | tier |
+|---|---|---|---|---|---|---|
+| 1 | search[eiffel tower country] | EMPTY_DRAFT | 0.00 | 0.002 | 0.002 | HIGH |
+| 2 | search[capital of France] | Paris | 1.00 | 0.002 | 0.004 | HIGH |
+| 3 | ANSWER "Paris" → logged, forced on | Paris | 1.00 | 0.001 | 0.005 | HIGH |
+| 4–10 | more searches (nothing new) | Paris | 1.00 | 0.002/ea | 0.019 | →LOW |
+
+`answered_flag=True` at t=3 (free self-stop measurement). q_t is scored at collection
+time only (string compare vs gold) — it never enters x_t.
+
+**Utilities (λ=1, median pilot spend = $0.01 → c̃_t = c_t/0.01).**
+U_t = q_t − Σ λ·m(tier_i)·c̃_i. With m(HIGH)=0.5: U_1 = 0 − 0.5·0.2 = −0.10;
+U_2 = 1.0 − 0.5·0.4 = 0.80; U_3 = 1.0 − 0.25 −0.05 = 0.75 (still paying, no quality
+gain); by t=10 (tier multipliers rising as the wallet empties) U_10 ≈ −0.4.
+**The curve rises to t=2 then strictly falls — the economics of overwork, in one row.**
+
+**Snell labels (P3, Algorithm 1).** Backward over ALL trajectories: at t=9,
+Cont(x_9)=Ê[V_10|x_9]≈−0.4 < U_9 ⇒ stop-region. ... At t=2, the regressor sees states
+like x_2 (fresh draft, HIGH tier, overlap low) across the whole batch; some continuations
+improved (multi-hop tasks), so Cont(x_2)≈0.71 < U_2=0.80 ⇒ **τ*=2, a*_2=STOP,
+Δ*_2 = 0.71−0.80 = −0.09**; at t=1, Cont(x_1)≈0.65 > U_1=−0.10 ⇒ CONTINUE, Δ*_1=+0.75.
+Per step we emit (a*, tanh(Δ*/s), V*) — V*_1 = max(U_1, Cont) = 0.65 is the VALUE label.
+
+**Coach training (P4).** Input = the §18.1 text block for x_t (with "λ = 1" inside);
+targets = the three labels. One coach for all λ, because λ is in the text.
+
+**Worker training (P6).** RL-mode rollout stops at ANSWER (t=3 here). Coach's value head
+gives Φ = V̂: say V̂(x_1)=0.65, V̂(x_2)=0.78, V̂(x_3)=0.74, terminal Φ:=0.
+Shaped rewards r_t = Φ(x_{t+1})−Φ(x_t): r_1 = +0.13 (that search moved the state toward
+stop-worthy — paid immediately), r_2 = −0.04 (past the frontier — mildly punished),
+r_3 = −0.74 (cash out: the telescoping settlement). R_base = 1.0 − (tier-scaled spend)
+≈ 0.75 paid at the end. Returns-to-go per step + group normalization per step index
+(cohort = rollouts still alive) = the advantages. The group's lazy rollout that searched
+10 times gets negative advantage at steps 3–10 — *step-resolved* pressure to stop, which
+a trajectory-level penalty cannot deliver (it telescopes away — proven in tests).
+
+**Inference (Alg.4).** User sets λ. Coach reads x_t each step; stop at Δ̂ ≤ 0. Same
+state under a tighter wallet serializes with tier=LOW → coach learned to output lower
+Δ̂ → earlier stop, no rule table. **Internalization check:** turn the coach OFF —
+a well-trained worker still answers at t≈2–3 by itself.
+
+---
+
+## 10. The experiments E1–E6 — what each proves, in plain terms
+
+| ID | Question it answers | Design in one line | Output |
+|---|---|---|---|
+| E1 | Does CASSI beat everything on cost-at-equal-accuracy? | full grid: CASSI vs B1–B9, 2 domains, 3 seeds at headline points, frontiers per method | T1/T2, F3 |
+| E2 | Did the economics move INTO the policy? + does it transfer? | monitor-off eval; % self-stopped; trained worker on OOD sets (BrowseComp-Plus/Bamboogle/2Wiki); coach supervising a frozen live-web agent on GAIA-103; coach across executors (Ministral-3-8B, Qwen3.5-4B) | F4, T5 |
+| E3 | Is the λ dial real? Is wallet-awareness learned? | sweep λ at INFERENCE on one fixed worker (+ one λ=0.3 trained spot-check); same tasks under small/medium/large wallets → stop-steps should shift | F3 overlay, E3 CSVs |
+| E4 | Are Snell labels actually better than alternatives? | same pipeline, label source swapped: Snell vs prophet-argmax vs TD/GAE vs MC at matched label compute | F5 |
+| E5 | Does the LOOP help (not just more training)? | iteration 2 run twice at matched compute: frozen coach vs refreshed coach; the DELTA between arms is the loop's contribution | per-iteration table |
+| E6 | Sanity: does stopping track difficulty? | 2-hop vs 4-hop MuSiQue stop-step correlation (consistency check only, no novelty claim) | one appendix figure |
+
+**The two metrics that carry the paper:** (1) dollar cost at iso-accuracy, read off each
+method's own knob-swept frontier by interpolation (never compare single points);
+(2) stopping regret = utility gap vs the Snell-optimal stop, measured by the dual-run
+replay protocol on a fixed 500-task subsample (replay costs billed to the analysis line).
+
+## 11. The baselines B1–B9 — who they are and what question each kills
+
+| # | What it is | Kills the question | Knob |
+|---|---|---|---|
+| B1 | plain ReAct, no cost signal | how much slack exists at all | none (excluded from iso-claims) |
+| B2 | self-eval prompt + calibrated confidence probe (Dynasor-style) | "why not just ask the model if it's done?" — DANGEROUS: literature says it can win | confidence threshold |
+| B3 | SupervisorAgent-style training-free monitor (ICLR'26, −29.7% GAIA tokens) | "why train anything?" — the strongest training-free bar | trigger sensitivity |
+| B4 | OTC-GRPO (tool-count-scaled outcome reward) | is STEP-level signal needed vs outcome-level? | tool-count coefficient |
+| B5 | EAPO (solve-rate-adaptive penalty) | is a learned VALUE better than adaptive scalar pressure? | penalty weight |
+| B6 | single model, cost-in-reward (CTA-style) | is the two-model split earning anything? | λ |
+| B7 | CaRT+cost, TWO arms (SFT-only / +GRPO) | is RL needed, or does imitating truncated trajectories suffice? | truncation λ |
+| B8 | AgentPRM + cost term (pooled return-to-go — NOT per-state MC) | is the STOPPING semantics what matters vs generic value+cost? | λ |
+| B9 | **the pivotal one**: our Snell labels as advantages directly, NO coach, same step-level machinery | does the coach earn its existence (generalization to unlabeled states)? | λ |
+| oracle | stop at Snell τ* using ground truth | headroom upper bound | none |
+
+Fairness invariants: all share the same scaffold/draft template, the same envs and
+price map, and every method's auxiliary inference is billed (B2's probes, B3's triggers,
+our coach's queries).
+
+## 12. Ablations A1–A9 (most reuse trained models at near-zero cost)
+
+A1 coach size 0.8B/2B/4B (watch: ~1B meta-models can collapse — ReMA warning) ·
+A2 single-model multitask vs two-model at MATCHED total params (the honest version of
+"do we need two models") · A3 potential-based vs v5's additive reward (prediction:
+additive teaches dawdling) · A4 coach input families (budget-only / +history / +draft
+stability) · A5 coach eval frequency every k-th step + legacy-probe vs running-draft
+label-source check · A6 SFT-only vs SFT+RL coach · A7 rationale text on/off ·
+A8 learned wallet-conditioning vs v5's hand-written δ(tier) rule table (beating it is
+a supporting result) · A9 **negative controls**: random coach (noise Δ̂/V̂) and
+shuffled-label coach — if the worker still improves, gains were generic dense-reward
+regularization, not economics. Cheap and decisive; reviewers love these.
+
+## 13. Hypotheses and the pre-planned "what if it fails" moves (plan §6)
+
+| H | Claim | If it FAILS → the paper becomes |
+|---|---|---|
+| H1 | CASSI Pareto-beats training-free B2/B3 on ≥2 domains | "when does learned stopping help" regime study (still publishable) |
+| H2 | bridge (training) > controller-only (same coach) | **KILL-SWITCH: stop/pivot per §12** |
+| H3 | CASSI > B9 direct shaping | coach demoted to optional; paper = "Snell-label shaping for agents" |
+| H4 | two models ≥ one at matched params | claim rests on transfer + privileged-info hygiene + runtime control |
+| H5 | ≥70% of savings retained with monitor OFF | "partial internalization" framing |
+| H6 | savings hold in both serving regimes | regime-conditional recommendation |
+
+A failed hypothesis is a REPORTED RESULT with its fallback framing — never buried.
+
+## 14. Config walkthrough (configs/cassi.yaml — §17)
+
+- `label.lambda_values [0.1,0.5,1,2,5]`: the λ grid for LABELS (one coach learns all).
+  `default_lambda 1.0`: headline; confirmed on dev before test (§5.6).
+- `label.tier_multipliers {0.5,1,2,5}`: m(tier) — the discretized "shadow price" of
+  spending when the wallet is fuller/emptier. `m≡1` = ablation A8's plain economy.
+- `label.allowances / cost_normalization`: **null until the P2 pilot** — every later
+  phase refuses to run while null (deliberate gate). small=P25, medium=P75, large=2×P90
+  of unconstrained pilot spend; median = the c̃ normalizer that makes λ dimensionless.
+- `label.regressor lightgbm`: the CROSS-SECTIONAL regressor inside Algorithm 1 (NOT the
+  coach — separate on purpose, to avoid label-model coupling).
+- `stopper.sft early_stop_metric heldout_stopping_regret`: the coach is selected by the
+  metric that matters (regret), not CE loss.
+- `stopper.heads action/delta/value = CE 1.0 / MSE 0.5 / MSE 0.5`: three heads; delta is
+  tanh-normalized (decisions), value is UNnormalized (the shaping potential must live in
+  quality units).
+- `executor.grpo`: G=8; `length_norm dr_grpo` + step-level advantage + `min_cohort_guard 3`
+  are correctness requirements, not tuning knobs. `advantage step_level` variant
+  (`per_step_rtg` vs `shape_segment`) — K1 picks the winner.
+- `executor.horizon {qa:10, alfworld:20}`: T_max. Changing it invalidates labels.
+- `inference.delta_threshold 0.0`: FIXED — wallet-sensitivity lives in the weights;
+  `ablation_A8_rule_table` is the comparator, never the default.
+- `cost_model`: reference local token prices + §17 tool fees; API models via the repo
+  harness price map. Draft-line tokens are charged to EVERY method.
+- `pins:`: the installed stack's exact commits/versions — the ground truth for "what
+  APIs am I coding against"; update ONLY at a deliberate re-pin + rerun of dry-run+tests.
+
+## 15. Data schema rationale (common/schema.py — §11)
+
+`StepFeatures` (x_t) is THE anti-hacking boundary. Everything in it is computable by the
+deployment harness at inference: budget arithmetic (tokens/calls/dollars/% of wallet/
+burn rate/tier), progress signals (step index, how long the draft has been unchanged,
+edit distances of recent drafts, retrieval overlap = "are searches finding anything
+new?", distinct sources), the draft text itself, task text, and digested recent history.
+**Deliberately absent:** anything derived from ground truth, and the executor's own
+stated confidence (self-reported confidence is the classic hacking channel). The honest
+caveat (plan §2.4): the executor authors the draft, so within an iteration it could
+freeze a wrong draft to fake stability — the defense is cross-iteration (label refresh
+re-grounds everything in GT) plus the V̂-vs-reward divergence diagnostic.
+
+`Step` adds what only training may see: q (GT quality), c/tier (billing),
+answered_flag (forced-continuation ANSWER event). `Trajectory` adds the wallet
+(allowance_B, wallet_size, group_id — the WALLET IS PER (task, GROUP), so group members
+are comparable) and the outcome dict. JSONL round-trip is tested.
+
+## 16. How the verl integration works (executor/verl_hooks.py — for whoever debugs P6)
+
+verl (pinned commit, see `configs/cassi.yaml pins:`) runs GRPO with an "agent loop"
+that rolls multi-turn episodes and, by default, puts ONE scalar reward on the final
+token and computes trajectory-level group advantages. CASSI needs per-step rewards and
+OUR advantages. Three hooks, all registered from one module import:
+
+1. `CassiReactAgentLoop` — a verl agent loop that internally drives our CPU-tested
+   `ReactAgent` scaffold (so the §2.6 template/features are identical in training and
+   eval) and records which token ends each step.
+2. `CassiAgentLoopManager` — after each rollout wave, groups trajectories by task
+   (verl's `uid`), queries the coach checkpoint for V̂ on every visited state, runs the
+   untouched `compute_cassi_rewards` (shaped rewards → step returns-to-go → cohort
+   advantages), and writes the result into the batch's reward tensor.
+3. Registered adv estimator `cassi_step_level` — verl's estimator API only hands over
+   the reward tensor, so the manager DIFFERENCE-ENCODES advantages on step-final tokens
+   (`A_t − A_{t+1}`) and the estimator's reverse-cumsum reconstructs A_t exactly on
+   every token of step t. This bypasses verl's own trajectory-level GRPO advantage
+   (which is provably blind to our shaping — §2.4). A round-trip unit test guards the
+   encoding; `--dry-run` verifies all three registrations against the pinned source.
+
+Quirks to know: verl's logged "reward" metric shows A₁ per trajectory (artifact of the
+encoding — IGNORE it); true economic rewards stream to `<out>/divergence.csv` (feeds
+figure F6); validation batches carry real terminal rewards so val metrics stay
+readable. Coach V̂ serving defaults to CPU (`CASSI_STOPPER_DEVICE=cuda:N` to change).
+
+## 17. Troubleshooting FAQ (errors you WILL meet, and what they mean)
+
+- `RuntimeError: Pilot calibration missing ...` → by design. Run the pilot
+  (smoke_and_pilot.sh) and write the printed values into configs/cassi.yaml. Never
+  bypass by inventing numbers.
+- `NotImplementedError` in alfworld.py / `--arm single_multitask` / BrowseComp-Plus →
+  deliberate walls with instructions inside; see HANDOFF "deliberate stubs".
+- `Permission denied (publickey)` on git push → the NatBrian SSH key needs re-adding
+  (github.com/settings/keys). NEVER switch to another credential (Brian/AGENTS.md).
+- `gpu_acquire.sh` prints "Acquired" but nvidia-smi shows ~100GB used → locks ≠ free
+  memory; a foreign job holds the GPUs. Release and stop. Never kill foreign processes.
+- `import verl` resolves to verl-agent's 0.3.x fork → the two packages share a name;
+  reinstall `third_party/verl` editable LAST (p0_setup.sh now enforces order; the
+  dry-run asserts the resolution).
+- vLLM serving Qwen3.5 emits `<think>` or drops the draft line → check
+  `enable_thinking=False` reaches the chat template (vllm_client.py extra_body) and the
+  §19 token-in-token-out note.
+- lightgbm "X does not have valid feature names" warning → cosmetic, suppressed in
+  snell.py; ignore elsewhere.
+- Retriever returns nothing / connection refused → the E5 server isn't up; see
+  smoke_and_pilot.sh (index load takes minutes; log at experiments/logs/retriever.log).
+- Tests suddenly failing after a verl/transformers upgrade → you changed the pinned
+  stack; either re-pin deliberately (update pins:, rerun dry-run + full tests) or
+  restore the pin. Never "fix" tests to match an accidental upgrade.
+
+## 18. Where numbers go — results → figures/tables → paper sections
+
+Every experiment writes CSVs to `experiments/results/` (frontier summary + per-instance
+files from `eval/run_frontier.py`). `make figures tables` regenerates everything —
+NO hand-edited numbers anywhere. Mapping: F1 pipeline schematic (no data) · F2 shaping
+intuition (one real trajectory's U/Cont/Δ/τ*) · F3 ← e1_grid + e3_lambda_frontier ·
+F4 ← e2_internalization (monitor-off bars, self-stop % across iterations) ·
+F5 ← label study CSVs (E4) · F6 ← divergence.csv from training · T1/T2 ← e1_grid with
+stats.py CIs · T3 ← ablation CSVs · T4 ← overhead ledger (billing symmetry re-checked
+at render — asymmetric CSVs are REFUSED) · T5 ← e2_transfer_*. Paper sections and page
+budgets: paper/sections/0*.tex headers quote their sources; writing order and the
+claims-audit greps are plan §16 P11 (banned phrases from §14 must not reappear).
+
+## 19. Project history — how we got here and why key decisions were made
+
+1. **Original idea (user's):** budget-aware agents; a monitor that tracks budget and
+   judges good-enough; "monitor as reward model" as a new training paradigm.
+2. **v5 plan** (research/archived/ — do not read) made strong claims; **15 independent
+   research agents** (94 papers read at PDF level) + **5 novelty audits** scored it
+   4–5.5/10 and falsified several claims (a "first self-reinforcing cycle" that wasn't
+   first; a complexity story based on misreading AgentPRM; a strawman "static penalty"
+   framing; a foresight-biased oracle; a reward with a dawdling incentive).
+3. **paper_plan_v2** was rewritten around the surviving, verified gap (the cost-aware
+   stopping bridge + internalization measurement) and then hardened by FOUR internal
+   adversarial review rounds (11+10+12 repairs + 19 consistency fixes — all logged with
+   evidence in its §14 changelog). Headline repairs worth knowing: Snell labels replaced
+   argmax (prophet bias); potential-based shaping replaced additive rewards (dawdling);
+   forced-continuation collection fixed a flaw where the method's own success would
+   have destroyed iteration-2 training data; the frontier protocol fixed an
+   iso-accuracy metric that was uncomputable as written; the E5 frozen-coach arm made
+   the loop claim defensible; model/benchmark choices were web-verified against
+   July-2026 SoTA with pre-written rebuttal lines (§19 of the plan).
+4. **Implementation session (2026-07-16):** everything in §6 above; four subagent
+   builders + one integrator; every module CPU-tested before any GPU exists.
+
+Moral for the next agent: the plan is not a draft — it is the survivor of a deliberate
+attempt to kill it. When something looks odd, the §14 changelog usually explains why
+it is the way it is. Check there before "simplifying".
+
+## 20. Reviewer landmines (for the agent that writes the paper)
+
+Pre-answered in plan §15 — keep them pre-answered: "why not just prompt/probe?" (B2 is
+in every table; RedundancyBench ≤24.9% F1 citation) · "isn't this AgentPRM + cost?"
+(B8 exists; delta = stopping semantics + Snell targets + bridge + internalization) ·
+"learned monitors get hacked" (objective features, per-iteration refresh, F6 curves) ·
+"overhead?" (T4 end-to-end dollars incl. draft tokens + collection + serving, both
+regimes) · "contamination?" (§5.6 protocol; headline metric is cost at MATCHED accuracy
+— uniform inflation cancels) · "n=103 significance?" (never claimed; CIs only, labeled
+transfer indicators) · "cherry-picking?" (frozen subsamples, dev-chosen λ, append-only
+GO_NO_GO.log, all seeds/λ in appendix). NEVER let these reappear: "first
+self-reinforcing cycle", O(K×T²) complexity claims, "static instance-blind penalties"
+strawman, "representation conflict" as theory.
