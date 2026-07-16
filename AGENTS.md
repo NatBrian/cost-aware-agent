@@ -11,12 +11,15 @@ This repository has TWO parts:
 
 ## If you are here to continue the work → START HERE
 
-1. Read `research/cassi/HANDOFF.md` — current implementation status, what is
-   pending (GPU experiments), exact next commands, and every decision already made.
-2. Read `research/paper_plan_v2.md` — the full research plan; it is the SOURCE OF
+1. Read `research/cassi/PROJECT_GUIDE.md` — the master plain-language explanation
+   (what the research is, glossary mapping paper terms to code symbols, pipeline
+   walkthrough, document map, status, the "ten commandments" invariants).
+2. Read `research/cassi/HANDOFF.md` — current status, pending GPU work, exact next
+   commands, post-experiment adjustment map, every decision already made.
+3. Read `research/paper_plan_v2.md` — the full research plan; it is the SOURCE OF
    TRUTH for everything under `research/cassi/` (each module cites its sections).
-3. Verify nothing rotted: `cd research/cassi && python -m pytest tests/ -q`
-   (expect 109+ passed, CPU-only, ~5 s).
+4. Verify nothing rotted: `cd research/cassi && python -m pytest tests/ -q`
+   (expect 114 passed, CPU-only, ~5 s).
 
 ## Hard rules
 

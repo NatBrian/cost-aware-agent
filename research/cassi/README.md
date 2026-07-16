@@ -3,6 +3,9 @@
 Implementation of `research/paper_plan_v2.md` (the source of truth — read it first).
 This folder is the `cassi/` repo layout defined in paper_plan_v2 §17.
 
+**New here (human or AI)? Read [`PROJECT_GUIDE.md`](PROJECT_GUIDE.md) first** — the full
+plain-language explanation: research idea, glossary (paper terms → code symbols),
+pipeline walkthrough, document map, invariants.
 **Status / what to run next: see [`HANDOFF.md`](HANDOFF.md).**
 
 ## What this is (plain language)
