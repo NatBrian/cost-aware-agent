@@ -1,0 +1,55 @@
+% =============================================================================
+% §1 INTRODUCTION — page budget: 1.25 pages (paper_plan_v2 §9)
+% Written SECOND-TO-LAST (§16 P11 writing order).
+%
+% Content sources (plan § references):
+%   * overthinking / agent-waste empirics WITH NUMBERS — plan §1.1:
+%       inverted-U in chain length (Wu 2502.07266); shortest-of-20 chains +34.5
+%       points (Hassid 2505.17813); overthinking score predicts failure R^2=0.892,
+%       selecting low-overthinking runs cuts cost 43% while improving success +24%
+%       (Cuadron 2502.08235); hard problems need up to 2.9x more tokens (dual failure).
+%   * prompting fails at economics — plan §1.2: <=24.88% step-redundancy F1
+%       (RedundancyBench 2605.29893); oracle gap under matched budgets (Token
+%       Economies 2406.06461); confidence probes are quality-only (LearnStop).
+%   * POSITIONING SENTENCE — plan §1.3, used VERBATIM (quoted below).
+%   * contributions C1–C5 — plan §3, each mapped to its proving experiment.
+%   * Figure F1 (pipeline) anchored here (plan §9 figure inventory).
+% Claims audit (§16 P11 step 4): no v5 dead claims — no "first self-reinforcing
+% cycle", no O(KxT^2) story, no "static instance-blind" strawman.
+% =============================================================================
+\section{Introduction}
+\label{sec:introduction}
+
+\TODO{Opening: LLM agents have no training signal that rewards recognizing that
+further work is not worth its cost (plan \S1.1). Ground in the verified empirics
+listed in this file's header --- every number must trace to its citation.}
+
+\TODO{Why prompting/probing is not enough, and why that justifies \emph{training}
+(plan \S1.2).}
+
+% ---- Positioning sentence — plan §1.3, VERBATIM: ----------------------------
+\begin{quote}
+Existing adaptive-efficiency methods set cost pressure \emph{before} generation
+(solve-rate-scaled penalties: ALP, DAST, LASER-D; difficulty tags: AdaCtrl;
+budget pre-commitment: TALE, Plan-and-Budget) or shape \emph{trajectory-level}
+rewards (tool-call counts: OTC-PO, EAPO, SlimSearcher), and existing stopping
+methods control a \emph{frozen} policy at inference time (TERMINATOR, OS-Pruner,
+LYNX, SupervisorAgent, Ares, BAGEN). \textbf{None learns a state-dependent
+economic stopping value from observed mid-trajectory progress and reuses it as a
+process reward to train the agent.} We do, and we show the training is what makes
+the difference.
+\end{quote}
+
+\TODO{Contributions C1--C5 (plan \S3), each with its proving experiment:
+C1 cost-aware stopping bridge (E1/K1); C2 internalized economic behavior (E2);
+C3 measurable Snell-envelope stopping labels (E4); C4 dollar-denominated objective
++ learned allowance-conditioning + $\lambda$ dial (E3); C5 honest map of when
+learned stopping helps (A1--A9 + low-slack control). State the \S3 non-claims.}
+
+\begin{figure}[t]
+  \centering
+  \figplaceholder{f1_pipeline}
+  \caption{\TODO{F1 --- pipeline: hindsight Snell labels $\to$ stopping-value
+  model $\to$ potential-based shaped GRPO $\to$ measured loop (plan \S9).}}
+  \label{fig:pipeline}
+\end{figure}

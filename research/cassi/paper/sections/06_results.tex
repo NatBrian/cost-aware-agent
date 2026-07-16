@@ -1,0 +1,81 @@
+% =============================================================================
+% §6 RESULTS — page budget: 1.75 pages (paper_plan_v2 §9)
+% Written THIRD (§16 P11 writing order).
+%
+% Content sources:
+%   * T1 headline cost@iso-accuracy / accuracy@iso-cost (3 seeds, CIs) — E1.
+%   * T2 all baselines x 2 training domains — E1.
+%   * T5 transfer by role (executor swap; ->BrowseComp-Plus/Bamboogle/2Wiki;
+%     stopper-as-monitor -> GAIA-103) — E2. (T3/T4 anchored in §7 Analysis;
+%     the §9 table does not fix T3–T5 placement — adjust at P11 if space demands.)
+%   * F3 cost-accuracy Pareto per domain (all baselines, λ sweep) — E1/E3.
+%   * F4 internalization (monitor-off bars + self-termination % across
+%     iterations 0/1/2) — E2/E5.
+%   * F5 label study (Snell vs prophet vs TD/GAE vs MC) — E4.
+%   * per-iteration loop gains WITH the frozen-coach control delta (E5) —
+%     "the (b)−(a) delta IS the loop's contribution".
+%   * HYPOTHESIS VERDICTS H1–H6 STATED EXPLICITLY, INCLUDING FAILURES (plan §6:
+%     each H has a pre-registered fallback framing — use it honestly).
+% Numbers discipline (§16 P11 step 4): every number in this section must exist in
+% a table/figure generated from experiments/results/ CSVs.
+% =============================================================================
+\section{Results}
+\label{sec:results}
+
+\begin{table}[t]
+  \centering
+  \caption{\TODO{T1 --- headline cost at iso-accuracy / accuracy at iso-cost
+  (3 seeds, 95\% bootstrap CIs; frontier protocol \S\ref{sec:setup}).}}
+  \label{tab:headline}
+  \tabplaceholder{t1_headline}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \caption{\TODO{T2 --- all baselines $\times$ 2 training domains (frontier
+  points 1-seed, headline points 3-seed --- say so in this caption, \S5.6).}}
+  \label{tab:baselines}
+  \tabplaceholder{t2_baselines}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \figplaceholder{f3_pareto}
+  \caption{\TODO{F3 --- cost--accuracy Pareto per domain, all baselines,
+  $\lambda$ sweep (E1/E3).}}
+  \label{fig:pareto}
+\end{figure}
+
+\TODO{Main comparison narrative: CASSI vs B1--B9 (E1); the K1-pivotal reads:
+vs controller-only (H2) and vs B9 direct shaping (H3).}
+
+\begin{figure}[t]
+  \centering
+  \figplaceholder{f4_internalization}
+  \caption{\TODO{F4 --- internalization: monitor-off bars + self-termination \%
+  across iterations 0/1/2 (E2/E5).}}
+  \label{fig:internalization}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \caption{\TODO{T5 --- transfer by role: executor swap (cross-family/scale);
+  trained executor $\to$ BrowseComp-Plus/Bamboogle/2Wiki; stopper-as-monitor
+  $\to$ GAIA-103 (point estimates + CIs only, n$<$500 --- \S5.6 small-n policy).}}
+  \label{tab:transfer}
+  \tabplaceholder{t5_transfer}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \figplaceholder{f5_label_study}
+  \caption{\TODO{F5 --- label study: Snell vs prophet-argmax vs TD/GAE vs MC ---
+  stopper regret + downstream executor cost at matched label-compute (E4).}}
+  \label{fig:labelstudy}
+\end{figure}
+
+\TODO{Per-iteration loop gains (E5): iteration table i=0,1,2 and the
+frozen-vs-refreshed coach delta at matched compute.}
+
+\TODO{Hypothesis verdicts H1--H6 stated explicitly (plan \S6), including any
+failures and their pre-registered fallback framings.}

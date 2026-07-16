@@ -1,0 +1,35 @@
+% =============================================================================
+% §2 RELATED WORK — page budget: 1.0 page (paper_plan_v2 §9)
+% Written FIFTH (§16 P11 writing order: after Analysis, before Intro).
+%
+% Content sources:
+%   * plan §4's nine-family positioning table rendered as prose + a compact table:
+%       (1) hindsight stop labels + trained stopper (TERMINATOR, OS-Pruner, LYNX,
+%           LearnStop, Chen et al. ICML'20) — inference-only, token-cost only;
+%       (2) agent early-stop/termination (CaRT, BAGEN, SIM-RAG, DAS);
+%       (3) monitors over frozen agents (SupervisorAgent, Ares, TAB, Dynasor);
+%       (4) cost-aware agent RL, outcome-level (OTC-PO, EAPO, SlimSearcher);
+%       (5) adaptive length control (ALP, DAST, LASER-D, L1, ...);
+%       (6) agent PRMs / step credit (AgentPRM x2, SWEET-RL, GiGPO, PRIME,
+%           Implicit PRM, DASH) — "no PRM encodes cost";
+%       (7) loops / co-evolution (iStar, Cooper, SPARK, Self-Guide);
+%       (8) reward shaping in LLM RL (SHAPE, TIPS, DIVER, Stop-RAG, SPAE);
+%       (9) theory + motivation empirics (Hansen–Zilberstein, Weitzman, prophet).
+%   * EXPLICIT deltas per family (the "what they lack" column).
+%   * the CORRECTED AgentPRM reading stated in text (plan §4 corrections:
+%     AgentPRM = pooled return-to-go, NOT per-state MC; two AgentPRMs disambiguated).
+%   * every claim about a competitor traces to a lit_review entry (§16 P11 step 3).
+% =============================================================================
+\section{Related Work}
+\label{sec:related}
+
+\TODO{Render plan \S4's family table as prose + compact table. One paragraph per
+family cluster; end each with the explicit delta. Key precursor citations to get
+right: Stop-RAG (fitted-Q stopping, quality-only, inference-only --- our deltas:
+$\lambda\cdot$cost objective, multi-dimensional cost, training bridge); SHAPE/TIPS
+(PBRS mechanics --- borrowed with citation, our claim is the potential's
+\emph{semantics}); OS-Pruner (acc $-\lambda\cdot$tokens objective but
+inference-only); DASH (labels-as-advantages, no stopper --- this is B9).}
+
+\TODO{State the corrected AgentPRM reading in text (pooled return-to-go; the
+Fudan AgentPRM 2511.08325 is the TD+GAE one) --- plan \S4 corrections list.}

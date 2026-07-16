@@ -1,0 +1,295 @@
+% =============================================================================
+% CASSI references — seeded from the verified arXiv IDs in paper_plan_v2.md
+% (§4 positioning table, §5.2 baselines, §2 method positioning).
+%
+% *** EVERY ENTRY MUST BE VERIFIED AGAINST THE ACTUAL PAPER AT P11 STEP 3 ***
+% (§16 P11: "no citation invented from memory"; every competitor claim traces to a
+% research/lit_review/ entry). Rules used when seeding this file:
+%   * arXiv IDs are exactly the ones given in paper_plan_v2 (note = {arXiv:...}).
+%   * titles are as given/derivable from the plan; short-hand names are marked.
+%   * author = {{TODO: verify}} wherever the plan does not give authors —
+%     NO invented venues or author lists. Classical entries (Ng/Hansen/Weitzman/
+%     Longstaff/Gao) are standard and filled fully.
+%   * entries whose arXiv id is NOT in the plan (Dr.GRPO, DAPO, Search-R1,
+%     BrowseComp-Plus) carry an explicit TODO(P11) id-verification flag.
+% =============================================================================
+
+% ---------- hindsight stop labels + trained stopper (plan §4 row 1) ----------
+@misc{terminator2026,
+  author = {{TODO: verify}},
+  title  = {{TERMINATOR}: hindsight exit labels for a trained stopper (title as cited in paper\_plan\_v2 -- verify)},
+  year   = {2026},
+  note   = {arXiv:2603.12529},
+}
+@misc{ospruner2026,
+  author = {{TODO: verify}},
+  title  = {{OS-Pruner}: overthinking-step pruning with an $\mathrm{acc} - \lambda\cdot\mathrm{tokens}$ objective (verify title)},
+  year   = {2026},
+  note   = {arXiv:2607.11089},
+}
+@misc{learnstop2026,
+  author = {{TODO: verify}},
+  title  = {{LearnStop}: when do learned stopping rules beat confidence probes (verify title; matched lost-correct-risk protocol)},
+  year   = {2026},
+  note   = {arXiv:2606.30852},
+}
+
+% ---------- agent early-stop / termination (plan §4 row 2) -------------------
+@misc{cart2025,
+  author = {{TODO: verify}},
+  title  = {{CaRT}: trained self-termination for {LLM} agents (verify title)},
+  year   = {2025},
+  note   = {arXiv:2510.08517},
+}
+@misc{bagen2026,
+  author = {{TODO: verify}},
+  title  = {{BAGEN}: trained stop/continue for agents (verify title)},
+  year   = {2026},
+  note   = {arXiv:2606.00198},
+}
+
+% ---------- monitors / controllers over frozen agents (plan §4 row 3) --------
+@misc{supervisoragent2025,
+  author = {{TODO: verify}},
+  title  = {{SupervisorAgent}: training-free runtime supervision of {LLM} agents (verify title; ICLR 2026, $-29.7\%$ {GAIA} tokens)},
+  year   = {2025},
+  note   = {arXiv:2510.26585},
+}
+@misc{ares2026,
+  author = {{TODO: verify}},
+  title  = {{Ares}: per-step effort routing from hindsight labels (verify title)},
+  year   = {2026},
+  note   = {arXiv:2603.07915},
+}
+@misc{dynasor2024,
+  author = {{TODO: verify}},
+  title  = {Efficiently serving {LLM} reasoning programs with certainty-based dynamic compute ({Dynasor}; verify title)},
+  year   = {2024},
+  note   = {arXiv:2412.20993},
+}
+
+% ---------- cost-aware agent RL, outcome-level (plan §4 row 4) ---------------
+@misc{otcpo2025,
+  author = {{TODO: verify}},
+  title  = {{OTC-PO}: optimal tool calls via cost-aware outcome rewards (verify title)},
+  year   = {2025},
+  note   = {arXiv:2504.14870},
+}
+@misc{eapo2026,
+  author = {{TODO: verify}},
+  title  = {{EAPO}: efficiency-aware policy optimization for tool agents (verify title)},
+  year   = {2026},
+  note   = {arXiv:2606.02132},
+}
+@misc{slimsearcher2026,
+  author = {{TODO: verify}},
+  title  = {{SlimSearcher}: cost-efficient search agents (verify title)},
+  year   = {2026},
+  note   = {arXiv:2606.07074},
+}
+@misc{cta2026,
+  author = {{TODO: verify}},
+  title  = {{CTA}: cost-discounted {GRPO} under-internalizes tool economy (verify title; plan §5.2 B6)},
+  year   = {2026},
+  note   = {arXiv:2602.16699},
+}
+
+% ---------- adaptive length control for reasoning (plan §4 row 5) ------------
+@misc{alp2025,
+  author = {{TODO: verify}},
+  title  = {{ALP}: adaptive length penalties scaled by solve rate (verify title; NeurIPS 2025 spotlight per plan)},
+  year   = {2025},
+  note   = {arXiv:2506.05256},
+}
+@misc{dast2025,
+  author = {{TODO: verify}},
+  title  = {{DAST}: difficulty-adaptive slow thinking (verify title)},
+  year   = {2025},
+  note   = {arXiv:2503.04472},
+}
+@misc{l1_2025,
+  author = {{TODO: verify}},
+  title  = {{L1}: controlling how long a reasoning model thinks with reinforcement learning (COLM 2025 per plan)},
+  year   = {2025},
+  note   = {arXiv:2503.04697},
+}
+
+% ---------- agent PRMs / step credit (plan §4 row 6) --------------------------
+@misc{agentprm2025,
+  author = {{TODO: verify}},
+  title  = {Process reward models for {LLM} agents ({AgentPRM}; pooled return-to-go + iterative loop -- plan §4 corrected reading)},
+  year   = {2025},
+  note   = {arXiv:2502.10325},
+}
+@misc{agentprmfudan2025,
+  author = {{TODO: verify}},
+  title  = {{AgentPRM} ({TD+GAE} variant; WWW 2026 per plan -- disambiguate from arXiv:2502.10325)},
+  year   = {2025},
+  note   = {arXiv:2511.08325},
+}
+@misc{sweetrl2025,
+  author = {{TODO: verify}},
+  title  = {{SWEET-RL}: training multi-turn {LLM} agents with privileged-information critics (verify title)},
+  year   = {2025},
+  note   = {arXiv:2503.15478},
+}
+@misc{gigpo2025,
+  author = {{TODO: verify}},
+  title  = {{GiGPO}: group-in-group policy optimization for {LLM} agent training (verify title)},
+  year   = {2025},
+  note   = {arXiv:2505.10978},
+}
+@misc{prime2025,
+  author = {{TODO: verify}},
+  title  = {{PRIME}: process reinforcement through implicit rewards (verify title)},
+  year   = {2025},
+  note   = {arXiv:2502.01456},
+}
+@misc{implicitprm2024,
+  author = {{TODO: verify}},
+  title  = {Free process rewards without process labels (implicit {PRM}; verify title)},
+  year   = {2024},
+  note   = {arXiv:2412.01981},
+}
+@misc{dash2026,
+  author = {{TODO: verify}},
+  title  = {{DASH}: post-hoc hindsight labels as direct advantages (verify title; plan §5.2 B9 template)},
+  year   = {2026},
+  note   = {arXiv:2607.00482},
+}
+
+% ---------- loops: policy-evaluator co-evolution (plan §4 row 7) --------------
+@misc{istar2025,
+  author = {{TODO: verify}},
+  title  = {{iStar}: iterated self-reinforcing policy--reward co-evolution (verify title)},
+  year   = {2025},
+  note   = {arXiv:2509.19199},
+}
+@misc{cooper2025,
+  author = {{TODO: verify}},
+  title  = {{Cooper}: co-evolving policy and reward models (verify title)},
+  year   = {2025},
+  note   = {arXiv:2508.05613},
+}
+
+% ---------- reward shaping in LLM RL (plan §4 row 8) --------------------------
+@misc{shape2026,
+  author = {{TODO: verify}},
+  title  = {{SHAPE}: segment-level potential-based reward shaping in {GRPO} with a telescoping fix (verify title; ACL 2026 per plan)},
+  year   = {2026},
+  note   = {arXiv:2604.06636},
+}
+@misc{tips2026,
+  author = {{TODO: verify}},
+  title  = {{TIPS}: turn-level potential-based reward shaping for search tool agents (verify title)},
+  year   = {2026},
+  note   = {arXiv:2603.22293},
+}
+@misc{stoprag2025,
+  author = {{TODO: verify}},
+  title  = {{Stop-RAG}: offline fitted-{Q} stopping for retrieval-augmented generation (verify title; NeurIPS 2025 workshop per plan)},
+  year   = {2025},
+  note   = {arXiv:2510.14337},
+}
+
+% ---------- motivation empirics (plan §4 row 10 / §1.1) -----------------------
+@misc{cuadron2025overthinking,
+  author = {{Cuadron et al. (TODO: verify full list)}},
+  title  = {The danger of overthinking: the reasoning--action dilemma in agentic tasks (verify title; $R^2=0.892$, $-43\%$ cost $+24\%$ success)},
+  year   = {2025},
+  note   = {arXiv:2502.08235},
+}
+@misc{wu2025moreisless,
+  author = {{Wu et al. (TODO: verify full list)}},
+  title  = {When more is less: the inverted-{U} between chain-of-thought length and accuracy (verify title)},
+  year   = {2025},
+  note   = {arXiv:2502.07266},
+}
+@misc{hassid2025shorter,
+  author = {{Hassid et al. (TODO: verify full list)}},
+  title  = {Preferring shorter thinking chains: shortest-of-20 is $+34.5$ points over longest (verify title)},
+  year   = {2025},
+  note   = {arXiv:2505.17813},
+}
+@misc{redundancybench2026,
+  author = {{TODO: verify}},
+  title  = {{RedundancyBench}: detecting redundant agent steps ($\le 24.88\%$ step-level {F1}; verify title)},
+  year   = {2026},
+  note   = {arXiv:2605.29893},
+}
+
+% ---------- RL estimator hygiene (ids NOT given in paper_plan_v2) -------------
+@misc{drgrpo2025,
+  author = {{TODO: verify}},
+  title  = {{Dr.~GRPO}: unbiased length handling in group-relative policy optimization (verify title)},
+  year   = {2025},
+  note   = {arXiv id TODO(P11): verify -- not given in paper\_plan\_v2 (believed 2503.20290)},
+}
+@misc{dapo2025,
+  author = {{TODO: verify}},
+  title  = {{DAPO}: decoupled clip and dynamic sampling policy optimization (verify title)},
+  year   = {2025},
+  note   = {arXiv id TODO(P11): verify -- not given in paper\_plan\_v2 (believed 2503.14476)},
+}
+
+% ---------- classical optimal stopping / shaping theory (plan §4 row 9) -------
+@inproceedings{ng1999policy,
+  author    = {Ng, Andrew Y. and Harada, Daishi and Russell, Stuart},
+  title     = {Policy invariance under reward transformations: theory and application to reward shaping},
+  booktitle = {Proceedings of the Sixteenth International Conference on Machine Learning (ICML)},
+  pages     = {278--287},
+  year      = {1999},
+}
+@article{hansen2001monitoring,
+  author  = {Hansen, Eric A. and Zilberstein, Shlomo},
+  title   = {Monitoring and control of anytime algorithms: a dynamic programming approach},
+  journal = {Artificial Intelligence},
+  volume  = {126},
+  number  = {1--2},
+  pages   = {139--157},
+  year    = {2001},
+}
+@article{weitzman1979optimal,
+  author  = {Weitzman, Martin L.},
+  title   = {Optimal search for the best alternative},
+  journal = {Econometrica},
+  volume  = {47},
+  number  = {3},
+  pages   = {641--654},
+  year    = {1979},
+}
+@article{longstaff2001valuing,
+  author  = {Longstaff, Francis A. and Schwartz, Eduardo S.},
+  title   = {Valuing {American} options by simulation: a simple least-squares approach},
+  journal = {The Review of Financial Studies},
+  volume  = {14},
+  number  = {1},
+  pages   = {113--147},
+  year    = {2001},
+}
+@misc{gao2022scaling,
+  author = {Gao, Leo and Schulman, John and Hilton, Jacob},
+  title  = {Scaling laws for reward model overoptimization},
+  year   = {2022},
+  note   = {arXiv:2210.10760},
+}
+
+% ---------- infra / benchmarks (plan §19) --------------------------------------
+@misc{halharness2025,
+  author = {{TODO: verify}},
+  title  = {{HAL}: a holistic agent leaderboard harness for cost- and consistency-aware agent evaluation (verify title; princeton-pli/hal-harness)},
+  year   = {2025},
+  note   = {arXiv:2510.11977},
+}
+@misc{searchr1_2025,
+  author = {{TODO: verify}},
+  title  = {{Search-R1}: training {LLMs} to reason and leverage search engines with reinforcement learning (verify title)},
+  year   = {2025},
+  note   = {arXiv id TODO(P11): verify -- not given in paper\_plan\_v2 (believed 2503.09516; repo PeterGriffinJin/Search-R1)},
+}
+@misc{browsecompplus2026,
+  author = {{TODO: verify}},
+  title  = {{BrowseComp-Plus}: browsing evaluation over a fixed 100{K}-document local corpus (verify title; ACL 2026 per plan §19)},
+  year   = {2026},
+  note   = {arXiv id TODO(P11): verify -- not given in paper\_plan\_v2},
+}

@@ -1,0 +1,61 @@
+% =============================================================================
+% §4 METHOD — page budget: 1.5 pages (paper_plan_v2 §9)
+% Written FIRST (§16 P11 writing order).
+%
+% Content sources:
+%   * Algorithms 1–3 in COMPACT form — plan §10 (label construction / stopper SFT /
+%     shaped GRPO); Algorithm 4 (inference) can fold into §2.5 text.
+%   * the stopping-value model M_theta — plan §2.3: three heads (action CE,
+%     Δ̂ MSE, V̂ MSE), λ-conditioned single stopper, honest "why a separate small
+%     model" (privileged-information asymmetry, reusability; Pareto = empirical A2).
+%   * potential-based bridge — plan §2.4: Φ(x_t)=V̂_θ(x_t), Φ(terminal)=0, γ=1;
+%     POLICY-INVARIANCE statement (Ng–Harada–Russell); telescoping consequence =>
+%     step-level advantage assignment is MANDATORY (min-cohort guard);
+%     "one Lagrangian, not three" (R_base uses the labels' economy).
+%   * anti-reward-hacking design — plan §2.4: harness-computed inputs only;
+%     per-iteration stopper refresh; V̂-vs-reward divergence diagnostic; the
+%     draft-freezing attack named HONESTLY with its cross-iteration defense.
+%   * the measured loop — plan §2.7: AgentPRM-style iteration CITED as template;
+%     ≥2 iterations, frozen-coach control (E5); "instantiation, not invention".
+%   * running draft & quality scoring — plan §2.6: template line for ALL methods,
+%     tokens billed in c_t; SWE-bench out-of-scope reasoning.
+%   * Figure F2 (shaping intuition) anchored here (plan §9).
+% Positioning guards (plan §2.4): PBRS-in-GRPO mechanics are SHAPE/TIPS/DIVER's —
+% cite and borrow; our claim is the potential's SEMANTICS (trained cost-aware
+% stopping value).
+% =============================================================================
+\section{Method: Cost-Aware Stopping Supervision, Internalized}
+\label{sec:method}
+
+\TODO{Overview paragraph: components (A) labels, (B) stopper, (C) shaped executor
+RL, (D) measured loop (plan \S2 intro).}
+
+\subsection{Measurable stopping-value labels}
+\TODO{Algorithm 1 compact (plan \S10); learned allowance-conditioning ---
+randomized wallets per (task, group) + tier-scaled marginal costing (plan \S2.2);
+honest complexity statement (labels free GIVEN quality measurements; draft tokens
+and forced continuation priced).}
+
+\subsection{The stopping-value model}
+\TODO{Three heads; $\lambda$-conditioning = the inference dial; SFT only
+(Algorithm 2); honest two-model justification (plan \S2.3).}
+
+\subsection{Executor training: potential-based economic shaping}
+\TODO{$R_\mathrm{base}$ + $r_t = \gamma\Phi(x_{t+1}) - \Phi(x_t)$; invariance
+convention; telescoping $\Rightarrow$ step-level credit mandatory; Algorithm 3
+compact; Dr.GRPO/DAPO hygiene; anti-hacking design (plan \S2.4). The conceptual
+core sentence: the stopper converts the sparse economic objective into dense
+per-step economic feedback without changing the optimal policy.}
+
+\subsection{Inference and the measured loop}
+\TODO{Stop when $\hat\Delta \le 0$; $\lambda$ dial; internalization metrics
+(monitor-off, self-termination) --- plan \S2.5. Loop with frozen-coach control
+--- plan \S2.7.}
+
+\begin{figure}[t]
+  \centering
+  \figplaceholder{f2_shaping_intuition}
+  \caption{\TODO{F2 --- shaping intuition: $U_t$, $\mathrm{Cont}(x_t)$, $\Delta$,
+  $\tau^*$ drawn on one real trajectory (plan \S9).}}
+  \label{fig:shaping}
+\end{figure}

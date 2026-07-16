@@ -1,0 +1,39 @@
+% =============================================================================
+% §5 EXPERIMENTAL SETUP — page budget: 0.75 pages (paper_plan_v2 §9)
+% Written SECOND (§16 P11 writing order).
+%
+% Content sources:
+%   * domains — plan §5.1 table: QA+search (primary; NQ+HotpotQA+MuSiQue,
+%     Search-R1 env via verl-tool); ALFWorld (verl-agent); OOD transfer SPLIT BY
+%     ROLE (executor -> BrowseComp-Plus/Bamboogle/2Wiki; stopper-as-monitor ->
+%     GAIA-103 over frozen live-web agent); MATH-500 + AIME 2025 low-slack control;
+%     SWE dropped from RL (reason stated).
+%   * baselines B1–B9 — plan §5.2 table (render compact; each row's "kills the
+%     question" purpose); oracle stopping upper bound.
+%   * metrics — plan §5.3: cost@iso-accuracy / accuracy@iso-cost + the per-method
+%     frontier protocol (own cost knob, interpolation, knobless excluded);
+%     stopping regret vs Snell τ* (utility gap) + dual-run replay protocol;
+%     internalization metrics; end-to-end honest accounting per serving regime;
+%     billing symmetry; HAL reporting conventions.
+%   * statistical protocol pointer — plan §5.6 (details to appendix): seeds
+%     42/123/789, bootstrap 10k, Holm–Bonferroni, small-n policy (no hypothesis
+%     tests under n=500), frozen eval subsamples, contamination protocol.
+%   * models/infra — plan §19: Qwen3.5-9B executor, Qwen3.5-2B stopper,
+%     Ministral-3-8B transfer, verl >= 0.8, TRL 1.8.
+% =============================================================================
+\section{Experimental Setup}
+\label{sec:setup}
+
+\TODO{Domains table (plan \S5.1) + why SWE-bench RL is out of scope (per-step
+quality cost degenerates $\tau^*$).}
+
+\TODO{Baselines B1--B9 compact table (plan \S5.2) --- keep each baseline's
+"kills the question" purpose in a column; disclose the B3 protocol adaptation
+(details to appendix).}
+
+\TODO{Metrics + frontier protocol (plan \S5.3): every method swept over ITS OWN
+cost knob; iso-metrics by interpolation; knobless methods excluded from
+iso-claims. Stopping regret via the 500-task dual-run replay. Billing symmetry
+sentence. Pointer to \S5.6 statistical protocol in appendix.}
+
+\TODO{Models, RL config (G=8, KL $\beta$=0.04, Dr.GRPO), infra pins (plan \S17/\S19).}

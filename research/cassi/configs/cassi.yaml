@@ -1,0 +1,102 @@
+# CASSI configuration — single source of truth, transcribed from paper_plan_v2.md §17.
+# Where the plan says "calibrate/freeze after P2", the value here is `null` until the
+# pilot runs; scripts must refuse to proceed past P2 while calibration fields are null.
+
+label:
+  lambda_values: [0.1, 0.5, 1.0, 2.0, 5.0]      # dimensionless (cost is pilot-normalized, §2.1)
+  default_lambda: 1.0                            # headline; chosen on dev (§5.6)
+  tier_multipliers: {HIGH: 0.5, MEDIUM: 1.0, LOW: 2.0, CRITICAL: 5.0}  # m(tier) in U_t (§2.2); m≡1 in A8
+  # allowances: per-domain wallets drawn per (task, GRPO group) — calibrated from the
+  # 200-task unconstrained pilot (small=P25 spend, medium=P75, large=2×P90); frozen after P2.
+  allowances:
+    qa: {small: null, medium: null, large: null}          # dollars — FILL FROM P2 PILOT
+    alfworld: {small: null, medium: null, large: null}    # dollars — FILL FROM P2 PILOT
+  cost_normalization:
+    qa_median_pilot_spend: null                  # dollars — FILL FROM P2 PILOT (C̃ = C / this)
+    alfworld_median_pilot_spend: null            # dollars — FILL FROM P2 PILOT
+  quality_scoring:
+    qa: f1            # F1/EM of per-step running draft vs gold (free string compare); EM used for terminal Q_τ headline
+    alfworld: subgoal_fraction                   # read from env state
+  collection_mode: forced_continuation_to_Tmax   # §2.1 — label rollouts only; RL rollouts terminate at ANSWER
+  legacy_probe_ablation: {name: answer_now_v1, max_tokens: 64}   # validation only (§2.6/§18.2, A5)
+  regressor:
+    type: lightgbm
+    fallback: mlp_2x256
+    lightgbm_params: {n_estimators: 200, num_leaves: 31, learning_rate: 0.05, min_child_samples: 20, verbosity: -1}
+  delta_scale:      # tanh scale s per domain — fit on round-0 data (Alg.1 line 7), then FROZEN
+    qa: null
+    alfworld: null
+
+stopper:
+  base_model: Qwen/Qwen3.5-2B                    # ablation A1: 0.8B / 4B (post-trained models carry no "-Instruct" suffix)
+  head_impl: trl_v1.8_scalar_head                # SFTTrainer + AutoModelForSequenceClassification num_labels=1 style heads
+  sft: {epochs: 3, lr: 2.0e-5, batch: 64, max_seq: 2048,
+        early_stop_metric: heldout_stopping_regret}   # NOT cross-entropy
+  heads:
+    action: {loss: ce, weight: 1.0}
+    delta:  {loss: mse, weight: 0.5}             # normalized margin — drives stop decisions (§2.5)
+    value:  {loss: mse, weight: 0.5}             # unnormalized V* — the shaping potential Φ (§2.4)
+  lambda_conditioning: true                      # λ in input serialization (§18.1); ONE stopper across all λ label sets
+  rationale: false                               # A7 ablation only
+
+executor:
+  base_model: Qwen/Qwen3.5-9B                    # enable_thinking=False
+  enable_thinking: false
+  training_lambda: 1.0                           # headline; +one λ=0.3 spot-check executor (E3); frontier via inference dial
+  transfer_models:
+    cross_family: mistralai/Ministral-3-8B-Instruct-2512
+    cross_scale: Qwen/Qwen3.5-4B
+  grpo:
+    G: 8
+    lr: 5.0e-6
+    kl_beta: 0.04
+    clip_eps: 0.2
+    length_norm: dr_grpo
+    advantage: step_level                        # SHAPE-segment or per-step RTG — K1 picks (§2.4)
+    step_level_variant: per_step_rtg             # alternatives: shape_segment — K1 compares both
+    min_cohort_guard: 3                          # <3 alive at step t → trajectory baseline for those steps ONLY
+                                                 # (whole-trajectory-level shaping is provably inert — §2.4, never a fallback)
+    rollout_temp: 1.0
+    eval_temp: 0.0
+  horizon: {qa: 10, alfworld: 20}                # T_max
+  shaping: {gamma: 1.0, format_weight: 0.1}
+  iterations: 2                                  # minimum; report per-iteration
+
+inference:
+  stopper_eval_every_k: 1                        # A5 ablation: 2, 3
+  delta_threshold: 0.0                           # fixed; allowance-sensitivity is learned (§2.2/§2.5)
+  budget_tiers:                                  # tier from % of allowance REMAINING
+    HIGH: [0.60, 1.01]                           # >60% remaining
+    MEDIUM: [0.30, 0.60]
+    LOW: [0.10, 0.30]
+    CRITICAL: [0.00, 0.10]
+  ablation_A8_rule_table: {HIGH: 0.00, MEDIUM: 0.05, LOW: 0.15, CRITICAL: 0.30}   # v5-style comparator only
+
+cost_model:                                      # dollars; relative weights are what matter
+  token_prices_per_1M:
+    reference_local: {input: 0.60, output: 2.20} # constant across methods (local vLLM serving)
+    api_models: harness_price_map                # cost_aware_agent/cost.py — do not duplicate
+  tool_costs:
+    web_search: {per_query: 0.003, per_result: 0.001}
+    http_fetch: {per_request: 0.0001}
+    code_exec: {per_exec: 0.0001, per_sec: 0.0001}
+    retrieval_local: {per_query: 0.0001}
+  draft_line_tokens: charged_at_executor_prices  # ALL methods; inside c_t (§2.6); feeds T4
+  legacy_probe_cost: same_pricing                # A5 ablation runs only
+
+data:
+  qa_train: {nq_hotpotqa_combined: 9000, musique: 5000}     # §11 sampling targets
+  collection: {rollouts_per_task_G: 8, pilot_tasks: 200}
+  eval_frozen_subsamples: {hotpotqa_dev: 1000, musique_dev: 500}   # chosen once before any method runs (§5.6)
+
+seeds: [42, 123, 789]
+tracking: {wandb_project: cassi-v2, tags: [phase, domain, lambda, seed, iteration]}
+
+pins:      # commit hashes recorded at P0 install time (§16 P0 / §19) — FILL AT P0
+  verl: null            # >= v0.8.0
+  verl_tool: null
+  verl_agent: null
+  search_r1: null
+  trl: null             # v1.8
+  transformers: null    # v5
+  vllm: null            # >= 0.17 (Qwen3.5 GDN kernels)

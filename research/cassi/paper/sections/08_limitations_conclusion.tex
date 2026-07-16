@@ -1,0 +1,30 @@
+% =============================================================================
+% §8 LIMITATIONS + CONCLUSION — page budget: 0.5 pages (paper_plan_v2 §9)
+% Written SIXTH, before the abstract (§16 P11 writing order).
+%
+% Content sources (plan §9 row 8 — all three named honestly):
+%   * domains where per-step quality is intrinsically EXPENSIVE (SWE-bench: a
+%     test-suite run per step; intermediate patches score ~0 until late,
+%     degenerating τ* — plan §2.6/§5.1): the label machinery does not transfer
+%     there; inference-time monitor on a frozen 32B agent is appendix-only.
+%   * serving-regime dependence of the overhead story (KV-cache-fork vs
+%     black-box re-prefill can FLIP the sign of stopper overhead — plan §5.3,
+%     LearnStop 2606.30852): recommendation is regime-conditional (H6).
+%   * scooping-window honesty (plan §8 risks: DASH/RePro/SlimSearcher/BAGEN are
+%     weeks old; CMU CaRT/MRT group adjacent) — state what was concurrent.
+%   * conclusion: restate the one claim (plan §0) + the honest boundary of what
+%     internalization was shown to do (H5 verdict), NOT a general-AI flourish.
+% =============================================================================
+\section{Limitations and Conclusion}
+\label{sec:limitations}
+
+\TODO{Limitation 1: per-step-quality-expensive domains (SWE) --- why the label
+machinery stops at the boundary (plan \S2.6).}
+
+\TODO{Limitation 2: serving-regime dependence of overhead; regime-conditional
+recommendation per H6 (plan \S5.3).}
+
+\TODO{Limitation 3: concurrent-work window disclosed (plan \S8).}
+
+\TODO{Conclusion: the bridge claim as proven (or its fallback framing as
+realized); internalization boundary per the H5 verdict.}

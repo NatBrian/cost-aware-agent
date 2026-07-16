@@ -1,0 +1,34 @@
+% =============================================================================
+% §3 PROBLEM FORMULATION — page budget: 0.75 pages (paper_plan_v2 §9)
+%
+% Content sources:
+%   * episodic decision process — plan §2.1: ANSWER = stop action; T_max;
+%     forced-continuation vs RL rollout modes (the critical distinction);
+%     x_t = inference-available features ONLY; q_t per domain; multi-dimensional
+%     dollar cost c_t; pilot-normalized C-tilde; U_t = q_t − λ·m(tier)·c̃.
+%   * Snell envelope — plan §2.2 / §10 Alg.1: V_T = U_T;
+%     V_t = max(U_t, E[V_{t+1}|x_t]); Cont; Δ*; τ* = min{t: U_t ≥ Cont(x_t)}.
+%   * classical citations (CITED, NOT CLAIMED — plan §3 contribution 3):
+%     Hansen & Zilberstein AIJ'01 (anytime monitoring), Weitzman '79,
+%     Longstaff–Schwartz regression, prophet inequalities.
+%   * prophet-bias motivation for the label choice — plan §2.2: argmax of the
+%     realized future upper-bounds every non-anticipating rule => stops late;
+%     max-of-mean (Snell) replaces mean-of-max.
+% =============================================================================
+\section{Problem Formulation}
+\label{sec:formulation}
+
+\TODO{Episodic loop with stop action; two rollout modes (label-collection
+forced-continuation vs RL termination) --- plan \S2.1 verbatim structure.}
+
+\TODO{Stopping utility $U_t = q_t - \sum_{i\le t}\lambda\, m(\mathrm{tier}_i)\,
+\tilde c_i$; tier-scaled marginal costing as discretized Lagrangian relaxation
+(plan \S2.2).}
+
+\TODO{Empirical Snell envelope by backward recursion with cross-sectional
+regression (Longstaff--Schwartz); define $\mathrm{Cont}(x_t)$, $\Delta^*_t$,
+$\tau^*$; the three precision notes (decision grid, $t{=}T$ edge, policy-relative
+$\tau^*$) --- plan \S2.2/\S10.}
+
+\TODO{Prophet-bias argument for why the naive argmax label stops late (plan
+\S2.2) --- classical roots cited, not claimed.}

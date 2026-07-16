@@ -1,0 +1,59 @@
+% =============================================================================
+% §7 ANALYSIS — page budget: 0.75 pages (paper_plan_v2 §9)
+% Written FOURTH (§16 P11 writing order).
+%
+% Content sources:
+%   * internalization deep-dive — plan §9: monitor-off cost/accuracy, self-stop
+%     rates (the cleanest evidence economics moved INTO the policy, §2.5).
+%   * hacking diagnostics — F6: V̂ vs realized reward divergence during training
+%     (plan §2.4 anti-hacking; reviewers will ask — report the curves).
+%   * label study discussion (E4) + backup-residual diagnostics (§5.3).
+%   * difficulty-consistency check E6 (2-hop vs 4-hop MuSiQue) — DEMOTED framing:
+%     consistency check, NO novelty claim (ALP owns the story; plan §5.4).
+%   * qualitative stop examples (plan §9).
+%   * T3 ablations A1–A9 + T4 overhead per serving regime anchored here
+%     (placement not fixed by §9 — adjust at P11).
+%   * same-task-three-wallets study (E3) + A8 learned-vs-rule-table read.
+% =============================================================================
+\section{Analysis}
+\label{sec:analysis}
+
+\TODO{Internalization deep-dive: monitor-off retention (H5: $\ge$70\% of savings),
+self-termination rates across iterations; three-wallets study (E3) --- stop-steps
+shift earlier under tighter wallets with graceful degradation, no rule anywhere.}
+
+\begin{figure}[t]
+  \centering
+  \figplaceholder{f6_hacking_diagnostic}
+  \caption{\TODO{F6 --- hacking diagnostic: stopper-predicted $\hat V$ vs realized
+  task reward across training; divergence triggers coach refresh (plan \S2.4).}}
+  \label{fig:divergence}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \caption{\TODO{T3 --- ablations A1--A9 (1 seed, say so; \S5.6 tiering).
+  A3 additive-vs-potential (dawdling prediction); A8 learned vs rule-table;
+  A9 negative controls (random / shuffled-label coach).}}
+  \label{tab:ablations}
+  \tabplaceholder{t3_ablations}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \caption{\TODO{T4 --- end-to-end overhead accounting per serving regime
+  (KV-fork vs re-prefill): draft tokens, forced-continuation collection, stopper
+  training + serving, amortization vs zero-amortization training-free baselines
+  (plan \S5.3); regret-replay costs billed to the analysis line.}}
+  \label{tab:overhead}
+  \tabplaceholder{t4_overhead}
+\end{table}
+
+\TODO{Label-study discussion (E4): why Snell beats prophet (late-stop bias
+realized?); TD/GAE and MC at matched compute; backup residuals.}
+
+\TODO{Difficulty-consistency check (E6) --- consistency framing only, cite
+ALP precedent and Wu r=0.57; no novelty claim.}
+
+\TODO{Qualitative stop examples: one early-stop save, one correct
+late-stop on a hard instance (dual failure, plan \S1.1).}
