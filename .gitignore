@@ -40,3 +40,5 @@ experiments/real_cli/sweep_all.log
 .pytest_cache/
 experiments/swe_ab/runs/
 experiments/swe_ab/*.log
+
+research/papers
