@@ -115,6 +115,78 @@ after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier pro
 - `references.bib`: every entry must be verified against the real paper at P11 (authors
   marked TODO where the plan gave only arXiv ids).
 
+## 3b. Post-experiment adjustment map — expected tuning once real numbers exist
+
+These are NOT bugs. They are places where a value was chosen a priori and the first real data
+will tell you the right one. Rules of the road: (i) anything frozen "after P2" changes ONLY
+via a rerun of the freezing step, never by hand-editing downstream; (ii) the shared agent
+scaffold and the economy are FAIRNESS INVARIANTS — see the "never change" list at the end.
+
+**After the smoke run (first hours):**
+- **Draft-line compliance** is the single biggest unknown: the whole label machinery assumes
+  the model emits "BEST ANSWER SO FAR:" every step. Check `format_score` in the smoke JSONL.
+  If compliance < ~95%, tune `SYSTEM_TEMPLATE` in `executor/react_agent.py` (add a few-shot
+  example) BEFORE any collection — and then freeze it forever (all methods share it; changing
+  it after any baseline has run invalidates the comparison).
+- Action-parsing robustness (`search[...]` / `answer[...]`): expect to harden the regexes
+  against real model output quirks. Same freeze rule applies.
+- Qwen3.5 chat template: verify `<think>` is actually stripped and multi-turn is
+  token-in-token-out (§19 stack note); adjust `vllm_client.py` chat_template_kwargs if not.
+
+**After the P2 pilot (calibration step):**
+- Fill `label.allowances` + `cost_normalization` (the script prints them). ALSO sanity-check:
+  - **Do episodes actually traverse tiers?** If most episodes end still in HIGH, the wallets
+    are too loose and tier-scaled costing is inert → tighten allowances (P25/P75/2×P90 is the
+    default recipe, not scripture — document any deviation in GO_NO_GO.log).
+  - **Does cost have variance beyond token count?** §17 tool fees are nominal; if retrieval
+    fees are negligible vs tokens, the "multi-dimensional cost" claim weakens — consider a
+    fee-scale sweep note, or report the dollar decomposition honestly in T4.
+  - T_max=10 (QA): if many pilot episodes are still improving at step 10, raise it — but
+    T_max changes invalidate any existing labels (rerun P3).
+- `stopper/features.py` nominal caps (DEFAULT_TOKENS_MAX=32768, tool cap=T_max) → set from
+  observed pilot distributions; add the chosen values to §17.
+
+**After P3 (labels):**
+- `fit_delta_scale` (tanh s) refits per domain — check the P3 memo's Δ histogram actually
+  uses tanh's responsive range; if Δ* piles up at ±1, the scale heuristic (P90 of |Δ|) needs
+  revisiting.
+- Backup residuals rising toward early steps = the LightGBM cross-section is too weak at
+  late/rare steps → try pooled regressor with t as a feature (one-line change in snell.py's
+  fallback logic) — this is E4-relevant, document either way.
+- λ-monotonicity violation rate > 5% → feature leakage or regressor noise; STOP and debug
+  before training the stopper on those labels.
+
+**After P4 (stopper v0):**
+- STOP/CONTINUE class imbalance (early steps are overwhelmingly CONTINUE): if stop-F1 is poor,
+  add class weighting to the CE head (train_sft.py) — regret, not F1, remains the gate metric.
+- If the 2B stopper underperforms the lightgbm label regressor on held-out regret, the text
+  serialization is losing information vs the raw feature vector — check §18.1 formatting
+  precision (rounding) before concluding "learned stopper doesn't work".
+
+**During P6 (GRPO) — watch items:**
+- The **difference-encoding** trick in `verl_hooks.py` (advantages on step-final tokens)
+  depends on exact step→token alignment; the round-trip test covers it, but ANY verl upgrade
+  or tokenizer change requires rerunning `--dry-run` + `tests/test_executor_cpu.py` first.
+- Stopper V̂ serving is CPU by default (`CASSI_STOPPER_DEVICE`); if rollout throughput tanks,
+  co-locate it on a GPU or raise the A5 every-k.
+- Watch `divergence.csv` (F6) from step 0: rising V̂-vs-reward divergence = the documented
+  hacking channel — the §2.4 response is a stopper refresh, not a training restart.
+- `--step-credit shape_segment` vs `per_step_rtg`: K1 picks; if SHAPE-segment wins, its
+  implementation gets promoted from variant to default (one config key).
+
+**Baseline alignment (P8):**
+- B4 (OTC ratio form) and B5 (EAPO family form) were implemented from the papers' text; when
+  official code differs, align to the official repo and note the change in each module
+  docstring. B3's trigger sensitivity was designed a priori — calibrate its knob on dev like
+  every other method (frontier protocol handles this).
+
+**NEVER change after their freeze points** (reviewers can void the paper otherwise):
+frozen dev/test subsamples (P1); the shared scaffold + draft template (after first baseline
+run); the economy definition U_t/R_base (after P3); headline λ chosen on dev before test
+(§5.6); GO_NO_GO.log entries (append-only). Refactors that are safe anytime: unifying the two
+MockStopper classes (executor/monitor.py vs stopper/model.py — documented duplication), a
+`--policy` flag for collect.py, a dedicated venv for the ALFWorld/verl-agent phase.
+
 ## 4. Schedule & budget reality (plan §7)
 
 ~30–35 training runs, 10–12 weeks on the 8×H200 node. K1/K2 (week 2–3) come FIRST — do not
