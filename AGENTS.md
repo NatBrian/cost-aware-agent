@@ -18,8 +18,11 @@ This repository has TWO parts:
    commands, post-experiment adjustment map, every decision already made.
 3. Read `research/paper_plan_v2.md` — the full research plan; it is the SOURCE OF
    TRUTH for everything under `research/cassi/` (each module cites its sections).
-4. Verify nothing rotted: `cd research/cassi && python -m pytest tests/ -q`
-   (expect 114 passed, CPU-only, ~5 s).
+4. Verify nothing rotted — the canonical ritual is PROJECT_GUIDE §7 (activate
+   `research/cassi/.venv`, then pytest → expect "114 passed, 1 skipped"; the
+   train_grpo --dry-run; the paper make; and `git config user.name` → must print
+   "Nathanael Brian" — if it prints anything else, STOP before committing).
+   Never "verify" by re-running scripts/p0_setup.sh (it's an installer; P0 is done).
 
 ## Hard rules
 

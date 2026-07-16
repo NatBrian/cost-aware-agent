@@ -67,7 +67,7 @@ Target: ICLR 2027 (submission ~Sept 2026). Fallback venues NeurIPS/ICML 2027.
 | Term | Meaning (plain) | In code |
 |---|---|---|
 | `q_t` | how good the agent's current draft answer is at step t (F1 vs gold; ALFWorld: fraction of subgoals done). Ground-truth-derived → label machinery ONLY | `labels/quality.py`; stored on `Step.q` (0.0 during live rollouts by design — filled at collection scoring) |
-| `c_t`, tier, wallet | dollar cost of step t; budget tier = how much of the wallet (allowance) remains (HIGH/MEDIUM/LOW/CRITICAL); wallet drawn per (task, GRPO group) | `budget/cost.py` (`tier_from_remaining`, `draw_wallet`) |
+| `c_t`, tier, wallet | dollar cost of step t; budget tier = how much of the wallet (allowance) REMAINS — tier names describe remaining budget, not urgency: HIGH = >60% left (m=0.5), MEDIUM = 30–60% (m=1.0), LOW = 10–30% (m=2.0), CRITICAL = <10% (m=5.0). m(tier) multiplies the cost penalty, so spending when nearly broke hurts 10× more than when flush. Wallet drawn per (task, GRPO group) | `budget/cost.py` (`tier_from_remaining`, `TIER_MULTIPLIERS`, `draw_wallet`) |
 | `U_t` | stopping utility = quality so far minus tier-scaled, normalized, λ-weighted spend: `q_t − Σ λ·m(tier_i)·c̃_i` | `budget/cost.py: stopping_utilities` |
 | λ (lambda) | the cost-sensitivity dial. Higher λ = cost matters more = stop earlier. The stopper is λ-CONDITIONED (λ is in its input text), so one model serves the whole dial | config `label.lambda_values`; `stopper/features.py: serialize` |
 | Snell envelope | the mathematically correct "should I stop now?" value computed backward over collected trajectories (max of stop-now vs expected-value-of-continuing). Avoids the "prophet bias" of just taking the best-in-hindsight step | `labels/snell.py: snell_labels` (Algorithm 1); prophet version kept only as E4 comparison |
@@ -81,6 +81,7 @@ Target: ICLR 2027 (submission ~Sept 2026). Fallback venues NeurIPS/ICML 2027.
 | GRPO / Dr.GRPO | the RL algorithm (group of G=8 rollouts per task, advantages relative to the group); Dr.GRPO = bias-hygiene settings so token savings aren't a length-bias artifact | `executor/train_grpo.py` + `verl_hooks.py` |
 | frontier protocol | you can't compare methods at "equal accuracy" unless EVERY method is swept over its own cost knob → 3–5 point frontier, interpolate | `eval/metrics.py: Frontier`; `eval/run_frontier.py` |
 | stopping regret | utility gap between where the method stopped and the Snell-optimal stop, measured via a second forced-continuation replay (dual-run protocol) | `eval/run_frontier.py`, `stopper/eval_regret.py` |
+| matched lost-correct risk | the LearnStop fairness protocol: sweep each method's own stop threshold and compare cost savings at EQUAL fractions of correct answers sacrificed (1%, 2%, 5%) — "how much do you save per correct answer you're willing to lose" | `eval/metrics.py: matched_lost_correct_risk`; used in §5.3/§5.6 reporting |
 | internalization | THE headline measurement: turn the monitor OFF at test time — a worker that still stops well has internalized the economics; also % episodes self-stopped before the monitor fires | `executor/monitor.py` stats; E2 in the plan |
 | K1 / K2 | kill-switches. K1: does the coach-as-training-signal beat coach-as-supervisor and labels-without-coach? K2: two models vs one at matched params. Run FIRST; NO-GO → pre-planned pivots | `scripts/p5_killswitch.sh`, plan §12, fallbacks §6 |
 
@@ -176,17 +177,22 @@ instruction: do not use or wait for GPUs). First command when that changes:
 
 Deliberate stubs (documented, will raise NotImplementedError with instructions):
 ALFWorld agent-loop under verl (package-name clash — needs own env), K2's
-single-multitask arm, BrowseComp-Plus staging, GAIA exact-103 filter.
+single-multitask arm (**must be implemented BEFORE P5 — K1 alone does not gate a GO;
+ideal work during the no-GPU period**, HANDOFF §6), BrowseComp-Plus staging, GAIA
+exact-103 filter. The full sanctioned no-GPU work queue: HANDOFF §6.
 
-## 7. How to verify nothing rotted (run anytime, no GPU)
+## 7. How to verify nothing rotted (THE canonical ritual — run anytime, no GPU)
 
 ```bash
-cd research/cassi
+cd research/cassi && source .venv/bin/activate     # manual shells must activate; scripts self-activate
 python -m pytest tests/ -q                                    # expect 114 passed, 1 skipped
-.venv/bin/python -m cassi.executor.train_grpo --dry-run \
+python -m cassi.executor.train_grpo --dry-run \
     --config configs/cassi.yaml --domain qa                   # expect "[dry-run] OK"
-cd paper && make && cd ..                                     # expect main.pdf builds
+(cd paper && make)                                            # expect main.pdf builds
+git config user.name                                          # expect: Nathanael Brian
 ```
+
+Never "verify" by re-running `scripts/p0_setup.sh` — it is an installer, and P0 is done.
 
 ## 8. The ten commandments (violating these voids the paper)
 
@@ -224,9 +230,9 @@ rollouts. One rollout, forced-continuation mode, T_max=10:
 time only (string compare vs gold) — it never enters x_t.
 
 **Utilities (λ=1, median pilot spend = $0.01 → c̃_t = c_t/0.01).**
-U_t = q_t − Σ λ·m(tier_i)·c̃_i. With m(HIGH)=0.5: U_1 = 0 − 0.5·0.2 = −0.10;
-U_2 = 1.0 − 0.5·0.4 = 0.80; U_3 = 1.0 − 0.25 −0.05 = 0.75 (still paying, no quality
-gain); by t=10 (tier multipliers rising as the wallet empties) U_10 ≈ −0.4.
+U_t = q_t − Σ λ·m(tier_i)·c̃_i. With m(HIGH)=0.5: U_1 = 0 − 0.10 = −0.10;
+U_2 = 1.0 − (0.10+0.10) = 0.80; U_3 = 1.0 − (0.10+0.10+0.05) = 0.75 (still paying, no
+quality gain); by t=10 (tier multipliers rising as the wallet empties) U_10 ≈ −0.4.
 **The curve rises to t=2 then strictly falls — the economics of overwork, in one row.**
 
 **Snell labels (P3, Algorithm 1).** Backward over ALL trajectories: at t=9,
@@ -262,7 +268,7 @@ a well-trained worker still answers at t≈2–3 by itself.
 |---|---|---|---|
 | E1 | Does CASSI beat everything on cost-at-equal-accuracy? | full grid: CASSI vs B1–B9, 2 domains, 3 seeds at headline points, frontiers per method | T1/T2, F3 |
 | E2 | Did the economics move INTO the policy? + does it transfer? | monitor-off eval; % self-stopped; trained worker on OOD sets (BrowseComp-Plus/Bamboogle/2Wiki); coach supervising a frozen live-web agent on GAIA-103; coach across executors (Ministral-3-8B, Qwen3.5-4B) | F4, T5 |
-| E3 | Is the λ dial real? Is wallet-awareness learned? | sweep λ at INFERENCE on one fixed worker (+ one λ=0.3 trained spot-check); same tasks under small/medium/large wallets → stop-steps should shift | F3 overlay, E3 CSVs |
+| E3 | Is the λ dial real? Is wallet-awareness learned? | sweep λ at INFERENCE on one fixed worker; PLUS one additional worker actually TRAINED at λ=0.3 (R_base at λ=0.3; coach queried at λ=0.3 via its λ-conditioning — no new labels, the point of the λ-in-input design) to check the inference dial tracks the trained frontier; same tasks under small/medium/large wallets → stop-steps should shift | F3 overlay, E3 CSVs |
 | E4 | Are Snell labels actually better than alternatives? | same pipeline, label source swapped: Snell vs prophet-argmax vs TD/GAE vs MC at matched label compute | F5 |
 | E5 | Does the LOOP help (not just more training)? | iteration 2 run twice at matched compute: frozen coach vs refreshed coach; the DELTA between arms is the loop's contribution | per-iteration table |
 | E6 | Sanity: does stopping track difficulty? | 2-hop vs 4-hop MuSiQue stop-step correlation (consistency check only, no novelty claim) | one appendix figure |

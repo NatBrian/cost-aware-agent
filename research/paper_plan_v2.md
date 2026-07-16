@@ -689,12 +689,25 @@ probe answers are logged only in A5 ablation runs.
 
 ## 12. Kill-switch protocol (run FIRST — weeks 2–3, small scale)
 
-K1 (**bridge test**): HotpotQA 1K-task subset, 2B stopper + 9B executor, 1 seed:
-Δ-shaped GRPO vs controller-only vs B9-direct-shaping. Proceed iff shaped-GRPO beats
-controller-only by ≥3 points cost-at-iso-accuracy AND ≥ B9 (1 seed — read as direction +
-magnitude, not significance). Else pivot per H2/H3 fallbacks.
+K1 (**bridge test**): HotpotQA 1K-task subset, 2B stopper + 9B executor, 1 seed, λ = 1.0
+(the headline default): Δ-shaped GRPO vs controller-only vs B9-direct-shaping. The shaped
+arm runs BOTH step-credit variants (per-step RTG and SHAPE-segment, §2.4) as sub-arms; the
+GO test applies to the better sub-arm and both results are logged (this is also how "K1
+picks" the production variant). Proceed iff, at iso-accuracy read by frontier interpolation
+(§5.3): (cost_controller − cost_shaped)/cost_controller ≥ 3 percentage points AND
+cost_shaped ≤ cost_B9 (tie passes) — 1 seed, read as direction + magnitude, not
+significance; implemented in `scripts/killswitch_decision.py`. Else pivot: **H2 fails
+(shaped ≤ controller-only): the concrete pivot is the inference-time-controller paper — "a
+trained λ·cost, wallet-conditioned stopping monitor for frozen agents" (the
+TERMINATOR/OS-Pruner line; our deltas = the economic objective, learned
+allowance-conditioning, and executor-transfer), reusing the already-trained stopper and
+dropping executor RL entirely. H3 fails (shaped < B9): drop the stopper from the training
+path; the paper becomes "Snell-label direct shaping for agents" with the stopper retained
+only for runtime control/transfer (per §6).**
 K2 (**separation test**): same subset: 9B single multi-task (task+stopping heads) vs 9B+2B
 (params counted in reporting). Any outcome is publishable via H4, but the framing changes.
+K2's single-multitask arm must be implemented before this phase (it is a deliberate stub in
+the initial codebase); K1 alone does not gate a GO.
 GO/NO-GO review after K1+K2 before building anything else.
 
 ---

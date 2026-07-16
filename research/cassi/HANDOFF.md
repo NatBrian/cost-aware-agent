@@ -61,15 +61,29 @@ after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier pro
    `configs/cassi.yaml`** (they are `null` now; later phases refuse to run until filled).
    FOOTGUN: `gpu_acquire.sh` can grant locks while a foreign job still holds GPU memory —
    the script checks actual memory and aborts safely (never kill other users' jobs).
-   Then `scripts/p2_pilot_and_collect.sh` for the full round-0 collection (G=8).
+   Then `scripts/p2_pilot_and_collect.sh` for the full round-0 collection (G=8) — despite
+   its name it SKIPS its pilot stage when calibration is already frozen in the config
+   (verified: it checks `require_pilot_calibration` per domain), so it will not re-derive
+   different percentiles after smoke_and_pilot.sh.
 4. **P3 — labels** (`scripts/p3_labels.sh`): Algorithm 1 per λ ∈ {0.1,0.5,1,2,5} + QC memo.
 5. **P4 — stopper v0** (`scripts/p4_stopper.sh`): SFT + the HARD GATE (beat majority-class AND
    the confidence probe on held-out regret, else STOP and fix features/labels).
 6. **P5 — KILL-SWITCHES K1/K2** (`scripts/p5_killswitch.sh`, §12): the GO/NO-GO moment on
-   HotpotQA-1K, 1 seed. Requires finishing the two wiring gaps below first. Decision appended
-   to `GO_NO_GO.log` — never delete or rewrite past entries (§5.6 no-cherry-picking).
+   HotpotQA-1K, 1 seed, λ=1.0 (the headline default). **Prerequisite: K2's
+   `--arm single_multitask` is still a NotImplementedError stub — implement it BEFORE this
+   phase (ideal no-GPU work, see §6). K1 alone must NOT gate a GO** unless the user
+   explicitly approves that scope cut. K1's shaped arm runs BOTH step-credit variants
+   (per_step_rtg and shape_segment) as sub-arms; the GO test applies to the better one and
+   both results go in the log. Decision formula (as implemented in
+   `scripts/killswitch_decision.py`): GO iff shaped costs ≥3 percentage points LESS than
+   controller-only at iso-accuracy (frontier interpolation) AND shaped cost ≤ B9's at
+   iso-accuracy (tie passes). Decision appended to `GO_NO_GO.log` — never delete or rewrite
+   past entries (§5.6 no-cherry-picking). The log is CREATED at the first documented
+   decision, whatever phase that is (an early P2 wallet-recipe deviation entry is fine).
 7. **P6–P9** per §16 (iteration 1, loop iteration 2 with frozen-coach control, baselines,
-   full eval incl. 500-task regret replays, 3 seeds on headline points).
+   full eval incl. 500-task regret replays, 3 seeds on headline points). **Before P8:**
+   read `research/lit_review/` for the baseline papers' actual mechanisms (B4/B5/B8
+   "align to the official repo" decisions cannot be made from these docs alone).
 8. **P10–P11**: `make figures tables`, then write the paper into `paper/sections/`
    (writing order and claims-audit rule: §16 P11; every §14-dead-claim is banned).
 
@@ -101,16 +115,24 @@ after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier pro
 
 - §17 named a single-head TRL recipe but §2.3 needs three heads → custom torch loop at the
   same hyperparameters (`stopper/train_sft.py` docstring).
-- §18.1 needs nominal caps the plan never fixed → `DEFAULT_TOKENS_MAX=32768`, tool cap =
-  T_max (feature-only, never enforcement); consider adding to §17.
+- §18.1 needs nominal caps the plan never fixed. Current state (KNOWN wrinkle — align at
+  P4): the CANONICAL serialization caps are `stopper/dataset.py: SerializeContext` defaults
+  (tokens_max=8192, tool cap=20) and `HFStopperPredictor` matches them — training and
+  value-head inference are consistent. `executor/react_agent.py: DEFAULT_TOKENS_MAX=32768`
+  is only the denominator for the `tokens_pct` FEATURE, not a serialization cap. The
+  monitor's TEXT path serializes with its own caps — do not use the text path with the real
+  stopper until the caps are unified into one config key (task in §6 queue, item 6).
 - Alg. 4 "budget exhausted" quantified as spent ≥ allowance (both monitor modes, any k).
 - §12 "≥3 points" interpreted as percentage-point cost reduction at iso-accuracy
   (`scripts/killswitch_decision.py`).
 - B4 uses OTC's ratio reward form; B5 implements the solve-rate-scaled penalty family (EAPO
   primary / agentic-ALP fallback share the form); B6 defaults to flat-λ (published CTA form)
   with a `tier_scaled` fairness variant. All disclosed in module docstrings.
-- Monitor accepts BOTH stopper protocols (text `evaluate` / feature `predict`) — see
-  `executor/monitor.py` docstring.
+- Monitor accepts BOTH stopper protocols: feature-based `predict(x, λ)` = the value-head
+  variant = THE DEFAULT in every phase (trained checkpoints load into it via
+  `stopper/model.py: load_predictor`; K1 and all E-runs use it); text-based
+  `evaluate(serialized_x)` exists for the generative variant (§18.3, ablation territory)
+  and for this module's test mock. If unsure, you want `predict`.
 - `LabelSet` persistence lives in `stopper/dataset.py` (`save_labelset`/`load_labelset`).
 - `references.bib`: every entry must be verified against the real paper at P11 (authors
   marked TODO where the plan gave only arXiv ids).
@@ -124,7 +146,10 @@ scaffold and the economy are FAIRNESS INVARIANTS — see the "never change" list
 
 **After the smoke run (first hours):**
 - **Draft-line compliance** is the single biggest unknown: the whole label machinery assumes
-  the model emits "BEST ANSWER SO FAR:" every step. Check `format_score` in the smoke JSONL.
+  the model emits "BEST ANSWER SO FAR:" every step. Check `format_score` in the smoke JSONL —
+  it lives in `Trajectory.outcome["format_score"]` (fraction of the episode's steps whose
+  output contained a parseable draft line, 0.0–1.0); "compliance < 95%" means the mean
+  format_score across smoke episodes is below 0.95.
   If compliance < ~95%, tune `SYSTEM_TEMPLATE` in `executor/react_agent.py` (add a few-shot
   example) BEFORE any collection — and then freeze it forever (all methods share it; changing
   it after any baseline has run invalidates the comparison).
@@ -150,7 +175,10 @@ scaffold and the economy are FAIRNESS INVARIANTS — see the "never change" list
 - `fit_delta_scale` (tanh s) refits per domain — check the P3 memo's Δ histogram actually
   uses tanh's responsive range; if Δ* piles up at ±1, the scale heuristic (P90 of |Δ|) needs
   revisiting.
-- Backup residuals rising toward early steps = the LightGBM cross-section is too weak at
+- Backup residuals (definition: at each backward step t, Algorithm 1 holds out ~10% of the
+  cross-section and records the held-out mean |Ê[V_{t+1}|x_t] − V_{t+1}| — stored on
+  `LabelSet.backup_residuals`; it measures how well the label regressor generalizes at that
+  step) rising toward early steps = the LightGBM cross-section is too weak at
   late/rare steps → try pooled regressor with t as a feature (one-line change in snell.py's
   fallback logic) — this is E4-relevant, document either way.
 - λ-monotonicity violation rate > 5% → feature leakage or regressor noise; STOP and debug
@@ -193,11 +221,32 @@ MockStopper classes (executor/monitor.py vs stopper/model.py — documented dupl
 build past P5 without a logged GO. Competitors are ≤3 weeks old at review time (DASH,
 OS-Pruner); if K1 passes, consider the workshop-preprint hedge (§8).
 
-## 5. Quick verification that nothing rotted
+## 5. Quick verification that nothing rotted (THE canonical ritual — same as PROJECT_GUIDE §7)
 
 ```bash
-cd research/cassi
-python -m pytest tests/ -q          # expect: 109 passed
-cd paper && make && cd ..           # expect: main.pdf builds
-bash scripts/p0_setup.sh            # first pending step (network + disk)
+cd research/cassi && source .venv/bin/activate
+python -m pytest tests/ -q                                    # expect: 114 passed, 1 skipped
+python -m cassi.executor.train_grpo --dry-run \
+    --config configs/cassi.yaml --domain qa                   # expect: "[dry-run] OK"
+(cd paper && make)                                            # expect: main.pdf builds
+git config user.name                                          # expect: Nathanael Brian
 ```
+
+Do NOT re-run `scripts/p0_setup.sh` as a check — it is a network installer; P0 is DONE
+(§3.1). Re-running it against moved upstream repos risks silently disturbing the pinned
+stack (the "accidental upgrade" failure mode in PROJECT_GUIDE §17). Re-pin only
+deliberately: update `pins:`, then rerun this whole ritual.
+
+## 6. While GPUs are blocked — the sanctioned CPU work queue (in order)
+
+The user has said GPUs cannot be used and must not be waited on. Useful work that is
+explicitly sanctioned meanwhile:
+1. **Close the K2 stub**: implement `--arm single_multitask` in `executor/train_grpo.py`
+   (9B one-model multi-task comparator, A2/K2 machinery) — P5 NEEDS it (see §3.6).
+2. Stage the dedicated ALFWorld env (verl-agent clashes with verl over the package
+   name — separate venv or PYTHONPATH staging; see §3.1 note).
+3. BrowseComp-Plus corpus staging (network/disk only, no GPU — large download, fine).
+4. Resolve the GAIA exact-103 filter (annotator-metadata tool filter; needed before E2).
+5. Safe refactors: unify the two MockStopper classes; add `--policy` to collect.py.
+6. Align the §18.1 serialization caps (see the decisions list below).
+Anything else GPU-shaped: don't. Don't poll for GPUs either.

@@ -48,10 +48,13 @@ python -m pytest tests/ -q
 Training/collection needs GPUs. On this machine, acquire/release with:
 
 ```bash
-eval $(/mnt/src/zhanka/gpu_acquire.sh 4)   # 2 for stopper SFT/collection, 4-8 for GRPO
+eval $(/mnt/src/zhanka/gpu_acquire.sh 2)   # collection / stopper SFT / eval serving
+eval $(/mnt/src/zhanka/gpu_acquire.sh 4)   # executor GRPO (4–8)
 # ... run ...
 /mnt/src/zhanka/gpu_release.sh
 ```
+Acquire the SMALLEST N the phase needs (the machine is shared). Note: acquired locks do
+not guarantee freed memory — verify with nvidia-smi (see HANDOFF; never kill foreign jobs).
 
 Phase order and done-criteria: paper_plan_v2 §16 (P0–P11). Kill-switches K1/K2
 (§12) run BEFORE the full pipeline — `scripts/p5_killswitch.sh`.
