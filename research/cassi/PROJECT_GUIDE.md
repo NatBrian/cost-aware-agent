@@ -158,7 +158,7 @@ third_party/ (gitignored) pinned clones: verl, verl-tool, verl-agent, Search-R1
 | Why is the field-positioning what it is? | `../lit_review/00_overview.md` (+ 10 area files); `../competitor_analysis.md` (beginner-friendly) |
 | How harsh were the pre-rewrite reviews? | `../novelty_check/` (5 audit verdicts vs the OLD v5 plan — v2 already answers them; see paper_plan_v2 §14 changelog) |
 | What was decided during experiments? | `GO_NO_GO.log` (append-only; created at P5) |
-| Machine rules (GPUs, git identity)? | repo-root `AGENTS.md`/`CLAUDE.md`; `/root/dataDisk/liangsheng/Brian/AGENTS.md`; `/root/dataDisk/liangsheng/CLAUDE.md` |
+| Machine rules (GPUs, git identity)? | repo-root `CLAUDE.md`; `/root/dataDisk/liangsheng/Brian/CLAUDE.md`; `/root/dataDisk/liangsheng/CLAUDE.md` |
 
 ---
 
@@ -402,7 +402,7 @@ readable. Coach V̂ serving defaults to CPU (`CASSI_STOPPER_DEVICE=cuda:N` to ch
 - `NotImplementedError` in alfworld.py / `--arm single_multitask` / BrowseComp-Plus →
   deliberate walls with instructions inside; see HANDOFF "deliberate stubs".
 - `Permission denied (publickey)` on git push → the NatBrian SSH key needs re-adding
-  (github.com/settings/keys). NEVER switch to another credential (Brian/AGENTS.md).
+  (github.com/settings/keys). NEVER switch to another credential (Brian/CLAUDE.md).
 - `gpu_acquire.sh` prints "Acquired" but nvidia-smi shows ~100GB used → locks ≠ free
   memory; a foreign job holds the GPUs. Release and stop. Never kill foreign processes.
 - `import verl` resolves to verl-agent's 0.3.x fork → the two packages share a name;
