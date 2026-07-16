@@ -201,6 +201,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--vllm-url", default="http://127.0.0.1:8001/v1")
     p.add_argument("--retriever-url", default="http://127.0.0.1:8000/retrieve")
     p.add_argument("--topk", type=int, default=3)
+    p.add_argument("--smoke", action="store_true",
+                   help="P0 smoke run: provisional flat wallets, bypasses the P2 "
+                        "calibration guard (§16 P0 precedes the pilot by design)")
     args = p.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -221,9 +224,12 @@ def main(argv: list[str] | None = None) -> int:
                          indent=2))
         return 0
 
+    smoke_allowances = ({"small": 0.05, "medium": 0.05, "large": 0.05}
+                        if args.smoke else None)   # provisional; NEVER for real collection
     report = collect_round(tasks, llm, env, cfg, domain=args.domain,
                            out_path=args.out, G=args.G, t_max=args.t_max,
-                           seed=args.seed, iteration=args.iteration)
+                           seed=args.seed, iteration=args.iteration,
+                           allowances=smoke_allowances)
     print(json.dumps(report, indent=2))
     return 0
 

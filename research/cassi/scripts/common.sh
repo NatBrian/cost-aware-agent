@@ -14,6 +14,14 @@ CASSI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RESEARCH_DIR="$(dirname "${CASSI_ROOT}")"
 REPO_ROOT="$(dirname "${RESEARCH_DIR}")"
 
+# Dedicated venv — NEVER install the GPU stack into the shared machine python.
+# p0_setup.sh creates it; every later phase auto-activates it when present.
+CASSI_VENV="${CASSI_ROOT}/.venv"
+if [ -f "${CASSI_VENV}/bin/activate" ] && [ -z "${VIRTUAL_ENV:-}" ]; then
+    # shellcheck disable=SC1091
+    source "${CASSI_VENV}/bin/activate"
+fi
+
 CONFIG="${CASSI_ROOT}/configs/cassi.yaml"
 THIRD_PARTY="${CASSI_ROOT}/third_party"
 DATA_DIR="${CASSI_ROOT}/data"

@@ -93,10 +93,10 @@ seeds: [42, 123, 789]
 tracking: {wandb_project: cassi-v2, tags: [phase, domain, lambda, seed, iteration]}
 
 pins:      # commit hashes recorded at P0 install time (§16 P0 / §19) — FILL AT P0
-  verl: null            # >= v0.8.0
-  verl_tool: null
-  verl_agent: null
-  search_r1: null
-  trl: null             # v1.8
-  transformers: null    # v5
-  vllm: null            # >= 0.17 (Qwen3.5 GDN kernels)
+  verl: 7aed6b230776f963fa09509c10d9c3a767d1102c            # >= v0.8.0
+  verl_tool: 383d4b1539ba387f94c3a117d3edc06b467c09d1
+  verl_agent: 20bd331bdbc9026a5668e11362178e10ab7400c8
+  search_r1: 598e61bd1d36895726d28a8d06b3a15bed19f5d3
+  trl: 1.8.0             # v1.8
+  transformers: 5.14.1    # v5
+  vllm: 0.19.1            # >= 0.17 (Qwen3.5 GDN kernels)

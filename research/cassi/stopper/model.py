@@ -227,3 +227,22 @@ class HFStopperPredictor:
             preds.extend(self._forward_texts(
                 [self._serialize(x, lam, meta or {}) for x, lam, meta in chunk]))
         return preds
+
+
+def load_predictor(checkpoint_dir: str, device: str = "cuda") -> "HFStopperPredictor":
+    """Load a trained stopper checkpoint (train_sft.py output dir: stopper_best.pt +
+    tokenizer/ + metrics.json) into an HFStopperPredictor — the monitor-ready
+    predict(x, λ, meta) interface (§2.5). Lazy torch import; GPU expected."""
+    import json
+    from pathlib import Path
+
+    import torch
+    from transformers import AutoTokenizer
+
+    ckpt = Path(checkpoint_dir)
+    meta = json.loads((ckpt / "metrics.json").read_text())
+    model = create_model(meta["base_model"], device=device)
+    state = torch.load(ckpt / "stopper_best.pt", map_location=device, weights_only=True)
+    model.load_state_dict(state)
+    tokenizer = AutoTokenizer.from_pretrained(ckpt / "tokenizer")
+    return HFStopperPredictor(model, tokenizer, device=device)

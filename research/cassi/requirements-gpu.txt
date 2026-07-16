@@ -9,7 +9,9 @@ trl>=1.8              # SFTTrainer + scalar head (NOT the legacy value-head wrap
 peft>=0.14
 accelerate>=1.4
 wandb
-flash-attn            # optional but expected on H200
+# flash-attn is OPTIONAL (vLLM ships its own attention kernels). Its build needs
+# torch preinstalled + long compile; install separately if wanted:
+#   pip install flash-attn --no-build-isolation
 # Installed from source at P0 (clone, pin, do not modify internally — §19):
 #   git clone https://github.com/verl-project/verl        (>= v0.8.0; GRPO + AgentLoop)
 #   git clone https://github.com/TIGER-AI-Lab/verl-tool   (Search-R1 env on modern verl)

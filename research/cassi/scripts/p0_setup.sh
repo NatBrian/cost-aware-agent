@@ -86,9 +86,9 @@ Prereqs: vLLM serving Qwen3.5-9B (--vllm-url) + the P1 retriever server
   eval \$(${GPU_ACQUIRE} 2)     # N=2: collection-class job (§16 P0 note)
   python3 scripts/make_task_file.py --in ${DATA_DIR}/hotpotqa_dev.jsonl \\
       --out ${EXP_DIR}/smoke/qa_task1.jsonl --n 1 --seed 42
-  python -m cassi.executor.collect --domain qa --tasks ${EXP_DIR}/smoke/qa_task1.jsonl \\
+  python -m cassi.executor.collect --smoke --domain qa --tasks ${EXP_DIR}/smoke/qa_task1.jsonl \\
       --G 1 --seed 42 --out ${EXP_DIR}/smoke/qa.jsonl
-  python -m cassi.executor.collect --domain alfworld --tasks <alfworld task list, P1.3> \\
+  python -m cassi.executor.collect --smoke --domain alfworld --tasks <alfworld task list, P1.3> \\
       --G 1 --seed 42 --out ${EXP_DIR}/smoke/alfworld.jsonl
   ${GPU_RELEASE}
 
@@ -110,7 +110,7 @@ if command -v nvidia-smi >/dev/null 2>&1 && [ -x "${GPU_ACQUIRE}" ]; then
     python3 "${CASSI_ROOT}/scripts/make_task_file.py" \
         --in "${DATA_DIR}/hotpotqa_dev.jsonl" --out "${EXP_DIR}/smoke/qa_task1.jsonl" --n 1 --seed 42
     # TODO(GPU): requires a running vLLM server + retriever server (see the recipe above)
-    python -m cassi.executor.collect --domain qa --tasks "${EXP_DIR}/smoke/qa_task1.jsonl" \
+    python -m cassi.executor.collect --smoke --domain qa --tasks "${EXP_DIR}/smoke/qa_task1.jsonl" \
         --G 1 --seed 42 --out "${EXP_DIR}/smoke/qa.jsonl"
     echo "TODO(GPU): ALFWorld smoke rollout once the verl-agent task list is staged (P1.3)"
     release_gpus
