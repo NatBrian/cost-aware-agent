@@ -155,6 +155,7 @@ third_party/ (gitignored) pinned clones: verl, verl-tool, verl-agent, Search-R1
 
 | Question | Read |
 |---|---|
+| Plain-language version of the whole plan (no jargon) | `../paper_plan_v2_simple.md` — read this first if the spec feels dense. |
 | What exactly is the method/experiments/claims? | `../paper_plan_v2.md` — THE spec. §2 method, §5 experiments, §10 algorithms, §12 kill-switches, §16 runbook, §17 config, §19 sourcing. Where anything disagrees, it wins. |
 | What's done / what's next / what commands? | `HANDOFF.md` (+ §3b adjustment map: what to tune after real data, freeze rules) |
 | Why is the field-positioning what it is? | `../lit_review/00_overview.md` (+ 10 area files); `../competitor_analysis.md` (beginner-friendly) |

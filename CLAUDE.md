@@ -16,10 +16,13 @@ This repository has TWO parts:
    walkthrough, document map, status, the "ten commandments" invariants).
 2. Read `research/cassi/HANDOFF.md` — current status, pending GPU work, exact next
    commands, post-experiment adjustment map, every decision already made.
-3. Read `research/paper_plan_v2.md` — the full research plan; it is the SOURCE OF
+3. Read `research/paper_plan_v2_simple.md` — the whole plan in plain language
+   (what each experiment is, why it exists, how to run it). Read it before the
+   real plan; it makes the real plan legible.
+4. Read `research/paper_plan_v2.md` — the full research plan; it is the SOURCE OF
    TRUTH for everything under `research/cassi/` (each module cites its sections).
-4. Verify nothing rotted — the canonical ritual is PROJECT_GUIDE §7 (activate
-   `research/cassi/.venv`, then pytest → expect "114 passed, 1 skipped"; the
+5. Verify nothing rotted — the canonical ritual is PROJECT_GUIDE §7 (activate
+   `research/cassi/.venv`, then pytest → expect "115 passed" in the venv; the
    train_grpo --dry-run; the paper make; and `git config user.name` → must print
    "Nathanael Brian" — if it prints anything else, STOP before committing).
    Never "verify" by re-running scripts/p0_setup.sh (it's an installer; P0 is done).

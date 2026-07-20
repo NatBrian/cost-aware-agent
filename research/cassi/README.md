@@ -7,6 +7,8 @@ This folder is the `cassi/` repo layout defined in paper_plan_v2 §17.
 plain-language explanation: research idea, glossary (paper terms → code symbols),
 pipeline walkthrough, document map, invariants.
 **Status / what to run next: see [`HANDOFF.md`](HANDOFF.md).**
+**Want the plan without the jargon?** [`../paper_plan_v2_simple.md`](../paper_plan_v2_simple.md)
+— the whole research plan in plain words (what/why/how for every experiment).
 
 ## What this is (plain language)
 
