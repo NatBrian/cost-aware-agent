@@ -631,25 +631,209 @@ Three quality checks before proceeding: manual review of 100 random trajectories
 re-run, and one sanity check that must hold — **higher λ must produce earlier
 stopping, everywhere.** If that fails, something is wrong upstream.
 
-### Stage 3: Training the coach (supervised fine-tuning)
+### Stage 3: Training the coach — the full walkthrough
 
-| Setting | Value |
-|---|---|
-| Method | SFT, three heads |
-| Epochs | 3 |
-| Learning rate | 2e-5 |
-| Batch size | 64 |
-| Max sequence | 2,048 |
-| **Early stopping on** | **held-out stopping regret — NOT cross-entropy** |
+This is the part people ask about most, so here it is end to end: what goes in,
+what comes out, what actually runs, and how we know it worked.
 
-That last row matters. Cross-entropy measures whether it classifies stop/continue
-correctly; stopping regret measures *how much utility the mistakes actually cost*.
-Getting a close call wrong is cheap; getting a wildly-off call wrong is expensive.
-Only the second metric knows the difference.
+#### 3a. What kind of training is this?
 
-**Gate:** the coach must beat both a majority-class baseline and a calibrated
-confidence probe on held-out regret. **If it can't, stop — fix features or labels
-before touching RL.** A bad coach makes everything downstream meaningless.
+**Supervised fine-tuning, not reinforcement learning.** We already know the right
+answer for every step — the backward recursion computed it in Stage 2. So there's
+no need for exploration or trial and error. We simply show the model a state and
+its correct label, repeatedly.
+
+This is a deliberate simplification from v5, which proposed training the coach with
+RL too. That was unjustified complexity: RL is for when you *don't* have the answer.
+An SFT-versus-SFT+RL comparison survives as ablation A6, so the question gets
+answered empirically rather than by assertion.
+
+#### 3b. The input — one block of text
+
+The coach is a language model, so its input is text. Every training example is one
+`<stopper_input>` block, exactly as shown in §7.5. It has six parts:
+
+| Field | What it contains | Why it's there |
+|---|---|---|
+| `[TASK]` | the question | Some tasks genuinely need more steps than others |
+| `[BUDGET]` | tokens, tool calls, dollars, tier, burn rate | The economics — *the whole point* |
+| `[OBJECTIVE]` | the λ value | Makes one model serve every cost setting |
+| `[PROGRESS]` | step index, steps since the draft changed, edit distances, retrieval overlap, distinct sources | Is the worker still learning anything, or spinning? |
+| `[HISTORY]` | the last 3 actions with 64-token observation digests | Recent context, compressed to stay cheap |
+| `[DRAFT]` | the current best answer | What we'd hand over if we stopped right now |
+
+Two rules govern this block, and both are load-bearing:
+
+**Rule 1 — identical at training and deployment.** The exact same function builds
+this text in both places (`stopper/features.py`). Not "similar" — the same code.
+Any drift between the two silently degrades the model in a way that's very hard to
+diagnose, because training metrics stay fine.
+
+**Rule 2 — nothing the deployment wouldn't have.** No ground-truth answer, no
+quality score, no worker-stated confidence. If the coach depends on something only
+available during training, it's useless in production. This is why quality is
+computed at *label* time and never enters the input.
+
+The progress features deserve a note, because they're where the signal actually
+lives. "Draft unchanged for 4 steps" plus "retrieval overlap 85%" is the model
+saying: *the worker is going in circles.* That pattern, combined with a tight
+budget tier, is what STOP looks like.
+
+#### 3c. The output — three heads, three different jobs
+
+The backbone reads the text and produces a hidden representation of the final
+token. Three small linear layers then read that same representation:
+
+| Head | Output | Range | Used for |
+|---|---|---|---|
+| **Action** | STOP or CONTINUE | a logit | Interpretability, and the classification loss |
+| **Margin (Δ)** | how much better continuing is | squashed to [−1, 1] | **The stop decision at inference** |
+| **Value (V)** | expected utility from here | unbounded | **The worker's training signal** |
+
+Why three heads rather than one? Because they're used by different consumers and
+need different shapes.
+
+- **The margin is bounded** (via tanh) because it's a *decision* signal, and its
+  label was squashed the same way. Bounded targets keep the regression stable.
+- **The value is unbounded** because it's a *quantity* — it becomes the potential
+  function in the worker's reward, and squashing it would distort the differences
+  that *are* the reward. Compressing the range would compress the training signal.
+- **The action head is technically redundant** (you can derive the decision from the
+  margin's sign). We keep it because the classification loss is a cleaner, better-
+  conditioned learning signal than regression alone, and it gives a directly readable
+  probability.
+
+At inference, the rule is simply: **stop when the margin is ≤ 0.** One threshold,
+no table, because budget-awareness is already in the weights.
+
+**One hard rule about the value:** it is always read from the value head, **never
+parsed out of generated text.** Asking a model to emit a number in its output and
+then regex-ing it back out is a reliability hazard — malformed output at the wrong
+moment corrupts a training step. A head cannot be malformed.
+
+#### 3d. The loss — three objectives, weighted
+
+```
+total loss  =  1.0 × cross-entropy(action)
+            +  0.5 × mean-squared-error(margin)
+            +  0.5 × mean-squared-error(value)
+```
+
+The action head gets double the weight of the others. The intuition: getting the
+*decision* right is the primary job, and the two regressions are refinements that
+make the decision usable downstream.
+
+#### 3e. The data — how examples are built
+
+Each labeled step becomes one training example: the serialized text in, the three
+targets out. Two details that are easy to get wrong:
+
+**All λ values pool into one dataset.** We labeled the same trajectories at five
+different λ values, so one step becomes five examples that differ only in the λ
+line of the input and in their targets. This is exactly what teaches the model what
+λ *means* — it sees identical situations labeled differently purely because the cost
+setting changed. This is why one coach can serve the whole dial.
+
+**The train/held-out split is by task, never within a task.** The 8 rollouts of one
+task share a question and highly correlated states. Splitting inside a task puts
+near-duplicates on both sides, and the held-out score becomes a fiction. We split at
+the task level so held-out means genuinely unseen.
+
+#### 3f. The settings
+
+| Setting | Value | Why |
+|---|---|---|
+| Base model | Qwen3.5-2B | Same family as the worker, so we're testing the method rather than a family difference |
+| Method | SFT, three heads | We already know the answers |
+| Epochs | 3 | Enough to fit; more risks memorizing individual trajectories |
+| Learning rate | 2e-5 | Standard for fine-tuning at this scale |
+| Batch size | 64 | Reached by accumulating gradients over micro-batches of 8 |
+| Max sequence | 2,048 tokens | The input block is compact by design — history is digested, not verbatim |
+| Precision | bfloat16 backbone, float32 heads | Heads stay in float32 because regression is more sensitive to precision than classification |
+| GPUs | 2 | It's a 2B model; this is the cheap phase |
+| **Early stopping on** | **held-out stopping regret** | See below — this is the important one |
+
+#### 3g. Why we early-stop on regret, not on loss
+
+This is the single most important choice in the phase.
+
+Cross-entropy asks: *did it classify stop-versus-continue correctly?* Every mistake
+counts the same.
+
+**Stopping regret asks: how much utility did the mistakes actually cost?** It
+simulates the coach's real policy — stop at the first step where the margin goes
+non-positive — and measures the utility gap against the true optimum.
+
+The difference is everything. Recall §7.4: at the optimal stopping step the margin
+was −0.09. Getting that step wrong costs almost nothing, because stopping one step
+later is nearly as good. But stopping at step 1, before any answer exists, is
+catastrophic. Cross-entropy scores those two errors identically. Regret does not.
+
+We also measure regret as a *utility gap* rather than "how many steps off were you"
+— for the same reason. Being three steps early on a task where those steps mattered
+is not the same as being three steps early on a task where they didn't.
+
+#### 3h. What actually runs
+
+```bash
+eval $(/mnt/src/zhanka/gpu_acquire.sh 2)     # 2 GPUs is plenty for a 2B model
+
+python -m cassi.stopper.train_sft \
+    --config configs/cassi.yaml \
+    --labels labels_lam0.1.jsonl labels_lam0.5.jsonl labels_lam1.0.jsonl \
+             labels_lam2.0.jsonl labels_lam5.0.jsonl \
+    --trajectories round0.jsonl \
+    --out runs/stopper_v0
+
+/mnt/src/zhanka/gpu_release.sh
+```
+
+Or just `bash scripts/p4_stopper.sh`, which wraps the above and then runs the gate
+check. Each epoch trains, then evaluates held-out regret; the best checkpoint by
+regret is kept, and training stops when an epoch fails to improve it.
+
+**One implementation note worth knowing.** The plan names "TRL SFTTrainer + scalar
+head," but that recipe supports exactly *one* scalar head, and we need three with a
+mixed classification-plus-regression objective. So the code implements the same
+recipe — same backbone loading, same optimizer, same hyperparameters — as a plain
+PyTorch loop instead of depending on TRL internals. Same method, fewer moving parts.
+
+#### 3i. The gate — how we know it worked
+
+The coach must beat **both** of these on held-out regret:
+
+1. **The majority-class baseline** — always predict whichever decision is more common.
+   If the coach can't beat this, it has learned nothing beyond the label distribution.
+2. **A calibrated confidence probe** — stop once the draft has been unchanged for *k*
+   steps, with *k* tuned on the training split. This is the honest strong-simple
+   baseline: a rule anyone could write in ten minutes without any model at all.
+
+Beating the second one is the real test. It's essentially baseline B2 in miniature,
+and published work (LearnStop) shows this style of probe sometimes *wins*. If a
+ten-minute rule matches our trained model, the trained model isn't earning its cost.
+
+We also report stop/continue F1 and an external check on RedundancyBench, where
+published LLMs score ≤24.88% — a number we should comfortably beat, since that
+benchmark is measuring exactly the skill we trained for.
+
+**If the gate fails: STOP.** Fix features or labels before touching RL. Worker
+training runs take 1–3 days each and every one of them inherits the coach's quality.
+This gate costs hours; discovering the same problem in Stage 4 costs weeks.
+
+#### 3j. Sanity checks worth running by hand
+
+Cheap, and they catch real bugs that metrics can hide:
+
+- **Feed the same state at λ = 0.1 and λ = 5.0.** The margin must be lower at high λ.
+  If λ doesn't move the output, λ-conditioning isn't working and the whole
+  inference-time dial is broken.
+- **Feed the same state with a full wallet and a nearly-empty one.** The nearly-empty
+  version should stop sooner. That's learned budget-awareness, and it's what E3 measures.
+- **Feed a step-1 state with an empty draft.** It must say CONTINUE. Stopping before
+  any answer exists is the one unambiguous failure.
+- **Check the oracle path.** Our test suite includes a mock coach that returns the true
+  labels; it should score ~zero regret and F1 = 1. If it doesn't, the *evaluation* is
+  broken, not the model — and you'd otherwise spend days debugging a healthy model.
 
 ### Stage 4: Training the worker (reinforcement learning)
 
