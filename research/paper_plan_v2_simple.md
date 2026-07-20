@@ -17,13 +17,14 @@ wins. This is a translation, not a second opinion.
 4. What we claim is new (and what we explicitly don't claim)
 5. The models, datasets, and benchmarks — every choice and why
 6. The training methods — exactly how each model is trained
-7. The baselines — all nine, and what each one is there to kill
-8. The experiments — what, why, how
-9. How we measure, and the rules that keep it honest
-10. What we expect, and everything that could go wrong
-11. The twelve phases, start to finish
-12. What the paper itself looks like
-13. Where to go next
+7. **Worked examples — what the coach and worker actually look like**
+8. The baselines — all nine, and what each one is there to kill
+9. The experiments — what, why, how
+10. How we measure, and the rules that keep it honest
+11. What we expect, and everything that could go wrong
+12. The detailed plan — twelve phases, start to finish
+13. What the paper itself looks like
+14. Where to go next
 
 ---
 
@@ -700,7 +701,216 @@ analysis and writing.
 
 ---
 
-## 7. The baselines — all nine
+## 7. Worked examples — what the two agents actually look like
+
+Everything above is abstract. This section shows the literal text going in and out
+of both models, on one task, all the way through. Numbers are illustrative but to
+scale, and they match the worked example in `PROJECT_GUIDE.md` §9 — if you change
+one, change both.
+
+**The task:** *"What is the capital of the country where the Eiffel Tower is?"*
+Gold answer: *"Paris"*. The group draws a medium wallet of $0.02, shared by all 8
+rollouts. Maximum 10 steps.
+
+### 7.1 The worker agent — what it emits
+
+This is the shared scaffold. **Every method uses it**, ours and all nine baselines,
+so the draft line is a constant rather than an advantage. Here is one real step of
+worker output:
+
+```
+Thought: I need to find which country the Eiffel Tower is in.
+Action: search[Eiffel Tower country]
+Observation: The Eiffel Tower is a wrought-iron lattice tower on the Champ de
+             Mars in Paris, France.
+BEST ANSWER SO FAR: EMPTY_DRAFT
+```
+
+That last line is mandatory. At step 1 the worker has seen "France" but hasn't yet
+formed an answer to the actual question (which asked for a *capital*), so the draft
+is empty. Its tokens are billed to this step for every method.
+
+Step 2:
+
+```
+Thought: The tower is in France. Now I need France's capital.
+Action: search[capital of France]
+Observation: Paris is the capital and most populous city of France.
+BEST ANSWER SO FAR: Paris
+```
+
+The draft is now correct. **In a normal run the worker would answer here.** But
+during label collection we force it onward:
+
+```
+Thought: I have the answer.
+Action: ANSWER[Paris]                    ← logged with answered_flag=True, NOT executed
+Observation: [forced continuation — episode continues]
+BEST ANSWER SO FAR: Paris
+```
+
+Steps 4–10 continue searching and find nothing new. The draft stays "Paris" and the
+meter keeps running. **This is the overwork we are trying to train away** — and by
+forcing it, we get to observe exactly what it costs.
+
+### 7.2 The full trajectory as logged
+
+| Step | Action | Draft after | Quality | Step cost | Total spent | Tier |
+|---|---|---|---|---|---|---|
+| 1 | search[eiffel tower country] | EMPTY_DRAFT | 0.00 | $0.002 | $0.002 | HIGH |
+| 2 | search[capital of France] | Paris | **1.00** | $0.002 | $0.004 | HIGH |
+| 3 | ANSWER (logged, forced on) | Paris | 1.00 | $0.001 | $0.005 | HIGH |
+| 4–10 | more searches, nothing new | Paris | 1.00 | ~$0.002 ea | $0.019 | → LOW → CRITICAL |
+
+Quality is measured at collection time only, by string-comparing the logged draft
+against the gold answer. **It never enters the coach's input.**
+
+### 7.3 Turning that into a utility curve
+
+With λ = 1 and a median pilot spend of $0.01 (so normalized cost = dollars ÷ 0.01),
+and the HIGH-tier multiplier of 0.5:
+
+| Step | Quality | minus cost so far | **Utility** |
+|---|---|---|---|
+| 1 | 0.00 | 0.10 | **−0.10** |
+| 2 | 1.00 | 0.20 | **+0.80** ← peak |
+| 3 | 1.00 | 0.25 | **+0.75** |
+| … | 1.00 | rising, and multipliers rising too | falling |
+| 10 | 1.00 | ~1.4 | **≈ −0.40** |
+
+**The curve rises to step 2, then falls monotonically.** That is the economics of
+overwork in a single column: quality flatlined at step 2, but the bill didn't. Note
+it falls *faster* late, because the tier multiplier climbs from 0.5× to 5× as the
+wallet empties — spending your last dollar hurts more than spending your first.
+
+### 7.4 The labels the backward recursion produces
+
+Working backward across *all* trajectories in the batch:
+
+- **At step 9:** expected value of continuing ≈ −0.40, which is worse than stopping
+  now → clearly in the stop region.
+- **At step 2:** the regressor looks at every state in the batch resembling this one
+  (fresh draft, HIGH tier, low retrieval overlap). Across the batch, *some* of those
+  continuations did improve — genuine multi-hop questions where step 3 helped. So the
+  expected continuation value is 0.71, not zero. But 0.71 < 0.80, so stopping wins.
+  **This is τ\* = 2, our optimal stop point, with margin Δ\* = 0.71 − 0.80 = −0.09.**
+- **At step 1:** continuing is worth ≈ 0.65 versus stopping at −0.10 → continue, with
+  a large positive margin of +0.75.
+
+Notice the margin at step 2 is *small* (−0.09), not dramatic. That's honest and it's
+the point: at the true stopping moment the decision is genuinely close. A model
+trained on the naive peeking label would see this trajectory's realized future and
+learn to keep going. The averaged label doesn't.
+
+Each step emits three labels: the decision, the squashed margin, and the raw value
+(here V\* at step 1 = 0.65).
+
+### 7.5 The coach — literal input
+
+This is exactly what the coach reads at step 2. Identical format at training and at
+deployment, which is the whole point.
+
+```
+<stopper_input>
+[TASK] What is the capital of the country where the Eiffel Tower is?
+[BUDGET] tokens 412/4096 (10%) | tool calls 2/10 | $0.004/$0.020
+         | tier HIGH | burn $0.0020/step
+[OBJECTIVE] cost-sensitivity λ = 1.0
+[PROGRESS] step 2/10 | draft unchanged for 0 steps
+           | draft edit-distance (last 3 steps): -,-,5
+           | retrieval overlap (last 3): 12% | distinct sources: 2
+[HISTORY] 1: search: "Eiffel Tower ... Champ de Mars in Paris, France."
+          2: search: "Paris is the capital and most populous city of France."
+[DRAFT] Paris
+</stopper_input>
+```
+
+**What is deliberately absent, and why.** No ground-truth answer, no quality score,
+no "is the draft correct" signal — those exist only at label time. And critically,
+**no worker-stated confidence**: the worker could simply learn to say "I'm very
+confident" to trigger an early stop and collect the cost saving. Closing that
+channel by construction is cheaper than policing it.
+
+Compare that same state under a nearly-empty wallet:
+
+```
+[BUDGET] tokens 3900/4096 (95%) | tool calls 9/10 | $0.019/$0.020
+         | tier CRITICAL | burn $0.0021/step
+```
+
+Nothing else changes. The coach outputs a lower margin and stops earlier — **because
+it learned that pattern from data, not because anyone wrote a rule.** This is what
+experiment E3's three-wallets study measures.
+
+### 7.6 The coach — output
+
+```
+<decision action="STOP" delta="-0.09"/>
+```
+
+Three numbers actually come out: the decision, the margin (which drives stopping),
+and the value from a separate head (which feeds worker training). The value is always
+read from the head, **never parsed out of text** — parsing a number from generated
+text is a reliability hazard we don't need.
+
+At step 1 the same coach would emit `action="CONTINUE" delta="+0.75"` — a big,
+confident margin. The margin shrinking from +0.75 to −0.09 across one step *is* the
+model recognizing that the job just got done.
+
+### 7.7 How that becomes the worker's training signal
+
+Now the RL rollout, which terminates normally at ANSWER (step 3). The coach's value
+head gives: V(step 1) = 0.65, V(step 2) = 0.78, V(step 3) = 0.74, and 0 at the
+terminal state by convention.
+
+Rewards are the *differences* between consecutive values:
+
+| Step | Calculation | Reward | What it means |
+|---|---|---|---|
+| 1 | 0.78 − 0.65 | **+0.13** | That search genuinely helped — paid immediately, not at the end |
+| 2 | 0.74 − 0.78 | **−0.04** | Past the optimal frontier — mildly punished |
+| 3 | 0 − 0.74 | **−0.74** | Cash-out: the telescoping settlement at termination |
+
+Plus the end-of-episode reward: quality 1.0 minus tier-scaled spend ≈ **+0.75**.
+
+Now the part that matters. Consider a sibling rollout in the same group of 8 that
+searched all 10 times and also ended at "Paris". Both get the same quality. But with
+step-level credit, the lazy rollout accrues **negative advantage at steps 3 through
+10** — every single wasted step is individually marked as bad.
+
+**A trajectory-level penalty cannot do this.** It would give one aggregate number,
+and, because these shaped terms telescope, it would give *exactly zero* signal from
+the coach. The step-resolved pressure is the entire mechanism, and this example is
+what "step-level advantages are mandatory" means concretely. We have a test that
+asserts the trajectory-level version is provably inert, so the codebase can't
+regress here silently.
+
+### 7.8 What success looks like at inference
+
+Turn the coach **off completely** and run the trained worker:
+
+```
+Thought: I need to find which country the Eiffel Tower is in.
+Action: search[Eiffel Tower country]
+Observation: ...Champ de Mars in Paris, France.
+BEST ANSWER SO FAR: EMPTY_DRAFT
+
+Thought: France. Its capital is Paris — that answers the question.
+Action: ANSWER[Paris]
+BEST ANSWER SO FAR: Paris
+```
+
+Two steps. No monitor. Nothing stopped it — **it stopped itself.**
+
+That is the entire thesis in one transcript. A monitor-based method produces the
+same two steps but requires a supervisor watching every step forever, paid for on
+every request. Ours put the judgment in the weights. And when the user raises λ, the
+same worker with the same weights becomes more frugal, because the coach it learned
+from was trained across the whole λ range.
+
+---
+
+## 8. The baselines — all nine
 
 Baselines are not decoration. Each closes off a specific "but couldn't you just…"
 objection. Every one runs in the same environment, with the same worker model, and
@@ -731,7 +941,7 @@ the coach kept for runtime control and transfer. That fallback is pre-registered
 
 ---
 
-## 8. The experiments
+## 9. The experiments
 
 ### First: the kill-switches (weeks 2–3, before anything else)
 
@@ -791,7 +1001,7 @@ would demand. Better to run them ourselves.
 
 ---
 
-## 9. How we measure, and the rules that keep it honest
+## 10. How we measure, and the rules that keep it honest
 
 ### The headline metrics
 
@@ -888,7 +1098,7 @@ equally; it does not create a cost *difference* between them.
 
 ---
 
-## 10. What we expect, and what could go wrong
+## 11. What we expect, and what could go wrong
 
 **Target: 20–40% dollar-cost reduction at equal accuracy on two agent domains.**
 
@@ -921,38 +1131,266 @@ other side of it.
 
 ---
 
-## 11. The twelve phases
+## 12. The detailed plan — twelve phases, start to finish
 
-Full detail with done-criteria is `paper_plan_v2.md` §16; current status is
-`HANDOFF.md`. **Never start a phase before the previous one's done-criterion is met**
-(the one exception: baseline implementation may overlap the main training).
+Each phase has a script in `research/cassi/scripts/`, a goal, a done-criterion, and
+a reason it exists. **Never start a phase before the previous one's done-criterion is
+met** — the one exception is P8, which may overlap P6–P7 because baselines are
+independent training runs.
 
-| Phase | What happens | Done when |
-|---|---|---|
-| **P0** ✅ | Install the pinned stack, pin every commit hash | One ReAct rollout runs end-to-end on both domains with draft lines and cost logging |
-| **P1** ✅ | Download data, build the retrieval index, freeze splits, decontaminate | Dataset manifest with counts and split hashes committed |
-| **P2** | 200-task pilot → **freeze wallet calibration into the config** → collect round 0 | ≥8K QA + ≥2K ALFWorld trajectories with scored drafts and balanced wallet strata |
-| **P3** | Build labels for every λ | Labeled datasets + a one-page label-quality memo |
-| **P4** | Train coach v0 | **Coach beats majority-class AND a confidence probe on held-out regret. If not, STOP.** |
-| **P5** | **Kill-switches K1 + K2** | **GO/NO-GO decision, logged with a date either way** |
-| **P6** | Worker GRPO, iteration 1, both domains | Beats B1 on cost-at-equal-accuracy on dev, both domains |
-| **P7** | Loop iteration 2, both arms | Per-iteration table **+ the (refreshed − frozen) delta** |
-| **P8** | Baselines B2–B9 (overlaps P6–P7) | All evaluated on the same frozen test sets with the same accounting |
-| **P9** | Full evaluation, ablations, transfer, regret replays, 3 seeds | Every number for the tables and figures exists as CSV with a generation script |
-| **P10** | Figures and tables | Everything regenerates from raw results with one `make` target — **no hand-edited numbers** |
-| **P11** | Write the paper | Compiled PDF, 8 pages + appendix, every claim traceable |
-
-**Everything from P2 onward needs GPUs.**
-
-Two things about P2 that are easy to get wrong and expensive to discover late: the
-prompt template must be **frozen before the pilot** (the template affects spend, and
-spend defines the wallets — change it after and the pilot must rerun), and nothing
-downstream is valid until the calibration is written into the config. The config
-loader physically blocks later phases until it is.
+Current status lives in `HANDOFF.md`, which is the file to trust for "what runs
+next." This section is the *shape* of the plan; HANDOFF has the exact commands.
 
 ---
 
-## 12. What the paper looks like
+### P0 — Environment setup ✅ DONE (week 1)
+
+**Goal:** a pinned, reproducible stack.
+
+Install verl ≥ 0.8, verl-tool (the search environment), verl-agent (ALFWorld), TRL
+1.8 (coach training), LightGBM (the label regressor), and wandb. Record **every
+commit hash** in the config. Requires transformers v5 and vLLM ≥ 0.17 for Qwen3.5.
+Train with thinking mode off, and note that the chat template strips thinking blocks
+from history — multi-turn needs token-in-token-out handling.
+
+**Done when:** one ReAct rollout runs end to end on HotpotQA *and* one on ALFWorld,
+with the draft line present at every step and per-step costs logging into the
+trajectory format.
+
+**Gotcha already hit and fixed:** verl-agent ships a fork that also calls itself
+`verl`, so install order determines which one Python actually imports. Do not
+reinstall into the existing virtual environment — you can silently flip which
+package wins.
+
+---
+
+### P1 — Data and environments ✅ DONE (week 1)
+
+**Goal:** every dataset staged, split, and decontaminated.
+
+Download NQ + HotpotQA train (sample 8–10K combined) and MuSiQue train (sample 5K).
+Build the retrieval index using the Search-R1 recipe — local Wikipedia dump with E5
+embeddings, BM25 as fallback — kept *identical to the baselines on purpose*. Stage
+the ALFWorld task list, freeze the dev/test splits, and stage all evaluation-only
+sets. Then run the decontamination pass (n-gram and MinHash, training prompts against
+every evaluation set).
+
+**Done when:** a dataset manifest with counts and split hashes is committed.
+
+**Still outstanding from this phase** (all CPU/network work, no GPU needed): staging
+the BrowseComp-Plus corpus, resolving the exact GAIA 103-question filter, and staging
+the ALFWorld environment in its own environment to dodge the package-name clash.
+
+---
+
+### P2 — Pilot and collection round 0 (weeks 1–2) ← **NEXT, needs 2 GPUs**
+
+**Goal:** the trajectories everything else is built from.
+
+Two steps, in order:
+
+**(a) The 200-task pilot.** Run the base worker with no budget constraint at all, and
+record what it spends. This produces two numbers that get **frozen into the config**:
+the three wallet sizes (25th percentile, 75th percentile, 2× the 90th) and the median
+spend used to normalize costs.
+
+**(b) Collection.** Base worker, 8 rollouts per task, max 10 steps for QA and 20 for
+ALFWorld, **forced-continuation mode**, draft template active, per-step draft scoring
+against gold, full features logged. Each (task, group) draws one wallet shared by all
+8 rollouts.
+
+**Done when:** ≥8,000 QA and ≥2,000 ALFWorld trajectories exist with scored drafts,
+dollar costs, and roughly balanced wallet strata — plus a report of what the draft
+tokens and forced continuation actually cost, which feeds the overhead table.
+
+**Two ways to get this wrong, both expensive:**
+
+1. **The prompt template must be frozen *before* the pilot.** The template affects
+   spend; spend defines the wallets. Change the template afterward and the pilot is
+   invalid and must rerun.
+2. **The calibration must be written into the config before anything downstream.** The
+   config loader physically refuses to run later phases until it is — that guard is
+   deliberate, don't disable it.
+
+---
+
+### P3 — Label construction (week 2)
+
+**Goal:** turn trajectories into stopping labels.
+
+Run the backward recursion for each λ ∈ {0.1, 0.5, 1, 2, 5}, with tier-scaled costing
+(the plain version is kept for ablation A8). Fit the squashing scale per domain, then
+freeze it.
+
+**Three quality checks, all required:**
+- Manually review 100 random trajectories — *does the chosen stop point look right to
+  a human?* There is no substitute for looking.
+- Label-noise sensitivity: re-run with step-subsampled draft scoring and see if the
+  labels move.
+- The sanity check that must hold: **higher λ produces earlier stopping, everywhere.**
+  If it doesn't, something upstream is broken and no amount of downstream work fixes it.
+
+**Done when:** labeled datasets exist per λ, plus a one-page label-quality memo.
+
+---
+
+### P4 — Coach v0 (week 2)
+
+**Goal:** a coach worth trusting.
+
+Supervised fine-tuning on the 2B base, three heads, early-stopped on held-out stopping
+regret. Then evaluate: stopping regret, stop/continue F1, and an external check on
+RedundancyBench.
+
+**Done when — and this is a hard gate:** the coach beats **both** a majority-class
+baseline **and** a calibrated confidence probe on held-out regret.
+
+**If it doesn't: STOP.** Fix the features or the labels before touching RL. A weak
+coach makes every downstream result meaningless, and RL runs are 1–3 days each. This
+gate is cheap; discovering the problem in P6 is not.
+
+---
+
+### P5 — The kill-switch gate (weeks 2–3) 🚦 **THE DECISION POINT**
+
+**Goal:** test the core bet before spending months on it.
+
+Run **K1** (does training beat monitoring?) and **K2** (do we need two models?) on the
+1,000-task HotpotQA subset, one seed. Exact pass conditions are in §9.
+
+**Done when:** a GO/NO-GO decision is logged **with a date**, either way. The decision
+log goes into the paper's appendix — including if it's a NO-GO, because a
+pre-registered kill-switch that actually fired is evidence of a well-run project.
+
+**Before this phase can run:** the K2 single-model comparator is currently a
+deliberate stub and must be implemented. **K1 passing alone does not authorize a GO.**
+
+**If NO-GO:** pivot as pre-registered — the trained-monitor paper, reusing the coach
+we already built. Do not push on. The whole point of putting this in week 2–3 is that
+the pivot is still cheap here.
+
+---
+
+### P6 — Worker training, iteration 1 (weeks 4–6, 4–8 GPUs)
+
+**Goal:** the headline model.
+
+GRPO with economic shaping on both domains. Run **both** step-credit variants and
+report which the headline numbers use. Dr. GRPO length hygiene is mandatory. Log the
+predicted-value-versus-actual-reward dashboard from step zero — it feeds the
+reward-hacking figure and you cannot reconstruct it after the fact.
+
+**Done when:** the iteration-1 worker beats plain ReAct on cost-at-equal-accuracy on
+dev, in both domains.
+
+**The implementation note that matters most:** under our conventions the shaped terms
+telescope to a constant within each group, so **trajectory-level advantages are exactly
+unaffected by the shaping**. Step-level assignment is therefore mandatory, not a
+fallback. If results come out suspiciously flat, check this first.
+
+---
+
+### P7 — Loop iteration 2 (weeks 7–8)
+
+**Goal:** show the loop is real.
+
+Re-collect with the iteration-1 worker — **in forced-continuation mode again**, because
+the improved worker stops early and late-step data would otherwise vanish *precisely
+because the method worked*. Then rerun labels and coach training, and run iteration 2
+**twice at matched compute**: once with the frozen old coach, once with the refreshed one.
+
+**Done when:** a per-iteration table exists **plus the (refreshed − frozen) delta**.
+That delta *is* the loop's contribution — the table without it proves nothing.
+
+---
+
+### P8 — Baselines (overlaps weeks 4–8)
+
+**Goal:** nine comparisons, no strawmen.
+
+Two are training-free (the confidence probe, the monitor). Six are training runs at
+1–3 days each, with 2–3 frontier points apiece — this is the bulk of the compute
+budget, so schedule it deliberately rather than fitting it in at the end. B7 needs
+both of its arms (imitation-only and RL).
+
+**Done when:** every baseline is evaluated on the same frozen test sets with the same
+cost accounting, including its own auxiliary inference.
+
+---
+
+### P9 — Full evaluation and ablations (weeks 9–10)
+
+**Goal:** every number the paper needs.
+
+The six experiment grids, the nine ablations, transfer evaluations, the 500-task
+forced-continuation regret replays, three seeds on headline tables, the full statistics,
+and overhead measured under both serving regimes.
+
+**Done when:** every number for the five tables and six figures exists as a CSV in
+`experiments/results/`, with a generation script per figure and table.
+
+---
+
+### P10 — Figures and tables (week 11)
+
+**Goal:** publication-ready artifacts that regenerate themselves.
+
+One script per figure and per table. CSV in, PDF or LaTeX out. Colorblind-safe palette,
+error bars are 95% bootstrap confidence intervals.
+
+**Done when:** everything regenerates from raw results with **one `make` target**.
+**No hand-edited numbers, ever** — a hand-edited number is a number that will silently
+disagree with its source when a run is repeated.
+
+---
+
+### P11 — The paper (weeks 11–12)
+
+**Goal:** the submission.
+
+ICLR 2027 style files. Write in this order — **what you know best first**: Method →
+Setup → Results → Analysis → Related Work → Introduction → Limitations → **Abstract
+last**, assembled from the headline numbers once they actually exist.
+
+Build the bibliography from the verified IDs in `research/lit_review/` and the
+competitor analysis. **Never cite from memory** — every claim about a competitor must
+trace to a specific review entry.
+
+**Two checks before every compile:** grep the draft against the dead-claim list in §4
+(none of v5's retracted claims may reappear), and verify every number in the prose
+exists in a table or figure.
+
+**Done when:** a compiled PDF exists, 8 pages plus appendix, every claim traceable, and
+the reviewer-FAQ objections pre-answered in the text.
+
+---
+
+### Quick reference
+
+| Phase | Script | GPUs | Weeks |
+|---|---|---|---|
+| P0 ✅ | `p0_setup.sh` | — | 1 |
+| P1 ✅ | `p1_data.sh` | — | 1 |
+| **P2** | `smoke_and_pilot.sh` → `p2_pilot_and_collect.sh` | **2** | 1–2 |
+| P3 | `p3_labels.sh` | — | 2 |
+| P4 | `p4_stopper.sh`, `p4_gate.py` | 2 | 2 |
+| **P5** 🚦 | `p5_killswitch.sh`, `killswitch_decision.py` | 4–8 | 2–3 |
+| P6 | `p6_grpo_iter1.sh` | 4–8 | 4–6 |
+| P7 | `p7_loop_iter2.sh` | 4–8 | 7–8 |
+| P8 | `p8_baselines.sh` | 4–8 | 4–8 |
+| P9 | `p9_eval.sh` | 2–4 | 9–10 |
+| P10 | `analysis/` scripts | — | 11 |
+| P11 | `paper/` + `make` | — | 11–12 |
+
+**Everything from P2 onward needs GPUs.** On the lab machine, acquire the smallest
+number a phase needs (`gpu_acquire.sh N`) and release when done. Acquiring a lock does
+**not** guarantee the memory is free — verify with `nvidia-smi`, and never kill another
+user's job.
+
+
+---
+
+## 13. What the paper looks like
 
 Eight pages plus appendix, targeting **ICLR 2027** (~Sept 2026 submission; fallback
 NeurIPS/ICML 2027).
@@ -988,7 +1426,7 @@ cite from memory.**
 
 ---
 
-## 13. Where to go next
+## 14. Where to go next
 
 1. **This file** — the complete picture in plain language.
 2. `research/cassi/PROJECT_GUIDE.md` — the same material with code symbols attached,
