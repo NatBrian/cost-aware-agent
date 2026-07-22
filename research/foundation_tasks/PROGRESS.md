@@ -54,11 +54,16 @@
 
 ## Experiment sequence (after I7 — each gated per the F-docs)
 
-- [ ] E-a: 50-task pilot (forced continuation) → pilot memo → Brian approves
-  budgets {small,medium,large} + λ → freeze in config
-- [ ] E-b: judge URL wired → rubric calibration: 50-step labeling sheet →
-  Brian's ~1h hand labels → ≥80%/70% gate
-- [ ] E-c: baselines A0/A1/A2 on dev-200 → baselines CSV + 10-line report
+- [x] E-a ✅ 2026-07-22: 200-episode pilot; knee at step 3; overthinking in
+  24/200; budgets {2,4,8} + λ=0.3 FROZEN from data (memo:
+  foundation/experiments/reports/pilot_memo.md; auto-approved under mandate)
+- [ ] E-b (in progress): judge wired (gemma-4-31B-it) + live rubric sanity
+  passed; 50-step sheet generated; labeling next (author-labels under
+  mandate; sheet kept for Brian's independent relabel)
+- [x] E-c ✅ 2026-07-22 (**dev-200 look #1 of 3**): 1400 episodes. A1 beats A2
+  everywhere (paired); A2 B=2 ceiling confirmed (F1 .221 vs .478); A1
+  budget-adapts ~1 step. RL bar at B=4: U>.205, F1≥.361, self-stop≥.70
+  (report: baselines_report.md)
 - [ ] E-d: F5 micro-run (10 tasks, real judge) → non-degenerate rewards check
 - [ ] E-e: full GRPO run (300 tasks, 1 seed) → checkpoint + dashboards
 - [ ] E-f: F6 eval (A3 harness-off/on × 3 budgets) + oracle replay → gate_check
