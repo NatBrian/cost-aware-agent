@@ -87,5 +87,5 @@ gate:                              # pre-registered GO/NO-GO (plan §6) — froz
 
 tracking:
   wandb_project: cassi-foundation
-  results_dir: ../../experiments/results/foundation
-  reports_dir: ../../experiments/reports
+  results_dir: experiments/results
+  reports_dir: experiments/reports

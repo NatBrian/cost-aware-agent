@@ -93,7 +93,7 @@ def _run_real(cfg: dict, args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--out", default="../../experiments/results/foundation/train")
+    ap.add_argument("--out", default="experiments/results/train")
     args = ap.parse_args()
     cfg = load_config()
     if args.dry_run:

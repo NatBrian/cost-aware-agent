@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=.venv/bin/python
 DEV=data/hotpotqa_dev_200.jsonl
-OUT=../../experiments/results/foundation/baselines
+OUT=experiments/results/baselines
 mkdir -p "$OUT"
 
 $PY -m collect.run_collection --task-file $DEV --arm a0 --mode none \

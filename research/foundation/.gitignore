@@ -4,3 +4,7 @@ cache/
 wandb/
 __pycache__/
 *.pyc
+# experiment outputs: trajectories/checkpoints local; reports + CSVs committed
+experiments/**/*.jsonl
+experiments/**/run_stamp.json
+experiments/train/
