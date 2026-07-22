@@ -1,0 +1,8 @@
+# GPU stack — install into the SERVING/TRAINING env at I2-smoke/I5, pin exact
+# versions at install time (record below when frozen):
+# vllm>=0.17          (executor + judge serving; GDN kernels for Qwen3.5)
+# torch               (matches vllm wheel)
+# transformers>=5     (Qwen3.5 support; E5 encoder for retrieval server)
+# faiss-cpu           (64G flat index; CPU search is fine, encoding on GPU)
+# fastapi + uvicorn   (retrieval server)
+# verl>=0.8           (GRPO AgentLoop — I5; clone + pin, see F5)
