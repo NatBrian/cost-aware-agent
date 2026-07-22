@@ -64,6 +64,24 @@
 - [ ] E-f: F6 eval (A3 harness-off/on × 3 budgets) + oracle replay → gate_check
 - [ ] E-g: F7 figures + report + GO/NO-GO verdict → tag `foundation-run-1`
 
+## Autonomy mandate (Brian, 2026-07-22)
+
+Full autonomy to run E-a…E-g end-to-end and REFINE UNTIL STABLE (RL beats
+baselines; PPO fallback if GRPO collapses; fix any issue; websearch when
+knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
+
+**Anti-overfitting policy (self-imposed, active from now):**
+1. dev-200 stays untouched during ALL refinement. Tuning/iteration decisions use
+   a 50-task VALIDATION slice carved from train-300's remainder pool (never the
+   frozen dev set, never the 300 training tasks themselves where avoidable).
+2. Every dev-200 evaluation is logged in this file with date + reason; target
+   ≤3 total dev evaluations (baselines once, headline A3 once, +1 reserve).
+   Iterating against dev until the gate passes would BE overfitting — the gate
+   must pass on the first or second dev look, driven by validation-slice signals.
+3. Refinement order on failure (cheapest first): rubric/judge → reward scales
+   (alpha, lambda) → RL hyperparams (lr, KL, epochs) → algorithm (PPO fallback)
+   → data size (300→500). One change per iteration, logged.
+
 ## Log
 
 - 2026-07-22: plan docs reviewed doc-by-doc with Brian; implementation started.
