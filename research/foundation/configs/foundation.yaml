@@ -42,9 +42,10 @@ executor:
   rollout_temperature: 1.0
   max_tokens_per_step: 512
 
-judge:                             # the prompted reward model (Qwen3.6-27B)
-  model: PLACEHOLDER-Qwen3.6-27B   # fill exact served name before F3 calibration
-  endpoint: PLACEHOLDER            # e.g. http://host:port/v1 — Brian provides
+judge:                             # the prompted reward model (lab vLLM server)
+  model: gemma-4-31B-it            # ACTUAL served model (checked /v1/models 2026-07-22;
+                                   # docs said Qwen 27B/35B — server serves Gemma-4-31B-it)
+  endpoint: http://122.11.227.227:6102/v1
   temperature: 0.0
   max_tokens: 512
   batch_size: 16
