@@ -22,7 +22,7 @@ retrieval:
   index_dir: ../data_shared/searchr1_index
   backend: e5                      # falls back to bm25 if index unusable (F1)
   top_k: 3
-  endpoint: http://127.0.0.1:8001  # local retrieval server (scripts/serve_retrieval.sh)
+  endpoint: http://127.0.0.1:8377  # local retrieval server (8001 belongs to another user's service)
 
 episode:
   t_max: 10                        # hard cap, all arms
@@ -37,7 +37,7 @@ economy:
 executor:
   model: Qwen/Qwen3.5-9B
   enable_thinking: false
-  endpoint: http://127.0.0.1:8000/v1   # vLLM OpenAI-compatible (scripts/serve_executor.sh)
+  endpoint: http://127.0.0.1:8378/v1   # vLLM OpenAI-compatible (8000 too contested on this shared box)
   eval_temperature: 0.0
   rollout_temperature: 1.0
   max_tokens_per_step: 512
