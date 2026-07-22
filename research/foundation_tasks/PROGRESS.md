@@ -22,10 +22,13 @@
   14 tests green. **Finding logged:** HotpotQA dev split is 100% hard-level by
   design → dev-200 is all-hard while train is mixed (matches F1 limitation #3;
   report must mention it)
-- [ ] **I2 — Agent/harness/collection (F2):** `configs/foundation.yaml` ·
-  prompts + budget tracker block · ReAct loop (vLLM executor client) · harness modes
-  none/enforce/forced_continuation · collection script + JSONL schema validator +
-  resumability · per-step draft F1 scoring · tests (mocked model) · 2-GPU smoke
+- [x] **I2 — Agent/harness/collection (F2)** ✅ 2026-07-22 (code): prompts +
+  facts-not-advice tracker (a0 budget-blind verified by test) · episode loop w/
+  3 harness modes, draft retry/persistence, per-step draft F1 · vLLM client +
+  serve_executor.sh · schema validator · resumable collection CLI w/ seeded
+  per-(task,group) wallet draw · 27 CPU tests green (commit 4bb6458).
+  **Pending:** live 2-GPU smoke (20-task batch per mode) — scheduled as the
+  pre-pilot checkpoint alongside retrieval-server first start
 - [ ] **I3 — Reward (F3):** rubric_v1 (bits, weights, anchored defs + worked examples) ·
   judge client (placeholder endpoint, batching, retry, neutral-on-parse-fail) ·
   cache keyed (rubric_version, input hash) · call logging · reward calc

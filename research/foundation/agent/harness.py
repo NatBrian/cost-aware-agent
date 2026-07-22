@@ -121,7 +121,8 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
     steps_used = (answered_at if spec.mode == "forced_continuation"
                   and answered_at is not None else len(steps))
     return {
-        "task_id": spec.task_id, "arm": spec.arm, "mode": spec.mode,
+        "task_id": spec.task_id, "question": spec.question,
+        "arm": spec.arm, "mode": spec.mode,
         "budget_B": spec.budget, "seed": spec.seed,
         "config_hash": spec.config_hash, "steps": steps,
         "answered_at": answered_at, "forced_stop": forced_stop,

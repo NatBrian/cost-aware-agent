@@ -1,7 +1,8 @@
 """Episode JSONL schema validator (F2) — every stage's contract with the next."""
 
 REQUIRED_EPISODE = {
-    "task_id": str, "arm": str, "mode": str, "budget_B": int, "seed": int,
+    "task_id": str, "question": str, "arm": str, "mode": str,
+    "budget_B": int, "seed": int,
     "config_hash": str, "steps": list, "forced_stop": bool,
     "final_answer": str, "final_f1": float, "final_em": float,
     "steps_used": int, "total_steps_run": int,
