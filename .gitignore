@@ -42,3 +42,5 @@ experiments/swe_ab/runs/
 experiments/swe_ab/*.log
 
 research/papers
+# foundation: shared regenerable data artifacts (indices, corpora, datasets) — see research/foundation_tasks/F0
+research/data_shared/

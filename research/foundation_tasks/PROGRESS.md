@@ -7,11 +7,13 @@
 
 ## Implementation stages (code-complete before experiments)
 
-- [ ] **I0 — Restructure (F0):** commit plan docs · rescue `cassi/data` artifacts →
-  `research/data_shared/` · rescue `cassi/experiments/reports/` →
-  `research/reports_run1/` · `git mv research/cassi research/archived/cassi_2026-07` ·
-  `foundation/` skeleton + fresh venv + Makefile + first test · CLAUDE.md rewrite ·
-  memory updated
+- [x] **I0 — Restructure (F0)** ✅ 2026-07-22: plan docs committed (8aef0ee) ·
+  79G data artifacts → `research/data_shared/` · run-1 reports + paid-measurement
+  records (dataset_manifest.csv, RM-P heldout, trivial baselines) →
+  `research/reports_run1/` · cassi archived → `research/archived/cassi_2026-07` ·
+  `foundation/` skeleton + configs/foundation.yaml + common.py + venv
+  (python3.12 via /mnt/src, get-pip bootstrap — system 3.10 lacks ensurepip) ·
+  Makefile `make venv`/`make test` · 5 skeleton tests green · CLAUDE.md rewritten
 - [ ] **I1 — Data (F1):** sampling scripts (300 train / 200 dev, stratified, seeded) ·
   SHA256 manifest + overlap check · retrieval wrapper (rescued index; BM25 fallback) ·
   tests

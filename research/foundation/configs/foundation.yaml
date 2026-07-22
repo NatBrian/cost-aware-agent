@@ -1,0 +1,84 @@
+# foundation.yaml — SINGLE source of truth for every constant in the foundation
+# run. No constant may be hard-coded elsewhere; modules load this file.
+# Plan: research/paper_plan_v2_1_foundation.md  ·  Tasks: research/foundation_tasks/
+# Values marked PROVISIONAL are frozen only after the F2 pilot memo is approved.
+
+seed: 42
+
+data:
+  train_size: 300
+  dev_size: 200
+  sampling_seed: 42
+  stratify_field: level            # HotpotQA official easy/medium/hard
+  data_dir: ../data_shared         # rescued from cassi at F0 (gitignored)
+  out_dir: data                    # foundation/data/ (gitignored)
+  train_file: data/hotpotqa_train_300.jsonl
+  dev_file: data/hotpotqa_dev_200.jsonl
+  manifest_file: data/manifest.json
+  source_train: ../data_shared/hotpotqa_train.decontaminated.jsonl
+  source_dev: ../data_shared/hotpotqa_dev.jsonl
+
+retrieval:
+  index_dir: ../data_shared/searchr1_index
+  backend: e5                      # falls back to bm25 if index unusable (F1)
+  top_k: 3
+  endpoint: http://127.0.0.1:8001  # local retrieval server (scripts/serve_retrieval.sh)
+
+episode:
+  t_max: 10                        # hard cap, all arms
+  budgets: {small: 3, medium: 6, large: 10}   # PROVISIONAL until pilot memo
+  draft_retry: 1                   # malformed draft line -> 1 retry -> EMPTY_DRAFT
+
+economy:
+  lambda: 0.5                      # PROVISIONAL headline; spot-check 0.1
+  lambda_spot: 0.1
+  # U = F1 - lambda * (steps_used / B)
+
+executor:
+  model: Qwen/Qwen3.5-9B
+  enable_thinking: false
+  endpoint: http://127.0.0.1:8000/v1   # vLLM OpenAI-compatible (scripts/serve_executor.sh)
+  eval_temperature: 0.0
+  rollout_temperature: 1.0
+  max_tokens_per_step: 512
+
+judge:                             # the prompted reward model (Qwen3.6-27B)
+  model: PLACEHOLDER-Qwen3.6-27B   # fill exact served name before F3 calibration
+  endpoint: PLACEHOLDER            # e.g. http://host:port/v1 — Brian provides
+  temperature: 0.0
+  max_tokens: 512
+  batch_size: 16
+  parse_retries: 1                 # then neutral score 0.5, failure logged
+  cache_dir: cache/judge           # keyed (rubric_version, input_hash)
+
+rubric:
+  version: rubric_v1
+  step_bits: {new_info: 0.4, not_redundant: 0.3, was_needed: 0.3}
+  answer_bits: {supported: 0.5, nothing_left: 0.5}
+  alpha: 0.2                       # r_t = alpha * (score - 0.5)
+  calibration: {n_steps: 50, per_bit_gate: 0.80, per_bit_floor: 0.70}
+
+reward:
+  format_weight: 0.1
+  # R_final = F1(answer, gold) - lambda * (steps_used / B) + format_weight * format_ok
+
+grpo:
+  group_size: 8
+  lr: 5.0e-6
+  kl_beta: 0.04
+  clip_eps: 0.2
+  length_norm: dr_grpo             # mandatory hygiene (plan §4)
+  advantage: step_returns_to_go    # group-normalized per step
+  min_cohort: 3                    # fewer alive at step t -> trajectory baseline
+  epochs: 3                        # tune from micro-run
+  algorithm: grpo                  # PPO = pre-agreed collapse fallback only (F5)
+
+pilot:
+  n_tasks: 50
+  rollouts_per_task: 4
+  mode: forced_continuation
+
+tracking:
+  wandb_project: cassi-foundation
+  results_dir: ../../experiments/results/foundation
+  reports_dir: ../../experiments/reports
