@@ -20,7 +20,9 @@ BEST ANSWER SO FAR: your current best one-line answer, or EMPTY_DRAFT if none ye
 Rules:
 - search[...] runs one search; you will see the top results next turn.
 - answer[...] submits your final answer and ends the task.
-- The BEST ANSWER SO FAR line is mandatory every turn.{budget_rules}"""
+- The BEST ANSWER SO FAR line is mandatory every turn. Always write your current
+  best guess there — even an uncertain one — as soon as any candidate exists;
+  use EMPTY_DRAFT only when you have no candidate at all.{budget_rules}"""
 
 BUDGET_RULES = """
 - You have a budget of {B} steps for this task. Each search and the final answer each cost one step."""

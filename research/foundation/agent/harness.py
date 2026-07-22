@@ -72,7 +72,7 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
             parsed = parse_step(raw)
         if parsed is None:
             parsed = {"action_type": "malformed", "content": "",
-                      "draft": last_draft}
+                      "draft": last_draft, "raw_excerpt": raw[:300]}
         messages.append({"role": "assistant", "content": raw})
         draft = parsed["draft"]
         if draft == EMPTY_DRAFT and last_draft != EMPTY_DRAFT:
@@ -84,6 +84,8 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
                 "draft": draft,
                 "draft_f1_vs_gold": f1(_final_from(draft), spec.golds),
                 "raw_len": len(raw)}
+        if "raw_excerpt" in parsed:
+            step["raw_excerpt"] = parsed["raw_excerpt"]
 
         if parsed["action_type"] == "answer":
             if spec.mode == "forced_continuation":
