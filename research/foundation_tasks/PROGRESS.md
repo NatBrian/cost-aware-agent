@@ -29,11 +29,12 @@
   per-(task,group) wallet draw · 27 CPU tests green (commit 4bb6458).
   **Pending:** live 2-GPU smoke (20-task batch per mode) — scheduled as the
   pre-pilot checkpoint alongside retrieval-server first start
-- [ ] **I3 — Reward (F3):** rubric_v1 (bits, weights, anchored defs + worked examples) ·
-  judge client (placeholder endpoint, batching, retry, neutral-on-parse-fail) ·
-  cache keyed (rubric_version, input hash) · call logging · reward calc
-  (r_t, R_final) · calibration labeling sheet + agreement/confusion calculator ·
-  tests (mocked judge)
+- [x] **I3 — Reward (F3)** ✅ 2026-07-22: rubric_v1 prompts (anchored bits +
+  worked examples, gold-free — tested) · judge client (parse retry → neutral 0.5
+  logged; disk cache; call/token stats; placeholder endpoint refused w/ hint) ·
+  rewards (8-level table, malformed=worst, terminal economy, returns-to-go —
+  plan worked example reproduced) · calibration sheet + agreement gate
+  (mean≥.80, floor .70) · 36 tests green (commit b48ff3c)
 - [ ] **I4 — Metrics/eval (F4+F6):** shared `eval/metrics.py` (F1/EM/steps/U/
   self-stop) · arm runners a0/a1/a2/a3 · bootstrap CIs + per-task pairing ·
   sanity checks (row counts, U recompute, byte-reproduction) · `gate_check.py` ·

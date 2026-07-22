@@ -78,6 +78,12 @@ pilot:
   rollouts_per_task: 4
   mode: forced_continuation
 
+gate:                              # pre-registered GO/NO-GO (plan §6) — frozen
+  budget: medium                   # gate evaluated at this wallet
+  min_self_stop: 0.70              # A3 harness-off self-termination rate
+  f1_margin: 0.05                  # A3 F1 >= A2 F1 - margin
+  bootstrap_resamples: 10000
+
 tracking:
   wandb_project: cassi-foundation
   results_dir: ../../experiments/results/foundation
