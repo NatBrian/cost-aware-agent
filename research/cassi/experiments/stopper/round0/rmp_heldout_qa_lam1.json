@@ -1,0 +1,26 @@
+{
+  "metrics": {
+    "lam": 1.0,
+    "n_trajectories": 150,
+    "n_steps": 1500,
+    "mean_regret": 5.604573339949253,
+    "median_regret": 1.2763090054995416,
+    "max_regret": 40.358615948670945,
+    "mean_tau_stopper": 6.433333333333334,
+    "mean_tau_star": 2.7866666666666666,
+    "f1_stop": 0.5213094502779494,
+    "precision_stop": 0.9075268817204301,
+    "recall_stop": 0.36568457538994803,
+    "accuracy": 0.48333333333333334
+  },
+  "rmp_meta": {
+    "model": "Qwen3.6-35B-A3B",
+    "n_trajectories": 150,
+    "judge_calls": 1500,
+    "parse_failures": 33,
+    "tokens_in": 649733,
+    "tokens_out": 164238,
+    "est_dollars": 0.7512,
+    "operating_point": "theta_p=0.5 (delta = 2*continue_score - 1)"
+  }
+}

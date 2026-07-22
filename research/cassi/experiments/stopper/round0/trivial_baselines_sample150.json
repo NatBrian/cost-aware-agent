@@ -1,0 +1,18 @@
+{
+  "majority_class": {
+    "mean_regret": -0.017,
+    "median_regret": -0.099,
+    "mean_tau_stopper": 1.0,
+    "mean_tau_star": 2.787,
+    "f1_stop": 0.87,
+    "accuracy": 0.769
+  },
+  "draft_stability_k1": {
+    "mean_regret": 1.131,
+    "median_regret": 0.199,
+    "mean_tau_stopper": 4.007,
+    "mean_tau_star": 2.787,
+    "f1_stop": 0.728,
+    "accuracy": 0.649
+  }
+}

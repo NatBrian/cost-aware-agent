@@ -1,9 +1,12 @@
 # CASSI Implementation — Handoff for the Next Agent
 
-**Written 2026-07-16, updated same day after the execution session.** The spec is
-`research/paper_plan_v2.md` (source of truth; §16 is the runbook). This document tells you
-what is already built/executed, what is pending, and the exact next commands. Read
-`research/paper_plan_v2.md` §0, §2, §12, §16, §17 before touching anything.
+**Written 2026-07-16, updated same day after the execution session; updated 2026-07-21 for
+plan v2.1.** The spec is **`research/paper_plan_v2_1.md`** (source of truth — an ADDITIVE
+revision of paper_plan_v2.md; every change tagged [v2.1], §20 is the changelog; §16 is the
+runbook). This document tells you what is already built/executed, what is pending, and the
+exact next commands. Read `research/paper_plan_v2_1.md` §0, §2, §12, §16, §17, §20 before
+touching anything. Design context for v2.1 (the two-reward-model agreement):
+`research/architecture_comparison.md`.
 
 **Per user instruction: never read anything under `research/archived/`** (stale AI outputs; that single directory is the whole ban).
 
@@ -11,8 +14,19 @@ what is already built/executed, what is pending, and the exact next commands. Re
 
 ## 1. Current state, in one paragraph
 
-ALL code is written and verified (115 CPU tests pass in ~17 s in the venv: `python -m pytest tests/ -q`
-from this dir), **both** former wiring gaps are CLOSED, and phases **P0 and P1 are executed**:
+**Updated 2026-07-22 after the first real experiment run — read §1b for the full session
+log.** Executed and DONE on this clone: P0 smoke (PASS), P2 pilot (wallet calibration
+FROZEN in cassi.yaml) + full QA collection round 0 (9,600 forced-continuation
+trajectories), P3 labels (96K steps × 5 λ, all QC passed, λ-dial monotone 5.0→1.0),
+and the RM-P prompted-judge held-out evaluation (B10 preview — prompted 35B LOSES badly
+at the neutral operating point). P4 stopper SFT was started but **KILLED BY USER ~7h in,
+before the first checkpoint** — no trained stopper exists yet; that is the resume point.
+Plain-language results: `experiments/reports/`. The paragraph below describes the
+original 2026-07-16 code+staging state and remains accurate.
+
+ALL code is written and verified (125 CPU tests pass in the venv: `python -m pytest tests/ -q`
+from this dir — count raised from 115 on 2026-07-21 by the v2.1 B10 module's 10 tests),
+**both** former wiring gaps are CLOSED, and phases **P0 and P1 are executed**:
 the §19 stack is cloned+pinned (hashes in `configs/cassi.yaml pins:`) into a dedicated venv
 (`.venv` — auto-activated by `scripts/common.sh`), all datasets are downloaded/decontaminated/
 manifested, the wiki-18 retrieval corpus + assembled 64GB E5 index sit in
@@ -22,6 +36,66 @@ pinned verl commit. Core math is validated on synthetic data (hand-computable τ
 λ-monotonicity; PBRS telescoping; B9≡CASSI when V̂≡V*). **No model is trained and no
 experiment has run — every GPU step is still pending** (the machine's GPUs are fully held by
 another user's training job; the user has said GPUs cannot be used for now).
+
+## 1b. SESSION LOG 2026-07-21→22 — what was done, exact current state, what next
+
+### Done, in order (each with its artifact)
+
+| # | What | Result / artifact |
+|---|---|---|
+| 1 | Plan v2.1 + B10 module + config + 10 tests (see §1 note) | `paper_plan_v2_1.md` (§20 changelog), `baselines/b10_prompted_rm.py` |
+| 2 | Full staging on THIS clone (see MACHINE NOTE in §3) | datasets, 61GB index, weights, GPU venv |
+| 3 | **P0 smoke: PASS** — 1 rollout, 10 steps, $0.0098, drafts + costs verified | `experiments/smoke/qa.jsonl`, report 00 |
+| 4 | **P2 pilot: DONE** — 200 unconstrained tasks; wallets FROZEN in cassi.yaml (qa: small 0.00182 / med 0.00988 / large 0.04043; median 0.00349). NEVER recalibrate | report 00 |
+| 5 | **P2 collection round 0: DONE** — 1,200 tasks × G=8 = 9,600 forced-continuation trajectories, balanced wallets (382/417/401), $143.08 total, 46% forced-continuation overhead (feeds T4), 68% self-answered somewhere | `experiments/collect/round0/qa.jsonl` (merged from 8 parallel shard collectors, seeds 44–51 — SHARDED, so wallet draws differ from a single-seed run; shard files kept), report 01 |
+| 6 | **P3 labels: DONE, all QC passed** — 96K steps × λ∈{0.1,0.5,1,2,5} × two economies. λ-dial mean τ*: 5.0/3.4/2.8/1.1/1.0 (tier-scaled; plain-λ A8 arm also built). QC: 0/38,400 monotonicity violations; noise |dτ*|=0.036; prophet-argmax stops **+0.41 steps later** (foresight bias CONFIRMED — E4 evidence). Caveat: EM/F1 alias noise ("DEA" vs "Drug Enforcement Administration" → 0.0) | `experiments/labels/round0/`, memo + `qa_review_20.jsonl` (manual review TODO still open), report 02 |
+| 7 | **RM-P (prompted 35B judge) held-out eval: DONE** — B10 preview on the SAME split/metric as the P4 gate, 150 held-out trajectories, λ=1, θ_p=0.5: mean regret **5.60**, stops at step **6.43** vs optimal 2.79 (≈4 steps too late), STOP F1 0.52 (precision 0.91 / recall 0.37 — conservative+miscalibrated, not pure noise), 2.2% parse failures, $0.75 total. Same-sample trivial baselines: majority-class regret ≈ **−0.02** (λ=1 makes always-stop-at-1 near-optimal — single-λ slice only; the REAL gate pools all λ where always-stop dies), draft-stability probe regret 1.13 | `experiments/stopper/round0/rmp_heldout_qa_lam1.json`, `trivial_baselines_sample150.json`, `scripts/eval_rmp_heldout.py` |
+| 8 | **P4 stopper SFT: STARTED, then KILLED BY USER** (2026-07-22 ~17:10) ~7h in, BEFORE the first checkpoint — **no stopper .pt exists**. Root causes of slowness: no nvcc ⇒ GDN fast kernels unavailable ⇒ torch fallback; seq 2048 × batch 64 × 480K examples | fix landed along the way: `stopper/model.py` reads width from `get_input_embeddings().embedding_dim` (Qwen3.5 config nests hidden_size under text_config) |
+
+### Exact machine state at handoff
+
+- **GPU hold ACTIVE**: locks on 6,7 (`/tmp/gpu_lock_{6,7}`, holder pid in
+  `/tmp/cassi_gpu_hold.pid` — verify with `scripts/gpu_hold.sh status`; locks are
+  COOPERATIVE only, user `yongyue` ignores them and cycles TP servers across all 8 cards;
+  wait for several-minute-stable free windows, never race their loads).
+- **torch retrieval server UP** on GPU 6 port 8000 (`scripts/torch_retrieval_server.py` —
+  custom, because CPU faiss = 35 s/query and pip faiss-gpu has no L20X kernels; 46 ms/query,
+  imports the pinned Search-R1 encoder unmodified). Client MUST send `return_scores: true`
+  (upstream unpack bug, fixed on our side in `executor/envs/searchr1_qa.py`).
+- **executor vLLM server DOWN** (was killed externally). Known-good relaunch:
+  `CUDA_VISIBLE_DEVICES=<card> VLLM_USE_FLASHINFER_SAMPLER=0 .venv/bin/python -m
+  vllm.entrypoints.openai.api_server --model Qwen/Qwen3.5-9B --port 8901
+  --gpu-memory-utilization 0.85 --gdn-prefill-backend triton` (both flags REQUIRED — no
+  nvcc on this box; port 8001 is squatted by a foreign 404 service).
+- Shell footgun that bit 3×: `pkill -f <pattern>` matches YOUR OWN wrapper shell if the
+  pattern's text appears anywhere in your compound command — run pkill alone, bracket-trick
+  the pattern, and never put the relaunch in the same command.
+
+### WHAT NEXT (ordered; user must green-light training restarts — they said "stop our training")
+
+1. **Retrain the stopper FAST, then the P4 gate.** Before rerunning
+   `scripts/p4_stopper.sh 0`, cut the wall-clock ~10×: `--max-seq 512` (serialized states
+   are ~400 tokens; check train_sft CLI, else edit §17 `stopper.sft.max_seq`), raise batch
+   to fit, and consider subsampling train examples (~150K of 480K). Expected ~1–2 h on one
+   L20X. The gate then auto-runs `p4_gate.py` (pooled multi-λ — the fair test vs
+   majority-class; see #7's single-λ caveat before interpreting).
+2. **Write report 03** (`experiments/reports/03_stopper.md`): the four-way table —
+   trained 2B vs prompted 35B (#7) vs majority vs probe, same held-out exam. Template
+   expectations and caveats are all in #7's row.
+3. **P5 kill-switches K1/K2** (`scripts/p5_killswitch.sh`, §12): needs the trained stopper,
+   the vLLM server back up, ~4 GPUs for GRPO (verl), and **K2's `--arm single_multitask`
+   is still a NotImplementedError stub — implement BEFORE P5** (§6). K1 GO/NO-GO decides
+   the paper; log to `GO_NO_GO.log` (not yet created).
+4. Then per §3 queue: P6–P9, B10's two proper arms at P8 (frontier θ_p sweep — #7 was one
+   operating point only), ALFWorld track (needs verl-agent env + its own pilot), GAIA
+   (gated, needs HF login).
+
+### Review pointers (for a reviewing agent)
+
+Plain-language reports: `experiments/reports/README.md` → 00/01/02. Senior-facing summary:
+`research/progress_report_2026-07-22.md`. Raw artifacts: paths in the table above. Logs:
+scratchpad `smoke_pilot3.log`, `p4b.log`; server logs `experiments/logs/`. Every §16
+done-criterion met so far is checkable from those files.
 
 ## 2. What is implemented (module map + test coverage)
 
@@ -34,7 +108,7 @@ another user's training job; the user has said GPUs cannot be used for now).
 | `stopper/features.py` | §18.1 serialization (λ-conditioning) + numeric vector for the label regressor | `tests/test_core.py` |
 | `stopper/dataset.py`, `model.py`, `train_sft.py`, `eval_regret.py` | SFT examples (pooled λ, split-by-task), 3-head model (Alg. 2), custom training loop (early-stop on held-out REGRET), regret eval + P4 gate baselines | `tests/test_stopper_cpu.py` (15) |
 | `executor/react_agent.py`, `collect.py`, `monitor.py`, `shaping.py`, `train_grpo.py`, `envs/`, `vllm_client.py` | Shared scaffold (both §2.1 rollout modes), forced-continuation collection + wallets per (task, group), Alg. 4 monitor (fixed Δ̂≤0 + A8 mode + internalization tracking), PBRS + step-level RTG advantages + min-cohort guard, verl config builder + adapter | `tests/test_executor_cpu.py` (29 incl. verl dry-run), `tests/test_integration.py` (2), `tests/test_run_frontier_cpu.py` (4) |
-| `baselines/` (b1–b9 + oracle) | One module per §5.2 row with registry, cost knobs, reward logic | `tests/test_baselines_cpu.py` (26) |
+| `baselines/` (b1–b10 + oracle) | One module per §5.2 row with registry, cost knobs, reward logic. **[v2.1] b10_prompted_rm** = "RM-P" prompted-judge baseline (CoT + designed binary rubric on the §18.1 serialization; continue-score = Δ̂ analog for the monitor arm, state-value = V̂ analog reusing `executor.shaping` for the rl arm; fail-open parsing; θ_p dev calibration; billing via the shared price map; `VLLMJudgeAdapter` for the lab 30B server). Config keys `prompted_rm` + `rl_algo_pilot` added to cassi.yaml; p8_baselines.sh runs the b10 monitor arm with the inference-only set | `tests/test_baselines_cpu.py` (36) |
 | `eval/metrics.py`, `stats.py`, `overhead.py` | Frontier protocol + interpolation, regret, matched-risk, §5.6 stats (small-n guard ENFORCED), T4 ledger + serving regimes + billing symmetry (enforced) | `tests/test_eval_cpu.py` (20) |
 | `analysis/` + `Makefile` | One script per F1–F6/T1–T5, CSV→PDF/tex, CVD-safe | `make figures tables` (skips gracefully pre-P9) |
 | `scripts/` | P0–P9 runners; `p5_killswitch.sh` writes `GO_NO_GO.log`; GPU acquire/release with EXIT traps | shellcheck-style review; python drivers tested |
@@ -45,6 +119,31 @@ another user's training job; the user has said GPUs cannot be used for now).
 Everything below needs GPUs and/or network downloads. **GPU protocol for this machine
 (CLAUDE.md):** `eval $(/mnt/src/zhanka/gpu_acquire.sh N)` before, `/mnt/src/zhanka/gpu_release.sh`
 after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier processes.
+**HOLD MODE (user policy 2026-07-21): keep GPUs held BETWEEN phases** —
+`scripts/gpu_hold.sh start N` acquires once (via the sanctioned acquire script — flock'd,
+skips others' locks/busy cards, never preempts) and a zero-footprint holder process keeps
+the locks valid; every phase script then REUSES the held cards automatically (common.sh
+detects the hold and skips its acquire + EXIT-trap release). `gpu_hold.sh status|stop`;
+stop releases ONLY the held ids (NEVER the bare user-wide gpu_release.sh — the OS account
+is shared with another person whose locks that would also drop). If a phase needs more
+GPUs than the hold has, it exits with a clear pending message (stop + re-start with more;
+never mix hold + extra per-phase acquires). A read-only availability watcher may already
+be running in the user's session; on its notification: `scripts/gpu_hold.sh start 2` →
+`scripts/smoke_and_pilot.sh`.
+
+**MACHINE NOTE (2026-07-21): full staging was REDONE on the `/home/liangsheng/brian` clone**
+(the original 2026-07-16 staging lives in a root-owned clone this account cannot read).
+Now present here: GPU venv (pinned stack + verl deps incl. ray/tensordict/numpy<2 +
+faiss-gpu), datasets (staged/decontaminated/manifested; GAIA still gated-pending),
+assembled `data/searchr1_index/` (e5_Flat.index 61GB + wiki-18.jsonl 14GB), Qwen3.5-9B +
+intfloat/e5-base-v2 in the HF cache. **Serving gotchas fixed live:** this box has NO CUDA
+toolkit (no nvcc) → every flashinfer JIT path crashes vLLM: launch with
+`VLLM_USE_FLASHINFER_SAMPLER=0` and `--gdn-prefill-backend triton` (both baked into
+smoke_and_pilot.sh); executor port is 8901 (8001 is squatted by a foreign 404 service);
+`--disable-log-requests` no longer exists in vLLM 0.19. **GPU contention:** user `yongyue`
+cycles TP4 vLLM servers across ALL 8 GPUs ignoring the zhanka locks — do not launch onto a
+card that just freed (their next cycle may land on it mid-load; happened twice); wait for a
+several-minute-stable free window, and prefer human coordination for a fixed card split.
 
 1. ~~P0 — installs~~ **DONE** (2026-07-16) except the GPU smoke rollout. Stack pinned; venv
    ready. NOTE: verl-agent and verl both claim the `verl` package name — the venv resolves to
@@ -94,6 +193,16 @@ after; N=2 for collection/stopper SFT, N=4–8 for GRPO. Never kill occupier pro
    full eval incl. 500-task regret replays, 3 seeds on headline points). **Before P8:**
    read `research/lit_review/` for the baseline papers' actual mechanisms (B4/B5/B8
    "align to the official repo" decisions cannot be made from these docs alone).
+   **[v2.1] B10 "RM-P" prompted-judge baseline (two arms, §5.2/§20):**
+   (a) *monitor arm* runs with the P8 inference-only set — prerequisite: fill
+   `prompted_rm.base_url` in cassi.yaml with the lab vLLM Qwen3.5-30B endpoint (the
+   senior's server; frozen, never trained) and calibrate θ_p on dev via
+   `b10_prompted_rm.calibrate_threshold` (write it into `prompted_rm.arms.monitor.threshold`);
+   (b) *rl arm* — executor GRPO with the judge's state-value as Φ (same shaping machinery,
+   only the potential source differs) — ONLY after a logged K1 GO, 1 seed, qa domain,
+   1 frontier point; log the judge-score-vs-true-reward divergence (the F6 analog).
+   The same 30B server is also the E2 stopper-as-monitor frozen agent and the optional
+   P3 review pre-screener (v2_1 §19) — one deployment, three inference-only roles.
 8. **P10–P11**: `make figures tables`, then write the paper into `paper/sections/`
    (writing order and claims-audit rule: §16 P11; every §14-dead-claim is banned).
 
@@ -240,10 +349,12 @@ OS-Pruner); if K1 passes, consider the workshop-preprint hedge (§8).
 
 ```bash
 cd research/cassi && source .venv/bin/activate
-python -m pytest tests/ -q       # expect: 115 passed IN THE VENV ("114 passed, 1 skipped"
+python -m pytest tests/ -q       # expect: 125 passed IN THE VENV ("124 passed, 1 skipped"
                                  # = wrong env: outside the venv, verl is missing and the
-                                 # dry-run test skips). Update this count (and PROJECT_GUIDE
-                                 # §7's) in the same commit whenever new tests land.
+                                 # dry-run test skips). Count history: 115 → 125 on
+                                 # 2026-07-21 (v2.1 B10 tests). Update this count (and
+                                 # PROJECT_GUIDE §7's) in the same commit whenever new
+                                 # tests land.
 python -m cassi.executor.train_grpo --dry-run \
     --config configs/cassi.yaml --domain qa                   # expect: "[dry-run] OK"
 (cd paper && make)                                            # expect: main.pdf builds

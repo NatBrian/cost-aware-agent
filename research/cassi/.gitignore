@@ -9,12 +9,21 @@ third_party/
 data/
 
 # Experiment outputs (trajectories, checkpoints, wandb runs, logs) are NOT committed —
-# EXCEPT the results CSVs that figures/tables regenerate from (§16 P9 done-criterion).
+# EXCEPT the results CSVs that figures/tables regenerate from (§16 P9 done-criterion),
+# the plain-language experiment reports (user deliverable, 2026-07-22), and small
+# result-summary JSONs (they are the only record of paid measurements).
 experiments/*
 !experiments/results/
 experiments/results/*
 !experiments/results/*.csv
 !experiments/results/.gitkeep
+!experiments/reports/
+!experiments/reports/*.md
+!experiments/stopper/
+experiments/stopper/*
+!experiments/stopper/round0/
+experiments/stopper/round0/*
+!experiments/stopper/round0/*.json
 
 wandb/
 
