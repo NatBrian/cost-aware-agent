@@ -57,9 +57,11 @@
 - [x] E-a ✅ 2026-07-22: 200-episode pilot; knee at step 3; overthinking in
   24/200; budgets {2,4,8} + λ=0.3 FROZEN from data (memo:
   foundation/experiments/reports/pilot_memo.md; auto-approved under mandate)
-- [ ] E-b (in progress): judge wired (gemma-4-31B-it) + live rubric sanity
-  passed; 50-step sheet generated; labeling next (author-labels under
-  mandate; sheet kept for Brian's independent relabel)
+- [x] E-b ✅ 2026-07-22: calibration gate PASSED (mean .848; all bits ≥.70;
+  was_needed 1.0). Label-review round documented (4 author-label fixes, 4
+  judge attention-misses kept+logged). Judge biases for divergence read:
+  lenient-on-redundancy, late-step supported noise
+  (report: calibration_report.md)
 - [x] E-c ✅ 2026-07-22 (**dev-200 look #1 of 3**): 1400 episodes. A1 beats A2
   everywhere (paired); A2 B=2 ceiling confirmed (F1 .221 vs .478); A1
   budget-adapts ~1 step. RL bar at B=4: U>.205, F1≥.361, self-stop≥.70
