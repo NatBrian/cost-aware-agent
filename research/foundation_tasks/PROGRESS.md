@@ -35,19 +35,22 @@
   rewards (8-level table, malformed=worst, terminal economy, returns-to-go —
   plan worked example reproduced) · calibration sheet + agreement gate
   (mean≥.80, floor .70) · 36 tests green (commit b48ff3c)
-- [ ] **I4 — Metrics/eval (F4+F6):** shared `eval/metrics.py` (F1/EM/steps/U/
-  self-stop) · arm runners a0/a1/a2/a3 · bootstrap CIs + per-task pairing ·
-  sanity checks (row counts, U recompute, byte-reproduction) · `gate_check.py` ·
-  tests (synthetic CSVs)
-- [ ] **I5 — Training (F5):** verl GRPO launcher + config · step-reward injection ·
-  per-step returns-to-go + group norm + min-cohort guard · Dr. GRPO hygiene ·
-  KL β=0.04 · `--dry-run` (CPU, mocked judge) · wandb dashboard incl.
-  judge-vs-F1 divergence · tests
-- [ ] **I6 — Analysis (F7):** figure scripts (mini-frontier, internalization 3-panel,
-  hacking curve) · report generator → `experiments/reports/` · adapted PPTAgent
-  six-dim diagnostic (offline) · make targets · tests
-- [ ] **I7 — Readiness:** full pytest green · README · experiment-start checklist
-  (GPU ritual, judge URL slot, ordered run commands) → **READY-TO-EXPERIMENT**
+- [x] **I4 — Metrics/eval (F4+F6)** ✅ 2026-07-22: `eval/metrics.py` (one scorer
+  path, bootstrap CIs, per-task paired deltas, row-count + stale-utility guards) ·
+  `eval/gate_check.py` (plan §6 itemized, thresholds in config `gate:`) ·
+  `eval/build_rows.py` + `scripts/f4_baselines.sh` · 43 tests (commit 8395c82)
+- [x] **I5 — Training (F5)** ✅ 2026-07-22 (CPU side): `train/advantages.py`
+  (min-cohort guard tested incl. lone-survivor) · `train/reward_adapter.py`
+  (+DivergenceLog = Fig-3 hacking curve) · `train/grpo_runner.py --dry-run`
+  green (24 eps, nonzero advantages). **Pending:** verl glue in `_run_real`,
+  wired + verified at the E-d micro-run against pinned verl (commit babfc2b)
+- [x] **I6 — Analysis (F7)** ✅ 2026-07-22: 3 figure scripts (dataviz-validated
+  entity-fixed palette, ALL PASS) · report generator (numbers auto-filled,
+  prose TODOs) · adapted PPTAgent diagnostic (offline) · 52 tests (commit f915d73)
+- [x] **I7 — Readiness** ✅ 2026-07-22: EXPERIMENT_CHECKLIST.md (ordered E-a…E-g
+  w/ gates + Brian's 3 inputs) · make test/dry-run/data targets · 52 tests green,
+  dry-run green → **CODE-COMPLETE; READY TO START EXPERIMENTS** (pre-flight GPU
+  smoke is checklist step 1)
 
 ## Experiment sequence (after I7 — each gated per the F-docs)
 

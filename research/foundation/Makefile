@@ -11,3 +11,11 @@ test:
 	$(PY) -m pytest tests/ -q
 
 .PHONY: venv test
+
+dry-run:
+	$(PY) -m train.grpo_runner --dry-run
+
+data:
+	$(PY) scripts/f1_data.py
+
+.PHONY: dry-run data
