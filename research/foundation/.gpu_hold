@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=6  # + lock 7 reserved (occupied); zhanka pool 0-3 full
