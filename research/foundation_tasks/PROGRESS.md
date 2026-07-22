@@ -14,9 +14,14 @@
   `foundation/` skeleton + configs/foundation.yaml + common.py + venv
   (python3.12 via /mnt/src, get-pip bootstrap — system 3.10 lacks ensurepip) ·
   Makefile `make venv`/`make test` · 5 skeleton tests green · CLAUDE.md rewritten
-- [ ] **I1 — Data (F1):** sampling scripts (300 train / 200 dev, stratified, seeded) ·
-  SHA256 manifest + overlap check · retrieval wrapper (rescued index; BM25 fallback) ·
-  tests
+- [x] **I1 — Data (F1)** ✅ 2026-07-22: `collect/sampling.py` (stratified, seeded,
+  deterministic) + `scripts/f1_data.py` → frozen train-300 (194 med/55 easy/51 hard)
+  + dev-200 + SHA256 manifest; rerun verified byte-identical; overlap check passes ·
+  `envs/retrieval_client.py` + `scripts/serve_retrieval.py` (E5+FAISS over rescued
+  64G index — dims verified 768/21M rows; live check deferred to I2 GPU smoke) ·
+  14 tests green. **Finding logged:** HotpotQA dev split is 100% hard-level by
+  design → dev-200 is all-hard while train is mixed (matches F1 limitation #3;
+  report must mention it)
 - [ ] **I2 — Agent/harness/collection (F2):** `configs/foundation.yaml` ·
   prompts + budget tracker block · ReAct loop (vLLM executor client) · harness modes
   none/enforce/forced_continuation · collection script + JSONL schema validator +
