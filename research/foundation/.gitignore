@@ -1,6 +1,6 @@
 data/
 cache/
-.venv/
+.venv*/
 wandb/
 __pycache__/
 *.pyc

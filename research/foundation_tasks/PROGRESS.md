@@ -67,3 +67,11 @@
 ## Log
 
 - 2026-07-22: plan docs reviewed doc-by-doc with Brian; implementation started.
+- 2026-07-22 (E-phase): judge = gemma-4-31B-it at 122.11.227.227:6102 (docs said
+  Qwen 27B/35B — server reality wins); live rubric sanity PASSED (good search
+  1,1,1 vs redundant rephrase 0,0,0). Standing 2-GPU-hold rule active (watcher
+  polling; all 8 cards busy). **Corpus corruption found & repaired:** rescued
+  wiki-18.jsonl was a botched tar extraction (512-byte header fused to record 0,
+  padding tail) — caught by the retrieval server's ntotal==lines assertion;
+  streaming repair validated all 21,015,324 records (ids 0…21015323), atomic
+  swap, offsets rebuilt. GPU stack pinned (vllm 0.25.1/torch 2.11.0).
