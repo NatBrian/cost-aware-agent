@@ -1,12 +1,12 @@
-# Paper Plan v2 — CASSI: Internalizing Economic Judgment into LLM Agents via Cost-Aware Stopping Rewards
-
-> **⚠️ SUPERSEDED (2026-07-21): read `paper_plan_v2_1.md` instead.** v2.1 is an additive
-> revision of this document (nothing removed; adds baseline B10 prompted-vs-trained reward
-> model, E7, A10, terminology) — its §20 changelog lists every difference. Where they differ,
-> v2.1 wins.
+# Paper Plan v2.1 — CASSI: Internalizing Economic Judgment into LLM Agents via Cost-Aware Stopping Rewards
 
 > **Target venue:** ICLR 2027 (submission ~Sept 2026) — fallback NeurIPS 2027 / ICML 2027
-> **Status:** Post-independent-review rewrite (2026-07-16). Supersedes `paper_plan.md` (v5).
+> **Status:** v2.1 (2026-07-21) — ADDITIVE revision of v2 after the two-reward-model design
+> discussion (see `architecture_comparison.md`). Every v2→v2.1 change is tagged **[v2.1]**
+> inline and listed in the §20 changelog — NOTHING from v2 is removed; v2.1 adds the
+> prompted-vs-trained reward-model comparison (B10), the index-policy framing (E7), an
+> RL-algorithm pilot (A10), and reward-model terminology. Where v2 and v2.1 differ, v2.1 wins.
+> Base: post-independent-review rewrite (2026-07-16). Supersedes `paper_plan.md` (v5).
 > **Provenance:** grounded in a fresh 10-area literature review (~94 papers read at PDF level,
 > `research/lit_review/00_overview.md`) and 5 independent novelty audits
 > (`research/novelty_check/`, scores 4–5.5/10 for v5 → this rewrite targets the unanimously
@@ -226,6 +226,16 @@ MC-style labels at matched compute (§5, E4).
 
 ### 2.3 (B) The stopping-value model M_θ
 
+**[v2.1 — terminology, binding for all writing]** M_θ is this paper's **trained reward model
+(RM-T)** in the standard RLHF sense (InstructGPT 2203.02155: train an RM on data, then RL the
+policy against it). It is NOT an agent — it never acts, never calls tools, never generates
+trajectories; it reads a serialized state and outputs three numbers, and during executor RL its
+V̂ is served into verl's `rm_scores` tensor. The historical names "stopper"/"monitor" survive in
+code symbols (`cassi/stopper/`) and refer, respectively, to the model itself and to its
+*optional inference-time role* (§2.5). The prompted-judge alternative (frozen 30B, CoT + rubric)
+is **RM-P** and lives in the paper as baseline **B10** (§5.2) — the trained-vs-prompted
+reward-model question is answered empirically, not by argument. Never write "monitor agent."
+
 A small model (default Qwen3.5-2B; 0.8B/4B in ablations — same family as the executor to isolate
 the method; SoTA-verified 2026-07-16, §19) with **three heads** trained on
 (x_t → a*_t, Δ*_t, V*_t): cross-entropy on STOP/CONTINUE; MSE on the normalized margin Δ̂
@@ -428,11 +438,11 @@ Chen et al.; two AgentPRMs must be disambiguated; CARL 2512.04949 authorship unv
 |---|---|---|---|
 | Multi-hop QA + search | **Primary training** | NQ + HotpotQA + MuSiQue train splits (the Search-R1/OTC-PO corpus mix), Search-R1 retrieval env via verl-tool (local Wikipedia index; Qwen3.5-9B executor) | the exact training data of the 2026 Search-R1 successors (Search-R2, CoSearch, Search-E1) AND of OTC-PO — cost comparisons stay commensurable; cheap draft scoring (F1 vs gold ≈ free, §2.6) |
 | Embodied/web tasks | **Second training domain** | ALFWorld via verl-agent (GiGPO harness) | train split + 2026 RL precedent (Agent2 RL-Bench, RWML); its success *saturation* is a feature for us — differences become pure efficiency (report steps/cost at matched success) |
-| Web research | **OOD transfer eval only — split by role (tool-stack mismatch resolved)** | **Trained-executor transfer:** BrowseComp-Plus (830 Qs, fixed 100K-doc local corpus, ACL 2026 — local retrieval matches the training tool type) + Bamboogle (125) + 2WikiMultihopQA (500-dev). **Stopper-as-monitor transfer:** GAIA text-only 103-Q dev (validation used as test — disclosed; test set hidden), stopper monitoring a strong frozen live-web agent — exactly SupervisorAgent's setup, so the ICLR'26 comparison is direct; search-time-contamination caveat (2606.05241) reported. Trained-executor-on-GAIA-with-live-tools: exploratory appendix only (the executor never saw live-web tools in training — running it as headline would confound stopping transfer with tool-API shift) | no train splits (v5 error); each eval's tool stack now matches what the evaluated component saw |
+| Web research | **OOD transfer eval only — split by role (tool-stack mismatch resolved)** | **Trained-executor transfer:** BrowseComp-Plus (830 Qs, fixed 100K-doc local corpus, ACL 2026 — local retrieval matches the training tool type) + Bamboogle (125) + 2WikiMultihopQA (500-dev). **Stopper-as-monitor transfer:** GAIA text-only 103-Q dev (validation used as test — disclosed; test set hidden), stopper monitoring a strong frozen live-web agent (**[v2.1] default frozen agent: Qwen3.6-35B-A3B on the lab's existing vLLM server** + live-web scaffold — zero training cost) — exactly SupervisorAgent's setup, so the ICLR'26 comparison is direct; search-time-contamination caveat (2606.05241) reported. Trained-executor-on-GAIA-with-live-tools: exploratory appendix only (the executor never saw live-web tools in training — running it as headline would confound stopping transfer with tool-API shift) | no train splits (v5 error); each eval's tool stack now matches what the evaluated component saw |
 | Math | **Low-slack control** | MATH-500 **+ AIME 2025**, inference-time monitor only | MATH-500 kept for ALP/DAST/LASER comparability — but ALP shows savings *concentrate* there (it's the easy set); AIME 2025 is the genuine can't-compress control |
 | SWE | **Dropped from RL** (appendix at most: inference-time monitor on frozen 32B agent) | — | 7B SWE RL doesn't work (DeepSWE needed 32B+cluster); per-step quality = test-suite run per step; intermediate quality ≈ 0 degenerates τ* |
 
-### 5.2 Baselines (~9, each with its purpose; all IDs verified)
+### 5.2 Baselines (~10, each with its purpose; all IDs verified) **[v2.1: B10 added]**
 
 | # | Baseline | Type | Kills the question |
 |---|---|---|---|
@@ -445,6 +455,7 @@ Chen et al.; two AgentPRMs must be disambiguated; CARL 2512.04949 authorship unv
 | B7 | CaRT + cost (2510.08517) — **two arms: SFT-only and +GRPO** | trained self-termination | v5's primary comparison, retained; the SFT-only arm (imitate oracle-truncated trajectories, no RL) answers "is RL even needed, or does imitation suffice?" |
 | B8 | **AgentPRM-cost, honestly implemented** (pooled return-to-go + cost term; optionally TD+GAE per 2511.08325) | quality-PRM+cost | is the *stopping-value semantics* what matters vs generic value+cost |
 | B9 | **DASH-style direct shaping** (2607.00482 adapted: Snell labels → advantages directly, NO stopper — implemented with CASSI's exact step-level machinery, only the stopper deleted; trajectory-level shaping is provably inert (§2.4), so anything less would be a strawman) | ablation-as-baseline | **the pivotal test: does the stopper earn its existence** |
+| B10 | **[v2.1] Prompted reward model "RM-P"**: frozen Qwen3.6-35B-A3B (lab vLLM server), CoT then a **designed binary rubric** over inference-available features only (same §18.1 x_t serialization as M_θ — no GT, no executor confidence), rubric bits combined by documented designed weights. **Two arms:** (a) *monitor* — training-free inference-time stopping (stop when rubric score ≤ θ_p, calibrated on dev; billed per §5.3 billing symmetry); (b) *RL* — executor GRPO trained with RM-P rubric rewards in place of RM-T's V̂ (**post-K1 GO only**, 1 seed, primary domain, 1 frontier point) | prompted judge (RM-P) | **the trained-vs-prompted reward-model question, answered in our own tables.** Predicted outcome: RM-P loses — LLM step-redundancy judgment is ≤24.9% F1 (RedundancyBench 2605.29893) and frozen judges get hacked under RL (Gao 2210.10760; AgentPRM 82%→70%); binary rubric bits also cannot supply the continuous per-step differences r_t needs (§2.4). If RM-P wins, we learn it early and cheaply. Judge-score-vs-true-reward divergence logged for arm (b) — the F6 analog |
 | — | Oracle stopping (Snell τ* with GT) | upper bound | headroom |
 
 ### 5.3 Headline metrics
@@ -492,6 +503,7 @@ Chen et al.; two AgentPRMs must be disambiguated; CARL 2512.04949 authorship unv
 | E4 | Label study: Snell vs prophet-argmax vs TD/GAE vs MC-style labels — stopper accuracy + downstream executor result at matched label-compute (draft-token + forced-continuation costs included) | Contribution 3 |
 | E5 | ≥2 loop iterations **with the decisive control**: iteration 2 is run twice at matched compute — (a) frozen iteration-1 coach ("more RL steps" control) vs (b) refreshed coach; **the (b)−(a) delta IS the loop's contribution** (without it, iteration-2 gains are confounded with extra training) | loop honesty |
 | E6 | Difficulty-stopping correlation (2-hop vs 4-hop MuSiQue), demoted to consistency check (precedents: ALP; Wu r=0.57) | supports C1/C2, no novelty claim |
+| E7 | **[v2.1] Adaptive tool-call granularity analysis** — log-based, ZERO new runs: from existing E1/E2 traces, does the trained executor choose big/expensive vs small/cheap call patterns adaptively by difficulty and remaining wallet (vs baselines)? Framed via the greedy/index-policy view: Δ is a one-step index in the Weitzman ('79)/Russell–Wefald sense — classical roots cited, not claimed; lit check 2026-07-21 found no LLM-agent paper claims the index-policy framing | supports C1/C2 + theory framing, no new headline claim |
 
 ### 5.5 Ablations
 
@@ -506,7 +518,12 @@ training, plain λ labels, hand-written δ(tier) thresholds at inference) ·
 A9 **negative controls** (cheap, decisive): (i) random-coach — Δ̂/V̂ replaced by noise; if the
 executor still improves, gains were generic dense-reward regularization, not economics;
 (ii) shuffled-label coach — trained on permuted labels; isolates whether label *content*
-matters. Both on the primary domain, 1 seed.
+matters. Both on the primary domain, 1 seed. ·
+A10 **[v2.1] RL-algorithm pilot** (~100 tasks, before P6): GRPO vs PPO, 1 seed each, plumbing
+smoke test only — eliminates an algorithm that visibly collapses; GRPO stays the pre-registered
+default regardless of small score gaps (100 tasks cannot rank algorithms — differences at that
+scale are within seed noise; PPO/GRPO comparisons are ablation-grade, not contributions:
+2512.07611, 2504.11343). Reported one line in the appendix.
 
 ### 5.6 Statistical & reporting protocol (restored from v1 §26, adapted)
 
@@ -571,10 +588,15 @@ matters. Both on the primary domain, 1 seed.
   stopper via HF TRL v1.8 (SFTTrainer + scalar reward head — not the legacy value-head wrapper).
   Cost/consistency reporting follows the HAL harness conventions. Exact repos + rebuttal lines:
   §19 manifest. Hardware: the 8×H200 node.
-- One 9B multi-turn GRPO run ≈ 1–3 days on 8×H200 (agentic-RL survey estimates). Budget ≈ 30–35
-  training runs, tiered: CASSI (2 domains × [iter-1 + iter-2×2 arms]) + trained baselines B4–B9
-  (each with 2–3 frontier points, 1 seed except headline points) + training ablations (A2, A3,
+- One 9B multi-turn GRPO run ≈ 1–3 days on 8×H200 (agentic-RL survey estimates). Budget ≈ 30–36
+  training runs **[v2.1: was 30–35; +1 for the optional B10-RL arm, post-K1 only]**, tiered:
+  CASSI (2 domains × [iter-1 + iter-2×2 arms]) + trained baselines B4–B9
+  (each with 2–3 frontier points, 1 seed except headline points) + the B10-RL arm (1 run,
+  1 seed, primary domain) + training ablations (A2, A3,
   A6, A9's two controls) on the primary domain, 1 seed + 3 seeds on headline operating points.
+  B10's monitor arm and A10's 100-task pilot are near-zero cost (inference-only / tiny runs);
+  the 30B server work (B10 monitor, E2 frozen agent, P3 pre-screen) is vLLM inference, no
+  training GPUs.
   **Inference-only ablations (A1's controller part, A4, A5, A7, A8) reuse trained models at
   near-zero cost** — this tiering is what keeps the matrix inside budget.
   **Total ~10–12 weeks**, not v5's 8 (audit: v5 matrix was ~10× over budget).
@@ -612,7 +634,7 @@ runbook (§16). This section fixes WHAT the paper contains and where each piece 
 | 4 | Method (1.5) | Algorithms 1–3 (compact); potential-based bridge + policy-invariance statement; anti-hacking design; the measured loop. Fig. F2 |
 | 5 | Experimental setup (0.75) | domains (§5.1), baselines B1–B9 table (§5.2), metrics incl. regret & matched-risk (§5.3), protocol pointer (§5.6) |
 | 6 | Results (1.75) | T1–T2, F3–F5; per-iteration loop gains (E5); hypothesis verdicts H1–H6 stated explicitly, including any failures |
-| 7 | Analysis (0.75) | internalization deep-dive (monitor-off, self-stop rates); hacking diagnostics (F6); label study (E4); difficulty-consistency check (E6); qualitative stop examples |
+| 7 | Analysis (0.75) | internalization deep-dive (monitor-off, self-stop rates); hacking diagnostics (F6); label study (E4); difficulty-consistency check (E6); qualitative stop examples; **[v2.1]** trained-vs-prompted reward model (B10, incl. judge-hacking curve); tool-call granularity analysis (E7, index-policy framing) |
 | 8 | Limitations + Conclusion (0.5) | domains where per-step quality is expensive (SWE); serving-regime dependence of overhead; scooping-window honesty |
 
 **Figure inventory:** F1 pipeline (labels → stopper → shaped GRPO → loop) · F2 shaping intuition
@@ -772,6 +794,11 @@ near-oracle on easy strata, no degradation on the MATH-500 + AIME 2025 controls.
 - *"Overhead?"* — End-to-end dollars incl. running-draft tokens, forced-continuation collection,
   and stopper serving, per serving regime, vs zero-amortization baselines (§5.3). LearnStop
   protocol adopted.
+- **[v2.1]** *"Why train a reward model — why not prompt a strong LLM (rubric/RLAIF)?"* — B10
+  tests exactly this, both as monitor and as RL reward source. The design answer: binary/rubric
+  outputs cannot supply the continuous per-step differences r_t = V̂(next)−V̂(this) needs, the
+  economic bits of any rubric are the ≤24.9%-F1 judgments (RedundancyBench), and every reliable
+  bit is computable exactly for free from gold + logs. The empirical answer is in the B10 rows.
 
 ---
 
@@ -823,7 +850,9 @@ reported (feeds T4).
 **P3 — Label construction (W2).**
 Run Algorithm 1 per λ ∈ {0.1, 0.5, 1, 2, 5} with tier-scaled marginal costing (§2.2; plain-λ
 variant kept for ablation A8); fit tanh scale s per domain; label-quality checks:
-(a) manual review of 100 random trajectories (does τ* look right?), (b) label-noise sensitivity
+(a) manual review of 100 random trajectories (does τ* look right?) — **[v2.1]** the lab vLLM
+30B may pre-screen/flag trajectories to speed this review (convenience only, NEVER a label
+source), (b) label-noise sensitivity
 (re-run with step-subsampled draft scoring), (c) sanity: higher λ ⇒ earlier τ* everywhere.
 ✅ Done: labeled datasets per λ + a one-page label-quality memo.
 
@@ -866,12 +895,18 @@ monitor (reimplement its trigger heuristics on our envs). B4 OTC-GRPO (reward fr
 same env). B5 EAPO (primary; agentic-ALP only if EAPO unreproducible — §5.2). B6 single-model
 GRPO with cost-in-reward. B7 CaRT+cost — BOTH arms: SFT-only and +GRPO (§5.2). B8 AgentPRM-cost
 (pooled return-to-go + cost; optional TD+GAE variant). B9 Snell-labels-as-advantages direct
-shaping, no stopper (step-level machinery, §5.2). Budget: B4–B9 are training runs (~1–3 days
-each on 8×H200), each with 2–3 frontier points per §5.3; schedule accordingly.
+shaping, no stopper (step-level machinery, §5.2). **[v2.1] B10 RM-P prompted judge (§5.2):
+arm (a) monitor — CoT + designed-rubric prompt on the lab vLLM 30B, threshold calibrated on
+dev, billed under §5.3 billing symmetry; arm (b) RL — executor GRPO with RM-P rubric rewards,
+ONLY after K1 GO, 1 seed, primary domain, with the judge-score-vs-true-reward divergence
+logged.** Budget: B4–B9 (+B10-RL) are training runs (~1–3 days
+each on 8×H200), each with 2–3 frontier points per §5.3 (B10-RL: 1 point); schedule accordingly.
 ✅ Done: every baseline evaluated on the same frozen test sets with the same cost accounting.
 
 **P9 — Full evaluation + ablations (W9–10).**
-E1–E6 grids, A1–A9 ablations, transfer evals (executor swap; OOD sets by role §5.1), the
+E1–E6 grids **[v2.1: +E7 granularity analysis from existing traces — zero new runs]**,
+A1–A9 ablations **[v2.1: +A10 RL-algo pilot — runs BEFORE P6, ~100 tasks]**,
+transfer evals (executor swap; OOD sets by role §5.1), the
 500-task forced-continuation regret replays (dual-run protocol §5.3), 3 seeds on headline
 tables, statistics per §5.6, serving-regime overhead measurements (KV-fork vs re-prefill).
 ✅ Done: all numbers for T1–T5 and F3–F6 exist in `experiments/results/` as CSVs with a
@@ -945,6 +980,21 @@ inference:
   delta_threshold: 0.0                           # fixed; allowance-sensitivity is learned (§2.2/§2.5)
   budget_tiers: {HIGH: '>60% remaining', MEDIUM: '30-60%', LOW: '10-30%', CRITICAL: '<10%'}
   ablation_A8_rule_table: {HIGH: 0.00, MEDIUM: 0.05, LOW: 0.15, CRITICAL: 0.30}   # v5-style comparator only
+
+prompted_rm:                                     # [v2.1] baseline B10 "RM-P" (§5.2)
+  model: lab vLLM Qwen3.6-35B-A3B (frozen; inference server, never trained)
+  input: SAME §18.1 serialization as M_θ — no GT, no executor-stated confidence (§2.1 rule)
+  protocol: CoT reasoning → binary rubric bits
+            [draft_likely_correct, last_step_necessary, more_work_likely_helps, budget_healthy]
+            → designed weighted sum (weights documented in appendix; NOT fitted — fitting
+            weights to labels would reintroduce a trained RM and dissolve the comparison)
+  arms: {monitor: training-free, stop when score <= theta_p (calibrated on dev);
+         rl: post-K1 GO only, 1 seed, primary domain, judge-vs-true-reward divergence logged}
+  billing: every RM-P call billed at 30B prices under §5.3 billing symmetry (feeds T4)
+
+rl_algo_pilot:                                   # [v2.1] ablation A10 (runs before P6)
+  tasks: 100, algos: [grpo, ppo], seeds: 1, purpose: plumbing smoke test only
+  decision_rule: eliminate only on visible collapse; GRPO stays default regardless of small gaps
 
 cost_model:                                      # dollars; relative weights are what matter
   token_prices_per_1M: {reference_local: {input: 0.60, output: 2.20},   # constant across methods
@@ -1047,6 +1097,7 @@ our additions are wrapper hooks with a documented diff.
 | Stopper SFT | HF TRL v1.8 — SFTTrainer + scalar head (`AutoModelForSequenceClassification`, num_labels=1) | Current standard; the legacy value-head wrapper was moved to `trl.experimental` — do not use it. |
 | Cost accounting | This repo's `cost_aware_agent/cost.py` price map + HAL-harness reporting conventions (`princeton-pli/hal-harness`) | HAL (2510.11977) is the 2026 standard for agent dollar/token accounting + multi-run consistency; adopting it preempts "how did you count cost?" reviews. |
 | Label regressor / misc | lightgbm, wandb, matplotlib, latexmk | Commodity; no currency risk. |
+| **[v2.1]** Prompted RM (B10) + E2 frozen strong agent + P3 pre-screen | Lab's existing vLLM Qwen3.6-35B-A3B server (frozen, inference-only) | Zero training cost; serves three inference-only roles: B10's RM-P judge, the E2 stopper-as-monitor frozen agent (SupervisorAgent-comparable), and optional P3 label-review pre-screening. vLLM cannot train — all trained components stay on the training GPUs. |
 
 ### Reuse — benchmarks & datasets (web-verified 2026-07-16)
 
@@ -1078,3 +1129,34 @@ tool-call rollouts does NOT affect the 9B. Ministral: vLLM mistral tokenizer mod
 **Re-verify this manifest in the week before submission** — model/framework churn in 2026 is
 fast enough that a February choice can be stale by September; this table was accurate on
 2026-07-16.
+
+---
+
+## 20. Changelog v2 → v2.1 (2026-07-21) — every change, with what was considered and rejected
+
+Context: a design discussion (recorded in `architecture_comparison.md`) proposed replacing the
+trained stopper with a single executor + a prompted 30B reward model, and comparing many RL
+algorithms as a contribution. The discussion converged (see below); v2.1 records the outcome.
+**All v2 experiments, claims, gates, and budgets stand. v2.1 is additive + clarifying.**
+
+| Change | What exactly | Why (evidence) |
+|---|---|---|
+| **ADDED: reward-model terminology** (§2.3) | M_θ = the paper's **trained reward model (RM-T)**; "stopper" = code symbol; "monitor" = its optional inference role only; "monitor agent" is banned wording | The "two agents" misreading nearly caused a redesign; the RLHF framing (InstructGPT 2203.02155: train RM → RL against it) describes the system accurately — M_θ never acts and its V̂ feeds verl's `rm_scores` tensor |
+| **ADDED: baseline B10 "RM-P"** (§5.2, §16 P8, §17 `prompted_rm`) | Frozen lab-vLLM Qwen3.6-35B-A3B, CoT + designed binary rubric on the same §18.1 inputs; arm (a) inference monitor (training-free), arm (b) executor RL with rubric rewards (post-K1, 1 seed, primary domain) | Agreed design: compare prompted vs trained reward models **in our own tables** rather than by citation. Predicted: RM-P loses (RedundancyBench 2605.29893 ≤24.9% step-F1; judge-hacking Gao 2210.10760, AgentPRM 82%→70%; binary bits give near-zero step-to-step differences so r_t vanishes). Either outcome strengthens the paper |
+| **ADDED: E7 granularity analysis + index-policy framing** (§5.4, §9) | Log-based analysis (zero new runs): does the trained executor adapt tool-call granularity (big/expensive vs small/cheap) to difficulty and remaining wallet; Δ framed as a one-step index (Weitzman '79, Russell–Wefald '91 — cited, not claimed) | The "greedy principle" design idea; lit check 2026-07-21: per-step utility rewards exist (ToolGate, MRT, PAV) but no LLM-agent paper claims the index-policy framing; free to add |
+| **ADDED: A10 RL-algorithm pilot** (§5.5, §17 `rl_algo_pilot`) | ~100-task GRPO-vs-PPO smoke test before P6; eliminates visible collapse only; GRPO stays default | Requested pipeline-validation step; explicitly NOT a contribution (algo comparisons are ablation-grade: 2512.07611, 2504.11343; 100 tasks are within seed noise) |
+| **SPECIFIED: E2 frozen strong agent** (§5.1) | = Qwen3.6-35B-A3B on the lab's existing vLLM server (+ live-web scaffold) | Resource is already deployed; role is inference-only (vLLM cannot train); keeps the SupervisorAgent comparison direct |
+| **ADDED: P3 pre-screen option** (§16 P3) | Lab 30B may flag trajectories to speed the 100-trajectory manual label review; never a label source | Convenience only; the §2.1 no-LLM-in-labels rule is untouched |
+| **UPDATED: budget** (§7) | 30–35 → 30–36 training runs (+1 = B10-RL arm, post-K1 gated) | Honest accounting; B10-monitor/A10/30B-server work are near-zero (inference-only) |
+| **CONSIDERED AND REJECTED: replace RM-T with a prompted judge** | The proposal that started the discussion — drop the trained stopper, prompt a 30B (binary rubric / natural language) for rewards | Three measured failures: (1) economic step-judgment ≤24.9% F1 (RedundancyBench) — and RL amplifies a weak judge (Goodhart); (2) binary/rubric outputs cannot supply the continuous per-step differences the shaping formula r_t = V̂(next)−V̂(this) requires — adjacent steps get identical rubric vectors and the dense signal vanishes; (3) every reliable rubric bit (correct? format? within budget?) is computable exactly for free from gold + logs, so the judge adds only noise and 30B serving cost. Also: fitting rubric weights to make the score fine-grained would BE training a reward model — conceding the design. The discussion itself converged: numerical rewards require training; the designed scoring rule already exists as U = q − λ·(tier-weighted cost); the future-value part cannot come from any single-trajectory judge (it needs the 8-rollout backward recursion at training time, and the trained predictor at inference). RM-P therefore enters as baseline B10, not as the method |
+| **CONSIDERED AND REJECTED: "compare many RL algorithms" as a contribution** | PPO vs GRPO vs REINFORCE vs DPO as a novelty claim | Comparison papers are positioned as benchmarks/guides, not method contributions (2512.07611, 2510.01132); inside a method paper it is one ablation line (A10). DPO additionally needs preference pairs — usable from best-vs-worst group trajectories (DAS 2602.03304 style) but boundary-level and weaker than GRPO here |
+| **CONSIDERED AND REJECTED: drop the trained RM in favor of direct label shaping** | Use Snell labels directly as rewards, no model | This is exactly baseline **B9**, and kill-switch **K1** already tests it head-to-head in weeks 2–3; if B9 ties/wins, the pre-registered H3 pivot applies. Dropping by fiat would discard: label denoising across ~10^5 steps, generalization to fresh RL rollouts, and ALL inference-time deliverables (monitor, λ dial, transfer — Contributions 2 and 4), since labels require gold answers that do not exist at deployment |
+| **CONSIDERED AND REJECTED: 30B backbone for RM-T** | "30B is a better model; SFT on 2B may not matter" | The RM's task is a 3-number regression on serialized features — capacity is not the bottleneck (InstructGPT: 6B RM trained a 175B policy); the RM is called on every step of every rollout, and a 30B watcher costs ~3× the 9B agent it supervises — T4's overhead accounting (LearnStop 2606.30852: overhead can flip savings) would refute the paper's own thesis. Pre-registered guards stay: P4 gate (2B must beat probes or STOP) and A1 size ablation (0.8B/2B/4B) — if 2B fails, scale up |
+
+**Code impact of v2.1** (to implement; plan-first per the working agreement):
+`cassi/baselines/b10_prompted_rm.py` (new module: rubric prompt, parser, designed weights,
+monitor-protocol interface + RL-reward adapter) · register in `cassi/baselines/__init__.py` ·
+`configs/cassi.yaml` += `prompted_rm`, `rl_algo_pilot` keys mirroring §17 · CPU tests with a
+mocked judge client in `tests/test_baselines_cpu.py` · `eval/overhead.py` already bills judges
+(no change). Everything else (labels, stopper, shaping, K1) is untouched — v2.1 adds arms, it
+does not modify the method.
