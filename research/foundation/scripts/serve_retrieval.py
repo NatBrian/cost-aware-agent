@@ -40,6 +40,11 @@ class Retriever:
         import torch
         from transformers import AutoModel, AutoTokenizer
 
+        # faiss segfaults in its SIMD kernels with the default 192 OMP threads
+        # on this box (kernel log 2026-07-22); 16 threads is stable, ~4s/query
+        # cold. The old cassi torch_retrieval_server was the same bug's workaround.
+        faiss.omp_set_num_threads(16)
+
         self.corpus_path = index_dir / "wiki-18.jsonl"
         self.offsets = build_corpus_offsets(self.corpus_path,
                                             index_dir / "wiki-18.offsets.json")
