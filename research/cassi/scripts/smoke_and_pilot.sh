@@ -42,13 +42,19 @@ banner "launch retriever server (E5, GPU ${GPU_A})"
     --index_path "${DATA_DIR}/searchr1_index/e5_Flat.index" \
     --corpus_path "${DATA_DIR}/searchr1_index/wiki-18.jsonl" \
     --retriever_name e5 --retriever_model intfloat/e5-base-v2 --topk 3 \
-    --port 8000 > "${EXP_DIR}/logs/retriever.log" 2>&1 & echo $! > "${EXP_DIR}/retriever.pid" )
+    > "${EXP_DIR}/logs/retriever.log" 2>&1 & echo $! > "${EXP_DIR}/retriever.pid" )
+    # (no --port flag: the pinned Search-R1 retrieval_server.py hardcodes uvicorn port 8000)
 echo "retriever pid $(cat "${EXP_DIR}/retriever.pid") — index load takes several minutes (64GB)"
 
 # --------------------------------------------------------- vLLM (GPU_B)
 banner "launch vLLM Qwen3.5-9B (GPU ${GPU_B})"
-CUDA_VISIBLE_DEVICES="${GPU_B}" nohup "${CASSI_VENV}/bin/python" -m vllm.entrypoints.openai.api_server \
-    --model "$(cfg_get executor.base_model)" --port 8001 --gpu-memory-utilization 0.85 \
+# VLLM_USE_FLASHINFER_SAMPLER=0 + --gdn-prefill-backend triton: this machine has
+# no CUDA toolkit (nvcc), so every flashinfer JIT path must be avoided — both
+# crash modes were hit live on 2026-07-21 (sampler JIT on first request; GDN
+# prefill JIT). Port 8901: 8001/8000 defaults collide with a foreign service.
+CUDA_VISIBLE_DEVICES="${GPU_B}" VLLM_USE_FLASHINFER_SAMPLER=0 nohup "${CASSI_VENV}/bin/python" -m vllm.entrypoints.openai.api_server \
+    --model "$(cfg_get executor.base_model)" --port 8901 --gpu-memory-utilization 0.85 \
+    --gdn-prefill-backend triton \
     > "${EXP_DIR}/logs/vllm.log" 2>&1 & echo $! > "${EXP_DIR}/vllm.pid"
 echo "vllm pid $(cat "${EXP_DIR}/vllm.pid")"
 
@@ -62,13 +68,13 @@ trap cleanup EXIT
 # ------------------------------------------------ wait for both servers
 banner "waiting for servers"
 for i in $(seq 1 120); do
-    curl -sf "http://127.0.0.1:8001/v1/models" >/dev/null 2>&1 && VOK=1 || VOK=0
+    curl -sf "http://127.0.0.1:8901/v1/models" >/dev/null 2>&1 && VOK=1 || VOK=0
     curl -sf -X POST "http://127.0.0.1:8000/retrieve" -H 'Content-Type: application/json' \
-         -d '{"queries":["test"],"topk":1}' >/dev/null 2>&1 && ROK=1 || ROK=0
+         -d '{"queries":["test"],"topk":1,"return_scores":true}' >/dev/null 2>&1 && ROK=1 || ROK=0
     [ "${VOK}${ROK}" = "11" ] && break
     sleep 10
 done
-[ "${VOK}${ROK}" = "11" ] || { tail -20 "${EXP_DIR}/logs/vllm.log" "${EXP_DIR}/logs/retriever.log"; pending "servers did not come up in 20 min — see logs above"; }
+[ "${VOK}${ROK}" = "11" ] || { tail -n 20 "${EXP_DIR}/logs/vllm.log" "${EXP_DIR}/logs/retriever.log"; pending "servers did not come up in 20 min — see logs above"; }
 echo "both servers up"
 
 # ------------------------------------------------- P0 smoke (done-criterion)
@@ -77,7 +83,7 @@ python3 "${CASSI_ROOT}/scripts/make_task_file.py" \
     --in "${DATA_DIR}/hotpotqa_dev.jsonl" --out "${EXP_DIR}/smoke/qa_task1.jsonl" --n 1 --seed 42
 "${CASSI_VENV}/bin/python" -m cassi.executor.collect --smoke --domain qa \
     --tasks "${EXP_DIR}/smoke/qa_task1.jsonl" --G 1 --seed 42 \
-    --vllm-url http://127.0.0.1:8001/v1 --retriever-url http://127.0.0.1:8000/retrieve \
+    --vllm-url http://127.0.0.1:8901/v1 --retriever-url http://127.0.0.1:8000/retrieve \
     --out "${EXP_DIR}/smoke/qa.jsonl"
 python3 "${CASSI_ROOT}/scripts/verify_smoke.py" "${EXP_DIR}/smoke/qa.jsonl"
 banner "P0 SMOKE PASSED (qa)"
@@ -89,7 +95,7 @@ python3 "${CASSI_ROOT}/scripts/make_task_file.py" \
     --out "${EXP_DIR}/pilot/tasks200.jsonl" --n 200 --seed 42
 "${CASSI_VENV}/bin/python" -m cassi.executor.collect --pilot --domain qa \
     --tasks "${EXP_DIR}/pilot/tasks200.jsonl" --seed 42 \
-    --vllm-url http://127.0.0.1:8001/v1 --retriever-url http://127.0.0.1:8000/retrieve \
+    --vllm-url http://127.0.0.1:8901/v1 --retriever-url http://127.0.0.1:8000/retrieve \
     --out "${EXP_DIR}/pilot/spends_qa.txt" | tee "${EXP_DIR}/pilot/calibration_qa.json"
 
 banner "DONE — freeze the printed calibration into configs/cassi.yaml (label.allowances.qa"

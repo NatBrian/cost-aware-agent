@@ -129,7 +129,10 @@ def get_model_class():
             super().__init__()
             self.backbone = AutoModel.from_pretrained(
                 base_model, dtype=torch_dtype or torch.float32)   # transformers v5 kwarg (§19 pin)
-            h = self.backbone.config.hidden_size
+            # Qwen3.5's config nests dims under text_config (no top-level
+            # hidden_size — hit live 2026-07-22); the embedding width is the
+            # architecture-independent source of truth.
+            h = self.backbone.get_input_embeddings().embedding_dim
             # heads in float32 for regression stability regardless of backbone dtype
             self.action_head = nn.Linear(h, 1)
             self.delta_head = nn.Linear(h, 1)

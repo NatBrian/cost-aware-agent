@@ -1,4 +1,4 @@
-"""CPU tests for cassi.baselines — paper_plan_v2 §5.2 (B1–B9 + oracle), §5.3, §2.4.
+"""CPU tests for cassi.baselines — paper_plan_v2_1 §5.2 (B1–B10 + oracle), §5.3, §2.4.
 
 Synthetic trajectories follow the canonical pattern: quality RISES then PLATEAUS
 while cost accrues linearly, so U_t peaks near the plateau and the Snell τ* lands
@@ -24,6 +24,7 @@ from cassi.baselines import (
     b7_cart_cost as b7,
     b8_agentprm_cost as b8,
     b9_direct_shaping as b9,
+    b10_prompted_rm as b10,
     oracle,
 )
 from cassi.budget.cost import base_reward
@@ -109,12 +110,12 @@ def terminal_rewards(trajs: list[Trajectory], lam: float = LAM) -> list[float]:
 # ------------------------------------------------------------ registry (§5.2)
 class TestRegistry:
     def test_completeness_vs_5_2(self):
-        expected = {f"b{i}_" for i in range(1, 10)}
+        expected = {f"b{i}_" for i in range(1, 11)}    # v2.1: B10 "RM-P" added (§5.2)
         names = set(BASELINES)
         assert "oracle" in names
         for prefix in expected:
             assert any(n.startswith(prefix) for n in names), f"missing §5.2 row {prefix}*"
-        assert len(BASELINES) == 10   # B1–B9 + oracle, nothing else
+        assert len(BASELINES) == 11   # B1–B10 + oracle, nothing else
 
     def test_required_keys_and_importable(self):
         for name, meta in BASELINES.items():
@@ -138,6 +139,7 @@ class TestRegistry:
         for n in ("b6_single_model_cost", "b8_agentprm_cost", "b9_direct_shaping"):
             assert BASELINES[n]["cost_knob"] == "lambda"
         assert BASELINES["b7_cart_cost"]["cost_knob"] == "label_lambda"
+        assert BASELINES["b10_prompted_rm"]["cost_knob"] == "rubric_threshold"   # v2.1
 
     def test_training_flags(self):
         trained = {n for n, m in BASELINES.items() if m["needs_training"]}
@@ -353,3 +355,120 @@ class TestOracle:
         assert summary["n_trajectories"] == len(group)
         assert summary["mean_utility_at_tau_star"] > 0
         assert oracle.should_stop(5, 3) and not oracle.should_stop(2, 3)
+
+
+# ------------------------------------------------------------- B10 (v2.1 §5.2)
+class _ScriptedJudge:
+    """JudgeClient fake: replays scripted outputs, records received prompts."""
+
+    def __init__(self, outputs: list[str]):
+        self.outputs = list(outputs)
+        self.prompts: list[str] = []
+
+    def complete(self, prompt: str) -> str:
+        self.prompts.append(prompt)
+        return self.outputs.pop(0)
+
+
+class TestB10PromptedRM:
+    def test_parse_rubric(self):
+        # CoT before the final line; last RUBRIC match wins
+        out = ("The draft looks right. The format is RUBRIC: [a,b,c,d].\n"
+               "RUBRIC: [1,0,0,1]")
+        assert b10.parse_rubric(out) == (1, 0, 0, 1)
+        assert b10.parse_rubric("RUBRIC: [ 0 , 1 , 1 , 0 ]") == (0, 1, 1, 0)
+        assert b10.parse_rubric("no rubric here") is None            # fail-open
+        assert b10.parse_rubric("RUBRIC: [1,0,1]") is None           # wrong arity
+        assert b10.parse_rubric("RUBRIC: [1,2,0,1]") is None         # non-binary
+        assert b10.parse_rubric("") is None and b10.parse_rubric(None) is None
+
+    def test_designed_weights_are_normalized_and_scores_bounded(self):
+        assert sum(b10.CONTINUE_WEIGHTS.values()) == pytest.approx(1.0)
+        assert sum(b10.STATE_VALUE_WEIGHTS.values()) == pytest.approx(1.0)
+        for bits in [(a, b_, c, d) for a in (0, 1) for b_ in (0, 1)
+                     for c in (0, 1) for d in (0, 1)]:
+            assert 0.0 <= b10.continue_score(bits) <= 1.0
+            assert 0.0 <= b10.state_value(bits) <= 1.0
+        with pytest.raises(ValueError):
+            b10.continue_score((1, 0, 1))                             # wrong arity
+
+    def test_score_semantics(self):
+        # every reason to continue → max continue-score; correct draft + dead
+        # budget + nothing to gain → min; correct-draft complement dominates
+        assert b10.continue_score((0, 1, 1, 1)) == pytest.approx(1.0)
+        assert b10.continue_score((1, 0, 0, 0)) == pytest.approx(0.0)
+        # designed cut-losses behavior: a hopeless state (wrong draft, but nothing
+        # will help and budget dead) scores BELOW a promising one even when the
+        # latter's draft already looks correct — stop wasting money on lost causes
+        assert b10.continue_score((0, 0, 0, 0)) == pytest.approx(0.40)
+        assert b10.continue_score((1, 1, 1, 1)) == pytest.approx(0.60)
+        assert b10.continue_score((0, 0, 0, 0)) < b10.continue_score((0, 1, 1, 1))
+        # state value: correct draft dominates budget health
+        assert b10.state_value((1, 0, 0, 0)) > b10.state_value((0, 0, 0, 1))
+        assert b10.state_value((1, 0, 0, 1)) == pytest.approx(1.0)
+
+    def test_should_stop_fail_open(self):
+        assert b10.should_stop(0.1, 0.2)
+        assert not b10.should_stop(0.5, 0.2)
+        assert not b10.should_stop(None, 1.0)     # unparseable ⇒ CONTINUE
+
+    def test_calibrate_threshold_monotone_and_never_stop(self):
+        rng = np.random.default_rng(0)
+        scores = rng.uniform(0, 1, 400)
+        # low continue-score states are mostly (but not always) correct drafts
+        correct = (scores < 0.4) | (rng.uniform(0, 1, 400) < 0.15)
+        targets = [0.5, 0.7, 0.9, 0.99]
+        thrs = [b10.calibrate_threshold(scores, correct, p) for p in targets]
+        assert all(a >= b for a, b in zip(thrs, thrs[1:]))   # non-increasing in target
+        # impossible target ⇒ NEVER_STOP sentinel, which never stops anything
+        thr = b10.calibrate_threshold([0.5, 0.6], [False, False], 0.9)
+        assert thr == b10.NEVER_STOP
+        assert not b10.should_stop(0.0, thr)
+
+    def test_billing_symmetry(self):
+        n_in = len(b10.build_judge_prompt("<stopper_input>x</stopper_input>")) // 4
+        bill = b10.bill_judge(n_in, b10.JUDGE_MAX_OUTPUT_TOKENS)
+        assert bill.dollars > 0                    # §5.3: nothing here is free
+
+    def test_rl_arm_reuses_shaping_and_telescopes(self):
+        bits = [(0, 1, 1, 1), None, (1, 0, 1, 1), (1, 0, 0, 0)]
+        pot = b10.judge_potentials(bits)
+        # fail-neutral: None carries the previous value forward
+        assert pot[1] == pot[0]
+        rewards = b10.rl_step_rewards(pot)
+        np.testing.assert_allclose(rewards, shaped_step_rewards(pot))  # same machinery as CASSI
+        assert rewards.sum() == pytest.approx(-pot[0])   # telescoping ⇒ −Φ(x_1) (§2.4)
+
+    def test_judge_decision_end_to_end(self):
+        x = "<stopper_input>[TASK] q [DRAFT] Ireland</stopper_input>"
+        client = _ScriptedJudge([
+            "Draft looks correct, budget spent.\nRUBRIC: [1,0,0,0]",   # ⇒ score 0 ⇒ stop
+            "Still searching.\nRUBRIC: [0,1,1,1]",                     # ⇒ score 1 ⇒ continue
+            "garbled reply, no rubric",                                # ⇒ fail-open continue
+        ])
+        d1 = b10.judge_decision(client, x, threshold=0.3)
+        assert d1.stop and d1.bits == (1, 0, 0, 0) and d1.value == pytest.approx(0.7)
+        d2 = b10.judge_decision(client, x, threshold=0.3)
+        assert not d2.stop and d2.score == pytest.approx(1.0)
+        d3 = b10.judge_decision(client, x, threshold=1.0)
+        assert not d3.stop and d3.bits is None and d3.score is None
+        # the serialized state and the rubric contract reached the judge verbatim
+        assert x in client.prompts[0] and "RUBRIC: [a,b,c,d]" in client.prompts[0]
+
+    def test_vllm_adapter_shape(self):
+        class FakeVLLM:
+            def generate(self, messages, max_tokens):
+                assert messages[0]["role"] == "user" and max_tokens == 256
+                return "RUBRIC: [0,1,1,1]"
+        d = b10.judge_decision(b10.VLLMJudgeAdapter(FakeVLLM()), "x", threshold=0.5)
+        assert not d.stop and d.bits == (0, 1, 1, 1)
+
+    def test_config_keys_present(self):
+        from cassi.common.config import load_config
+        cfg = load_config()
+        prm = cfg["prompted_rm"]
+        assert prm["rubric_dims"] == list(b10.RUBRIC_DIMS)
+        assert prm["continue_weights"] == pytest.approx(b10.CONTINUE_WEIGHTS)
+        assert prm["state_value_weights"] == pytest.approx(b10.STATE_VALUE_WEIGHTS)
+        assert prm["max_output_tokens"] == b10.JUDGE_MAX_OUTPUT_TOKENS
+        assert cfg["rl_algo_pilot"]["default"] == "grpo"     # A10 (v2.1)

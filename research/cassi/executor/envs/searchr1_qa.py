@@ -79,7 +79,11 @@ class SearchR1QAEnv(AgentEnv):
         try:
             resp = requests.post(
                 self.retriever_url,
-                json={"queries": [query], "topk": self.topk},
+                # return_scores=True is REQUIRED: the pinned retrieval_server.py
+                # unpacks (results, scores) unconditionally and crashes when the
+                # flag is false (upstream bug, verified 2026-07-21); _doc_fields
+                # already normalizes the {"document":…, "score":…} shape.
+                json={"queries": [query], "topk": self.topk, "return_scores": True},
                 timeout=self.timeout,
             )
             resp.raise_for_status()

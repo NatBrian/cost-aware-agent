@@ -188,18 +188,19 @@ exact-103 filter. The full sanctioned no-GPU work queue: HANDOFF §6.
 
 ```bash
 cd research/cassi && source .venv/bin/activate     # manual shells must activate; scripts self-activate
-python -m pytest tests/ -q                                    # expect 115 passed (canonical, in .venv)
+python -m pytest tests/ -q                                    # expect 125 passed (canonical, in .venv)
 python -m cassi.executor.train_grpo --dry-run \
     --config configs/cassi.yaml --domain qa                   # expect "[dry-run] OK"
 (cd paper && make)                                            # expect main.pdf builds
 git config user.name                                          # expect: Nathanael Brian
 ```
 
-Count semantics: **in the .venv, expect 115 passed, 0 skipped.** Outside the venv you
-get "114 passed, 1 skipped" — the skip is `tests/test_executor_cpu.py`'s dry-run test,
+Count semantics: **in the .venv, expect 125 passed, 0 skipped.** Outside the venv you
+get "124 passed, 1 skipped" — the skip is `tests/test_executor_cpu.py`'s dry-run test,
 skipped when `verl` isn't importable; that signature means WRONG ENVIRONMENT, not rot.
 Per-file breakdown (for localizing a regression): core 19 · stopper 15 · executor 29
-(28 + the verl dry-run) · baselines 26 · eval 20 · integration 2 · run_frontier 4 = 115.
+(28 + the verl dry-run) · baselines 36 (26 + the v2.1 B10 class) · eval 20 ·
+integration 2 · run_frontier 4 = 125. (Count history: 115 → 125 on 2026-07-21, plan v2.1.)
 When sanctioned new code adds tests, update this count AND HANDOFF §5 in the same commit.
 Never "verify" by re-running `scripts/p0_setup.sh` — it is an installer, and P0 is done.
 
@@ -287,7 +288,12 @@ method's own knob-swept frontier by interpolation (never compare single points);
 (2) stopping regret = utility gap vs the Snell-optimal stop, measured by the dual-run
 replay protocol on a fixed 500-task subsample (replay costs billed to the analysis line).
 
-## 11. The baselines B1–B9 — who they are and what question each kills
+## 11. The baselines B1–B10 — who they are and what question each kills
+
+**[v2.1]** B10 "RM-P" was added by plan v2.1 (`paper_plan_v2_1.md` §5.2/§20): a frozen
+prompted 30B judge (CoT + designed binary rubric) with a monitor arm and a post-K1 rl arm —
+it answers "trained vs prompted reward model" inside our own tables. Module:
+`baselines/b10_prompted_rm.py`; knob: rubric threshold θ_p.
 
 | # | What it is | Kills the question | Knob |
 |---|---|---|---|

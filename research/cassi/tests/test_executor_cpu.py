@@ -70,6 +70,17 @@ def cfg():
     return load_config()
 
 
+def uncalibrated(cfg: dict) -> dict:
+    """Deep-copy of cfg with the P2-frozen calibration nulled — the shipped
+    config now carries REAL frozen values (P2 done 2026-07-22), so tests of the
+    pre-P2 refusal guard must construct the uncalibrated state themselves."""
+    import copy
+    c = copy.deepcopy(cfg)
+    c["label"]["allowances"]["qa"] = {"small": None, "medium": None, "large": None}
+    c["label"]["cost_normalization"]["qa_median_pilot_spend"] = None
+    return c
+
+
 # ======================================================== (a) react_agent modes
 class TestReactAgentModes:
     def test_rl_mode_stops_at_answer(self):
@@ -210,7 +221,7 @@ class TestCollect:
         assert spends == pytest.approx([spends[0]] * 5)
 
     def test_uncalibrated_config_refuses(self, tmp_path):
-        cfg = load_config()                              # allowances are null pre-P2
+        cfg = uncalibrated(load_config())                # simulate pre-P2 nulls
         with pytest.raises(RuntimeError, match="Pilot calibration missing"):
             collect_round([TASK], ScriptedLLMClient(ANSWER_MIDWAY),
                           MockSearchEnv(CORPUS), cfg, domain="qa",
@@ -357,11 +368,11 @@ class TestComputeCassiRewards:
         with pytest.raises(ValueError, match="Q_tau"):
             compute_cassi_rewards([bad], [np.zeros(3)], cfg, median_pilot_spend=1.0)
         with pytest.raises(RuntimeError, match="median_pilot_spend"):
-            compute_cassi_rewards([tr], [np.zeros(3)], cfg)   # cfg still null pre-P2
+            compute_cassi_rewards([tr], [np.zeros(3)], uncalibrated(cfg))  # pre-P2 nulls
 
     def test_adapter_is_cpu_safe(self, cfg):
         """The verl seam builds its trainer config without importing verl (§16 P6)."""
-        adapter = VerlCassiAdapter(cfg, domain="qa")
+        adapter = VerlCassiAdapter(uncalibrated(cfg), domain="qa")
         tc = adapter.trainer_config
         assert tc["actor_rollout_ref"]["rollout"]["n"] == 8
         assert tc["actor_rollout_ref"]["actor"]["kl_loss_coef"] == pytest.approx(0.04)

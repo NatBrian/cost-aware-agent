@@ -81,13 +81,36 @@ require_gpu_tooling() {
 
 acquire_gpus() {  # acquire_gpus <N>
     local n="$1"
+    # Active gpu_hold.sh hold? → REUSE the held cards; do NOT acquire and do NOT
+    # release on exit (the hold outlives this phase so the next one starts
+    # instantly — user policy 2026-07-21). Only ids the hold owns are reused;
+    # nothing else is touched.
+    local hold_pid_file=/tmp/cassi_gpu_hold.pid hold_dev_file=/tmp/cassi_gpu_hold.devices
+    if [ -f "${hold_pid_file}" ] && [ -s "${hold_dev_file}" ] \
+            && kill -0 "$(cat "${hold_pid_file}")" 2>/dev/null; then
+        local held; held="$(cat "${hold_dev_file}")"
+        local count; count="$(echo "${held//,/ }" | wc -w)"
+        if [ "${count}" -ge "${n}" ]; then
+            export CUDA_VISIBLE_DEVICES="${held}"
+            _GPUS_HELD=0    # release_gpus stays a no-op — the hold owns the cards
+            banner "GPU reuse: hold is active — CUDA_VISIBLE_DEVICES=${held} (no per-phase release)"
+            return 0
+        fi
+        pending "gpu_hold.sh holds ${count} GPU(s) but this phase needs ${n} — 'scripts/gpu_hold.sh stop' then 'start ${n}' (do NOT mix hold + extra acquire: split locks)"
+    fi
     require_gpu_tooling
     banner "GPU acquire: ${n} GPU(s) (release is trapped on EXIT)"
-    # shellcheck disable=SC2046
-    eval $("${GPU_ACQUIRE}" "${n}") || pending "GPU acquire failed (not enough free GPUs?) — try fewer GPUs or wait"
+    # PARSE the acquire output — never eval it: the zhanka script prints
+    # non-shell lines ("Ready: ...") on stdout that make eval fail even when
+    # acquisition succeeded, orphaning fresh locks (hit 2026-07-21).
+    local _acq_out
+    _acq_out="$("${GPU_ACQUIRE}" "${n}")" || pending "GPU acquire failed (not enough free GPUs?) — try fewer GPUs or wait"
+    CUDA_VISIBLE_DEVICES="$(echo "${_acq_out}" | sed -n 's/^export CUDA_VISIBLE_DEVICES=//p' | tail -1)"
+    [ -n "${CUDA_VISIBLE_DEVICES}" ] || pending "GPU acquire output had no CUDA_VISIBLE_DEVICES line"
+    export CUDA_VISIBLE_DEVICES
     _GPUS_HELD=1
     trap release_gpus EXIT
-    echo "[gpu] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-<unset>}"
+    echo "[gpu] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
 }
 
 release_gpus() {

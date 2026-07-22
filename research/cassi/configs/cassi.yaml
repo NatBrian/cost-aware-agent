@@ -9,11 +9,13 @@ label:
   # allowances: per-domain wallets drawn per (task, GRPO group) — calibrated from the
   # 200-task unconstrained pilot (small=P25 spend, medium=P75, large=2×P90); frozen after P2.
   allowances:
-    qa: {small: null, medium: null, large: null}          # dollars — FILL FROM P2 PILOT
-    alfworld: {small: null, medium: null, large: null}    # dollars — FILL FROM P2 PILOT
+    # FROZEN 2026-07-22 from the 200-task unconstrained pilot (seed 42; §16 P2:
+    # small=P25 spend, medium=P75, large=2×P90) — experiments/pilot/, report 00.
+    qa: {small: 0.00182415, medium: 0.0098835, large: 0.0404294}
+    alfworld: {small: null, medium: null, large: null}    # dollars — FILL FROM ALFWORLD PILOT
   cost_normalization:
-    qa_median_pilot_spend: null                  # dollars — FILL FROM P2 PILOT (C̃ = C / this)
-    alfworld_median_pilot_spend: null            # dollars — FILL FROM P2 PILOT
+    qa_median_pilot_spend: 0.0034912             # FROZEN 2026-07-22 (C̃ = C / this)
+    alfworld_median_pilot_spend: null            # dollars — FILL FROM ALFWORLD PILOT
   quality_scoring:
     qa: f1            # F1/EM of per-step running draft vs gold (free string compare); EM used for terminal Q_τ headline
     alfworld: subgoal_fraction                   # read from env state
@@ -71,6 +73,36 @@ inference:
     LOW: [0.10, 0.30]
     CRITICAL: [0.00, 0.10]
   ablation_A8_rule_table: {HIGH: 0.00, MEDIUM: 0.05, LOW: 0.15, CRITICAL: 0.30}   # v5-style comparator only
+
+prompted_rm:                                     # [v2.1] baseline B10 "RM-P" (paper_plan_v2_1 §5.2, §17)
+  model: Qwen3.6-35B-A3B                         # lab vLLM server — FROZEN, inference-only, never trained
+                                                 # (actual deployment 2026-07-21; plan drafts said "Qwen3.5-30B")
+  base_url: http://122.11.227.227:6101/v1        # vLLM TP=1, max_model_len 32768 — plenty for §18.1 states
+                                                 # LIVE-VERIFIED 2026-07-21: end-to-end b10 judge_decision OK
+                                                 # ($0.0004/call, 379 in / 88 out tokens)
+  e2_frozen_agent_url: http://122.11.227.227:6102/v1   # same model, TP=4, 262K ctx + TOOL-CALL support —
+                                                 # use THIS one as the E2 frozen live-web agent (needs tools)
+  request_kwargs: {temperature: 0.0, chat_template_kwargs: {enable_thinking: false}}
+                                                 # thinking OFF: rubric needs the brief-CoT protocol, not
+                                                 # long reasoning; with thinking off, 256 output tokens suffice
+  input: same_18_1_serialization                 # identical x_t block as M_θ — no GT, no executor confidence (§2.1)
+  rubric_dims: [draft_likely_correct, last_step_necessary, more_work_likely_helps, budget_healthy]
+  # weights are DESIGNED, never fitted (fitting = training an RM ⇒ dissolves the comparison, §20):
+  continue_weights: {draft_likely_correct: 0.40, more_work_likely_helps: 0.30,
+                     last_step_necessary: 0.15, budget_healthy: 0.15}   # Δ̂ analog (monitor arm)
+  state_value_weights: {draft_likely_correct: 0.70, budget_healthy: 0.30}  # V̂ analog (rl-arm potential Φ)
+  max_output_tokens: 256                         # CoT allowed; billed under §5.3 symmetry
+  arms:
+    monitor: {training: none, rule: stop_when_continue_score_le_threshold,
+              threshold: null}                   # θ_p — FILL from dev calibration (b10.calibrate_threshold)
+    rl: {gate: post_K1_GO_only, seeds: 1, domain: qa, frontier_points: 1}
+
+rl_algo_pilot:                                   # [v2.1] ablation A10 (runs BEFORE P6)
+  tasks: 100
+  algos: [grpo, ppo]
+  seeds: 1
+  purpose: plumbing_smoke_test_only              # eliminate only on visible collapse
+  default: grpo                                  # stays default regardless of small gaps (within seed noise at n=100)
 
 cost_model:                                      # dollars; relative weights are what matter
   token_prices_per_1M:

@@ -1,4 +1,4 @@
-"""Baseline suite — paper_plan_v2 §5.2 (rows B1–B9 + oracle), §5.3 frontier protocol, §16 P8.
+"""Baseline suite — paper_plan_v2_1 §5.2 (rows B1–B10 + oracle), §5.3 frontier protocol, §16 P8.
 
 One module per §5.2 row. Decision/reward logic lives here as pure CPU-testable
 functions; anything needing training reuses the executor GRPO wiring and is
@@ -95,6 +95,16 @@ BASELINES: dict[str, dict] = {
         "needs_training": True,
         "paper": "2607.00482",                   # DASH, adapted
         "kills": "THE pivotal test: does the stopper earn its existence (H3)",
+    },
+    "b10_prompted_rm": {
+        "module": "cassi.baselines.b10_prompted_rm",
+        "type": "prompted_reward_model",
+        "cost_knob": "rubric_threshold",         # θ_p — stop when continue-score ≤ θ_p (v2.1 §5.2)
+        "needs_training": False,                 # the judge is NEVER trained; the rl arm trains
+                                                 # the EXECUTOR (post-K1, reuses P6/P8 GRPO wiring)
+        "paper": "2309.00267",                   # RLAIF-style prompted judge (v2.1 B10 "RM-P")
+        "kills": "the trained-vs-prompted reward-model question, in our own tables (v2.1)",
+        "arms": ["monitor_training_free", "rl_post_k1_trains_executor"],
     },
     "oracle": {
         "module": "cassi.baselines.oracle",
