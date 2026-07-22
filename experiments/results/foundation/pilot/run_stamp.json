@@ -1,0 +1,115 @@
+{
+  "git": "7934ad3",
+  "config_hash": "356ec26f30af",
+  "config": {
+    "seed": 42,
+    "data": {
+      "train_size": 300,
+      "dev_size": 200,
+      "sampling_seed": 42,
+      "stratify_field": "level",
+      "data_dir": "../data_shared",
+      "out_dir": "data",
+      "train_file": "data/hotpotqa_train_300.jsonl",
+      "dev_file": "data/hotpotqa_dev_200.jsonl",
+      "manifest_file": "data/manifest.json",
+      "source_train": "../data_shared/hotpotqa_train.decontaminated.jsonl",
+      "source_dev": "../data_shared/hotpotqa_dev.jsonl"
+    },
+    "retrieval": {
+      "index_dir": "../data_shared/searchr1_index",
+      "backend": "e5",
+      "top_k": 3,
+      "endpoint": "http://127.0.0.1:8377"
+    },
+    "episode": {
+      "t_max": 10,
+      "budgets": {
+        "small": 3,
+        "medium": 6,
+        "large": 10
+      },
+      "draft_retry": 1
+    },
+    "economy": {
+      "lambda": 0.5,
+      "lambda_spot": 0.1
+    },
+    "executor": {
+      "model": "Qwen/Qwen3.5-9B",
+      "enable_thinking": false,
+      "endpoint": "http://127.0.0.1:8378/v1",
+      "eval_temperature": 0.0,
+      "rollout_temperature": 1.0,
+      "max_tokens_per_step": 512
+    },
+    "judge": {
+      "model": "gemma-4-31B-it",
+      "endpoint": "http://122.11.227.227:6102/v1",
+      "temperature": 0.0,
+      "max_tokens": 512,
+      "batch_size": 16,
+      "parse_retries": 1,
+      "cache_dir": "cache/judge"
+    },
+    "rubric": {
+      "version": "rubric_v1",
+      "step_bits": {
+        "new_info": 0.4,
+        "not_redundant": 0.3,
+        "was_needed": 0.3
+      },
+      "answer_bits": {
+        "supported": 0.5,
+        "nothing_left": 0.5
+      },
+      "alpha": 0.2,
+      "calibration": {
+        "n_steps": 50,
+        "per_bit_gate": 0.8,
+        "per_bit_floor": 0.7
+      }
+    },
+    "reward": {
+      "format_weight": 0.1
+    },
+    "grpo": {
+      "group_size": 8,
+      "lr": 5e-06,
+      "kl_beta": 0.04,
+      "clip_eps": 0.2,
+      "length_norm": "dr_grpo",
+      "advantage": "step_returns_to_go",
+      "min_cohort": 3,
+      "epochs": 3,
+      "algorithm": "grpo"
+    },
+    "pilot": {
+      "n_tasks": 50,
+      "rollouts_per_task": 4,
+      "mode": "forced_continuation"
+    },
+    "gate": {
+      "budget": "medium",
+      "min_self_stop": 0.7,
+      "f1_margin": 0.05,
+      "bootstrap_resamples": 10000
+    },
+    "tracking": {
+      "wandb_project": "cassi-foundation",
+      "results_dir": "../../experiments/results/foundation",
+      "reports_dir": "../../experiments/reports"
+    }
+  },
+  "cli": {
+    "task_file": "data/hotpotqa_train_300.jsonl",
+    "arm": "a1",
+    "mode": "forced_continuation",
+    "budget": "large",
+    "g": 4,
+    "limit": 50,
+    "temperature": null,
+    "out": "../../experiments/results/foundation/pilot/pilot_fc.jsonl"
+  },
+  "n_tasks": 50
+}

@@ -26,11 +26,11 @@ retrieval:
 
 episode:
   t_max: 10                        # hard cap, all arms
-  budgets: {small: 3, medium: 6, large: 10}   # PROVISIONAL until pilot memo
+  budgets: {small: 2, medium: 4, large: 8}    # FROZEN from pilot 2026-07-22 (P25/P75/~P90 of steps-to-95%-peak)
   draft_retry: 1                   # malformed draft line -> 1 retry -> EMPTY_DRAFT
 
 economy:
-  lambda: 0.5                      # PROVISIONAL headline; spot-check 0.1
+  lambda: 0.3                      # FROZEN from pilot: knee at step 3 becomes interior optimum at B=4
   lambda_spot: 0.1
   # U = F1 - lambda * (steps_used / B)
 
