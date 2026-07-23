@@ -22,11 +22,13 @@ class JudgeStats:
         self.calls = 0
         self.cache_hits = 0
         self.parse_failures = 0
+        self.transport_failures = 0
         self.total_tokens = 0
 
     def as_dict(self):
         return dict(calls=self.calls, cache_hits=self.cache_hits,
                     parse_failures=self.parse_failures,
+                    transport_failures=self.transport_failures,
                     total_tokens=self.total_tokens)
 
 
@@ -63,15 +65,30 @@ class JudgeClient:
 
     # -- transport ---------------------------------------------------------
     def _complete(self, prompt: str) -> str:
-        resp = requests.post(
-            f"{self.endpoint}/chat/completions",
-            json={"model": self.model,
-                  "messages": [{"role": "user", "content": prompt}],
-                  "temperature": self.temperature,
-                  "max_tokens": self.max_tokens},
-            timeout=self.timeout)
-        if resp.status_code != 200:
-            raise RuntimeError(f"judge HTTP {resp.status_code}: {resp.text[:200]}")
+        """POST with transport retries (connection resets happen under
+        concurrent load on the shared judge server — round-2 lesson)."""
+        import time
+        last_err: Exception | None = None
+        for wait in (0, 3, 10, 30):
+            if wait:
+                time.sleep(wait)
+            try:
+                resp = requests.post(
+                    f"{self.endpoint}/chat/completions",
+                    json={"model": self.model,
+                          "messages": [{"role": "user", "content": prompt}],
+                          "temperature": self.temperature,
+                          "max_tokens": self.max_tokens},
+                    timeout=self.timeout)
+            except requests.RequestException as e:
+                last_err = e
+                continue
+            if resp.status_code == 200:
+                break
+            last_err = RuntimeError(
+                f"judge HTTP {resp.status_code}: {resp.text[:200]}")
+        else:
+            raise last_err or RuntimeError("judge unreachable")
         data = resp.json()
         usage = data.get("usage") or {}
         self.stats.total_tokens += int(usage.get("total_tokens") or 0)
@@ -107,7 +124,15 @@ class JudgeClient:
         bits = None
         for _ in range(1 + self.parse_retries):
             self.stats.calls += 1
-            bits = self._parse(self._complete(attempt_prompt), bit_names)
+            try:
+                text = self._complete(attempt_prompt)
+            except Exception:
+                # judge unreachable after all transport retries: neutral, never
+                # crash the reward pipeline (round-2 lesson)
+                self.stats.transport_failures += 1
+                bits = None
+                break
+            bits = self._parse(text, bit_names)
             if bits is not None:
                 break
             attempt_prompt = (prompt + "\n\nYour previous reply was not valid "

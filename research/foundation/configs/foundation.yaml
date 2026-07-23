@@ -65,8 +65,8 @@ reward:
 
 grpo:
   group_size: 8
-  lr: 5.0e-6
-  kl_beta: 0.04
+  lr: 2.0e-6                      # was 5e-6: round-1 damaged temp-1.0 sampling (71% malformed)
+  kl_beta: 0.1                    # was .04: stronger round-start anchor after distribution damage
   clip_eps: 0.2
   length_norm: dr_grpo             # mandatory hygiene (plan §4)
   advantage: step_returns_to_go    # group-normalized per step

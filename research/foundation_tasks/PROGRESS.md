@@ -95,6 +95,15 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-23 REFINEMENT ITERATION 1 (ladder tier: RL hyperparams): round-1
+  training (lr 5e-6, 250 updates, full-FT) damaged the SAMPLING distribution —
+  temp-0 val-50 healthy (F1 .607) but temp-1.0 rollouts 71.6% malformed, U
+  -0.29; round-2 was training on that garbage -> killed. Changes: lr 2e-6,
+  kl_beta 0.1, 150-update cap, KL log-ratio clamp, + NEW post-round temp-1.0
+  health probe gate (scripts/probe_policy_health.sh: malformed<10%, cap<15%).
+  Round-1b retraining from base on the original healthy rollouts (cached).
+  Judge client hardened (transport retries + neutral fallback) after a
+  connection-reset crash under 12-thread load.
 - 2026-07-22: plan docs reviewed doc-by-doc with Brian; implementation started.
 - 2026-07-22 (E-phase): judge = gemma-4-31B-it at 122.11.227.227:6102 (docs said
   Qwen 27B/35B — server reality wins); live rubric sanity PASSED (good search
