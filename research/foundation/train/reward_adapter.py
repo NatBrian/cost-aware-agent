@@ -45,18 +45,22 @@ def batch_rewards(groups: list[list[dict]], judge, cfg: dict,
     Returns the same nesting where each episode gains:
       step_rewards, r_final, returns_to_go, advantages (aligned with steps).
     """
+    from concurrent.futures import ThreadPoolExecutor
     judge_scores: list[float] = []
     f1s: list[float] = []
+    flat = [(gi, ep) for gi, group in enumerate(groups) for ep in group]
+    with ThreadPoolExecutor(max_workers=12) as pool:   # judge is the bottleneck
+        rewards = list(pool.map(lambda t: episode_rewards(t[1], judge, cfg), flat))
+    enriched_by_group: dict[int, list[dict]] = {}
+    for (gi, ep), rew in zip(flat, rewards):
+        enriched_by_group.setdefault(gi, []).append({**ep, **rew})
+        f1s.append(ep["final_f1"])
+        for s, bits in zip(ep["steps"], rew["bits"]):
+            if s["action_type"] == "search":
+                judge_scores.append(step_score(bits, cfg["rubric"]["step_bits"]))
     out: list[list[dict]] = []
-    for group in groups:
-        enriched = []
-        for ep in group:
-            rew = episode_rewards(ep, judge, cfg)
-            enriched.append({**ep, **rew})
-            f1s.append(ep["final_f1"])
-            for s, bits in zip(ep["steps"], rew["bits"]):
-                if s["action_type"] == "search":
-                    judge_scores.append(step_score(bits, cfg["rubric"]["step_bits"]))
+    for gi in sorted(enriched_by_group):
+        enriched = enriched_by_group[gi]
         advs = group_step_advantages([e["returns_to_go"] for e in enriched],
                                      cfg["grpo"]["min_cohort"])
         for e, a in zip(enriched, advs):

@@ -7,4 +7,7 @@ __pycache__/
 # experiment outputs: trajectories/checkpoints local; reports + CSVs committed
 experiments/**/*.jsonl
 experiments/**/run_stamp.json
-experiments/train/
+experiments/**/train/
+experiments/results/train/
+experiments/results/train/
+experiments/**/checkpoint/

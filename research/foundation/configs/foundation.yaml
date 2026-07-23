@@ -71,7 +71,8 @@ grpo:
   length_norm: dr_grpo             # mandatory hygiene (plan §4)
   advantage: step_returns_to_go    # group-normalized per step
   min_cohort: 3                    # fewer alive at step t -> trajectory baseline
-  epochs: 3                        # tune from micro-run
+  accum: 32                        # samples per update (micro-run: 8 was too hot w/ lr 5e-6)
+  rounds: 3                        # round-synced on-policy passes (E-e)
   algorithm: grpo                  # PPO = pre-agreed collapse fallback only (F5)
 
 pilot:

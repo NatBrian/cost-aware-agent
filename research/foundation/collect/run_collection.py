@@ -60,6 +60,7 @@ def main(argv=None) -> None:
                     help="small|medium|large|draw (per task+group, seeded)")
     ap.add_argument("--g", type=int, default=1, help="rollouts per task")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--skip", type=int, default=0, help="shard offset")
     ap.add_argument("--temperature", type=float, default=None)
     ap.add_argument("--train", action="store_true",
                     help="capture messages+logprobs for the trainer (F5)")
@@ -71,7 +72,8 @@ def main(argv=None) -> None:
     temp = (args.temperature if args.temperature is not None
             else ex_cfg["rollout_temperature"] if args.g > 1
             else ex_cfg["eval_temperature"])
-    tasks = load_jsonl(args.task_file)[: args.limit]
+    tasks = load_jsonl(args.task_file)[args.skip:]
+    tasks = tasks[: args.limit]
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     done = completed_keys(out_path)

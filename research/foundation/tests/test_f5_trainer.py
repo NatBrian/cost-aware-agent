@@ -4,7 +4,8 @@ from train.grpo_trainer import build_samples, group_episodes
 
 
 class FakeTok:
-    def apply_chat_template(self, msgs, add_generation_prompt=True):
+    def apply_chat_template(self, msgs, add_generation_prompt=True,
+                            tokenize=True, **kwargs):
         return list(range(sum(len(m["content"]) for m in msgs) % 50 + 5))
 
     def encode(self, text, add_special_tokens=False):
