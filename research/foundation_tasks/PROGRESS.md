@@ -66,7 +66,11 @@
   everywhere (paired); A2 B=2 ceiling confirmed (F1 .221 vs .478); A1
   budget-adapts ~1 step. RL bar at B=4: U>.205, F1≥.361, self-stop≥.70
   (report: baselines_report.md)
-- [ ] E-d: F5 micro-run (10 tasks, real judge) → non-degenerate rewards check
+- [x] E-d ✅ 2026-07-23 (GATE PASSED): verl replaced by custom lean GRPO trainer
+  (rationale in commits e4fe6b6/18542f1). Micro-round end-to-end: 124/124
+  samples zero token mismatch; update-1 ratio 1.003 / KL 6e-4 (math verified);
+  KL-blowup tuned (shuffle + accum 32); multimodal-tensor merge at save;
+  trained checkpoint SERVES ('READY')
 - [ ] E-e (RUNNING since 2026-07-23): 3 rounds × (300 tasks × G=8 sharded collect → judge → train → serve ckpt); round1 launched
 - [ ] E-f: F6 eval (A3 harness-off/on × 3 budgets) + oracle replay → gate_check
 - [ ] E-g: F7 figures + report + GO/NO-GO verdict → tag `foundation-run-1`
