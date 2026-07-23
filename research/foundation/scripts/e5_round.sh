@@ -27,7 +27,9 @@ echo "== train =="
 ARGS=""
 [ -n "$MAX" ] && ARGS="$ARGS --max-steps $MAX"
 [ -n "$INIT" ] && ARGS="$ARGS --init-from $INIT"
-.venv-train/bin/python -m train.grpo_trainer --episodes "$ROUND/rollouts.jsonl" \
+GPUS=$(grep -oP "CUDA_VISIBLE_DEVICES=\\K[0-9,]+" .gpu_hold)
+CUDA_VISIBLE_DEVICES=$GPUS PYTORCH_ALLOC_CONF=expandable_segments:True \
+  .venv-train/bin/python -m train.grpo_trainer --episodes "$ROUND/rollouts.jsonl" \
     --out "$ROUND" $ARGS
 
 echo "== serve new checkpoint =="

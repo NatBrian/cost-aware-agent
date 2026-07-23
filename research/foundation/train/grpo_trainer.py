@@ -118,8 +118,11 @@ def grpo_microbatch_loss(model, batch, device, clip_eps: float, kl_beta: float,
         unclipped = ratio * adv
         clipped = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * adv
         pg = -torch.minimum(unclipped, clipped)                 # per token
-        # k3 KL estimator to the rollout policy (anchor)
-        log_r = old_lp - new_lp
+        # k3 KL estimator to the rollout policy (anchor). Round-1 lesson:
+        # unbounded log-ratios exploded KL to 1e5 on rare outlier tokens
+        # (mean 626 vs healthy 0.02); clamp keeps the estimator finite while
+        # leaving the in-trust-region signal untouched.
+        log_r = (old_lp - new_lp).clamp(-8.0, 8.0)
         kl = torch.exp(log_r) - 1 - log_r
         tok_loss = (pg + kl_beta * kl).sum() / norm_const       # Dr.GRPO const norm
         total = tok_loss if total is None else total + tok_loss
@@ -217,7 +220,7 @@ def train_round(episodes_path: str, out_dir: str, cfg: dict,
             opt.zero_grad()
             n_upd += 1
             m["update"] = n_upd
-            m["loss"] = float(loss)
+            m["loss"] = float(loss.detach())
             log.append(m)
             if n_upd % 5 == 0:
                 print(f"[round] upd {n_upd}: loss={m['loss']:.4f} "
