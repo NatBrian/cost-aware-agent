@@ -33,6 +33,7 @@ class EpisodeSpec:
     seed: int
     config_hash: str
     draft_retry: int = 1
+    train_mode: bool = False   # capture messages + sampled-token logprobs (F5)
 
 
 def _final_from(draft: str) -> str:
@@ -59,7 +60,10 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
         if with_budget:
             messages.append({"role": "user",
                              "content": tracker_block(t - 1, spec.budget)})
-        raw = llm.chat(messages, temperature=spec.temperature)
+        if spec.train_mode:
+            raw, step_lps = llm.chat_with_logprobs(messages, spec.temperature)
+        else:
+            raw, step_lps = llm.chat(messages, temperature=spec.temperature), None
         parsed = parse_step(raw)
         retries = 0
         while parsed is None and retries < spec.draft_retry:
@@ -68,7 +72,10 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
             messages.append({"role": "user",
                              "content": "Invalid format. Reply with exactly the "
                                         "THOUGHT / ACTION / BEST ANSWER SO FAR lines."})
-            raw = llm.chat(messages, temperature=spec.temperature)
+            if spec.train_mode:
+                raw, step_lps = llm.chat_with_logprobs(messages, spec.temperature)
+            else:
+                raw, step_lps = llm.chat(messages, temperature=spec.temperature), None
             parsed = parse_step(raw)
         if parsed is None:
             parsed = {"action_type": "malformed", "content": "",
@@ -86,6 +93,12 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
                 "raw_len": len(raw)}
         if "raw_excerpt" in parsed:
             step["raw_excerpt"] = parsed["raw_excerpt"]
+        if spec.train_mode:
+            # index of this step's FINAL assistant reply in the message list
+            # (appended just above); retried garbage replies stay in messages
+            # for context fidelity but only the final reply is trained on.
+            step["asst_idx"] = len(messages) - 1
+            step["logprobs"] = step_lps or []
 
         if parsed["action_type"] == "answer":
             if spec.mode == "forced_continuation":
@@ -122,7 +135,8 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
 
     steps_used = (answered_at if spec.mode == "forced_continuation"
                   and answered_at is not None else len(steps))
-    return {
+    extra = {"messages": messages} if spec.train_mode else {}
+    return {**extra,
         "task_id": spec.task_id, "question": spec.question,
         "arm": spec.arm, "mode": spec.mode,
         "budget_B": spec.budget, "seed": spec.seed,

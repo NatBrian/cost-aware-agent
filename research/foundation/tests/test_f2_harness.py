@@ -24,6 +24,9 @@ class FakeLLM:
         self.calls.append([dict(m) for m in messages])
         return self.outputs.pop(0)
 
+    def chat_with_logprobs(self, messages, temperature=0.0):
+        return self.chat(messages, temperature), [-0.5, -0.1]
+
 
 class FakeRetriever:
     def search(self, query):
@@ -160,3 +163,19 @@ def test_completed_keys_resume(tmp_path):
                  json.dumps({"task_id": "t1", "rollout": 1}) + "\n")
     assert completed_keys(p) == {("t1", 0), ("t1", 1)}
     assert completed_keys(tmp_path / "missing.jsonl") == set()
+
+
+def test_train_mode_captures_messages_logprobs_and_asst_idx():
+    llm = FakeLLM([step_out("search", "q1", "d"),
+                   step_out("answer", "Rosie Mac", "Rosie Mac")])
+    ep = run_episode(spec(train_mode=True), llm, FakeRetriever())
+    assert "messages" in ep and ep["messages"][0]["role"] == "system"
+    for s in ep["steps"]:
+        assert s["logprobs"] == [-0.5, -0.1]
+        # asst_idx points at THIS step's reply in the message list
+        assert ep["messages"][s["asst_idx"]]["role"] == "assistant"
+        assert ep["messages"][s["asst_idx"]]["content"].startswith("THOUGHT")
+    # non-train mode stays lean
+    llm2 = FakeLLM([step_out("answer", "x", "x")])
+    ep2 = run_episode(spec(), llm2, FakeRetriever())
+    assert "messages" not in ep2 and "logprobs" not in ep2["steps"][0]

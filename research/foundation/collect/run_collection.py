@@ -61,6 +61,8 @@ def main(argv=None) -> None:
     ap.add_argument("--g", type=int, default=1, help="rollouts per task")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--temperature", type=float, default=None)
+    ap.add_argument("--train", action="store_true",
+                    help="capture messages+logprobs for the trainer (F5)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
 
@@ -97,7 +99,7 @@ def main(argv=None) -> None:
                     golds=task["answers"], arm=args.arm, mode=args.mode,
                     budget=budget, t_max=ep_cfg["t_max"], temperature=temp,
                     seed=cfg["seed"], config_hash=chash,
-                    draft_retry=ep_cfg["draft_retry"])
+                    draft_retry=ep_cfg["draft_retry"], train_mode=args.train)
                 ep = run_episode(spec, llm, retr)
                 ep["rollout"] = r
                 validate_episode(ep)

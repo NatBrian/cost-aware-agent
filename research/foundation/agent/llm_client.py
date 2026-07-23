@@ -17,9 +17,20 @@ class OpenAIChat:
         self.extra_body = extra_body or {}
 
     def chat(self, messages: list[dict], temperature: float = 0.0) -> str:
+        content, _ = self.chat_with_logprobs(messages, temperature,
+                                             want_logprobs=False)
+        return content
+
+    def chat_with_logprobs(self, messages: list[dict], temperature: float = 0.0,
+                           want_logprobs: bool = True) -> tuple[str, list[float] | None]:
+        """Returns (content, per-sampled-token logprobs or None). Logprobs of
+        the CHOSEN tokens are the trainer's pi_old for importance ratios and
+        the KL-to-round-start anchor (F5 round-synced design)."""
         body = {"model": self.model, "messages": messages,
                 "temperature": temperature, "max_tokens": self.max_tokens,
                 **self.extra_body}
+        if want_logprobs:
+            body["logprobs"] = True
         try:
             resp = requests.post(f"{self.endpoint}/chat/completions", json=body,
                                  timeout=self.timeout)
@@ -27,4 +38,8 @@ class OpenAIChat:
             raise LLMError(f"LLM server unreachable: {e}") from e
         if resp.status_code != 200:
             raise LLMError(f"LLM server HTTP {resp.status_code}: {resp.text[:200]}")
-        return resp.json()["choices"][0]["message"]["content"]
+        choice = resp.json()["choices"][0]
+        lps = None
+        if want_logprobs and choice.get("logprobs"):
+            lps = [t["logprob"] for t in choice["logprobs"].get("content") or []]
+        return choice["message"]["content"], lps
