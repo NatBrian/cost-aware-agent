@@ -67,7 +67,7 @@
   budget-adapts ~1 step. RL bar at B=4: U>.205, F1≥.361, self-stop≥.70
   (report: baselines_report.md)
 - [ ] E-d: F5 micro-run (10 tasks, real judge) → non-degenerate rewards check
-- [ ] E-e: full GRPO run (300 tasks, 1 seed) → checkpoint + dashboards
+- [ ] E-e (RUNNING since 2026-07-23): 3 rounds × (300 tasks × G=8 sharded collect → judge → train → serve ckpt); round1 launched
 - [ ] E-f: F6 eval (A3 harness-off/on × 3 budgets) + oracle replay → gate_check
 - [ ] E-g: F7 figures + report + GO/NO-GO verdict → tag `foundation-run-1`
 
