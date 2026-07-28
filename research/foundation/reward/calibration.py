@@ -73,13 +73,24 @@ def agreement(sheet_csv: str | Path, judge, cfg_rubric: dict) -> dict:
         lines = [l for l in f if not l.startswith("#")]
     rows = list(csv.DictReader(lines))
     per_bit: dict[str, list[tuple[int, int]]] = {}
+    neutral: dict[str, int] = {}
     for row in rows:
         bits = (ANSWER_BITS if row["action_type"] == "answer" else STEP_BITS)
         got = judge.judge(row["context"], bits)
         for b in bits:
             human = row.get(f"label_{b}", "").strip()
-            if human in ("0", "1"):
-                per_bit.setdefault(b, []).append((int(human), int(round(float(got[b])))))
+            if human not in ("0", "1"):
+                continue
+            v = float(got[b])
+            # A neutral 0.5 means the judge had NO OPINION (parse/transport
+            # failure). int(round(0.5)) == 0 in Python's banker's rounding, so
+            # the old path silently scored "no opinion" as a confident NO and
+            # folded judge outages into the agreement number. Count them
+            # separately instead. (audit 2026-07-28)
+            if v not in (0.0, 1.0):
+                neutral[b] = neutral.get(b, 0) + 1
+                continue
+            per_bit.setdefault(b, []).append((int(human), int(v)))
     gate, floor = cfg_rubric["calibration"]["per_bit_gate"], cfg_rubric["calibration"]["per_bit_floor"]
     report: dict = {"bits": {}, "gate": gate, "floor": floor}
     scores = []
@@ -90,10 +101,21 @@ def agreement(sheet_csv: str | Path, judge, cfg_rubric: dict) -> dict:
                 "h1_j0": sum(h == 1 and j == 0 for h, j in pairs),
                 "h0_j1": sum(h == 0 and j == 1 for h, j in pairs)}
         report["bits"][b] = {"n": len(pairs), "agreement": round(agree, 3),
-                             "confusion": conf}
+                             "confusion": conf, "neutral_dropped": neutral.get(b, 0)}
         scores.append(agree)
-    # gate semantics (F3): mean per-bit agreement >= gate AND no bit below floor
     report["mean_agreement"] = round(sum(scores) / len(scores), 3) if scores else 0.0
-    report["passed"] = (bool(scores) and report["mean_agreement"] >= gate
-                        and min(scores) >= floor)
+    report["neutral_dropped_total"] = sum(neutral.values())
+    # TWO readings, both reported, because they disagree (audit 2026-07-28):
+    #  - strict:     plan §5 / F3 line 118 literally say ">=80% PER BIT".
+    #  - mean+floor: what this function used to gate on alone (mean >= .80 and
+    #                no bit < .70) — looser, and it is what the 2026-07-22 run
+    #                passed (mean .848 with new_info .792, nothing_left .769,
+    #                i.e. two bits that the strict reading fails).
+    # `passed` follows the SPEC. Shipping the looser one as the only number is
+    # how a gate quietly stops being a gate.
+    report["passed_strict_per_bit"] = bool(scores) and min(scores) >= gate
+    report["passed_mean_and_floor"] = (bool(scores)
+                                       and report["mean_agreement"] >= gate
+                                       and min(scores) >= floor)
+    report["passed"] = report["passed_strict_per_bit"]
     return report

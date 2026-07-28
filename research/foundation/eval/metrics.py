@@ -13,11 +13,20 @@ import pandas as pd
 
 
 def episode_row(ep: dict, lam: float) -> dict:
-    self_stopped = (ep.get("answered_at") is not None and not ep["forced_stop"]
+    # self_stopped means the agent stopped ITSELF with nothing armed to stop it.
+    # Requiring mode == "none" is load-bearing: in "enforce" the harness is armed
+    # even on episodes it never had to cut, so counting those as self-stops
+    # credits A2 with internalization it does not have; in
+    # "forced_continuation" answered_at is logged while the episode keeps
+    # running, so it is not a stop at all. (audit 2026-07-28)
+    self_stopped = (ep["mode"] == "none" and ep.get("answered_at") is not None
+                    and not ep["forced_stop"]
                     and ep["answered_at"] <= ep["budget_B"])
     return {
         "task_id": ep["task_id"], "arm": ep["arm"], "mode": ep["mode"],
         "budget_B": ep["budget_B"], "rollout": ep.get("rollout", 0),
+        "answered_at": ep.get("answered_at"),   # kept so A0 can be re-scored
+                                                # at budgets it never ran under
         "f1": ep["final_f1"], "em": ep["final_em"],
         "steps_used": ep["steps_used"],
         "utility": ep["final_f1"] - lam * (ep["steps_used"] / max(1, ep["budget_B"])),
@@ -62,6 +71,13 @@ def paired_delta(df: pd.DataFrame, arm_a: str, arm_b: str, budget: int,
     arm ran the identical dev list)."""
     a = df[(df.arm == arm_a) & (df.budget_B == budget)].set_index("task_id")[metric]
     b = df[(df.arm == arm_b) & (df.budget_B == budget)].set_index("task_id")[metric]
+    # A duplicated task_id (e.g. a3 present in two modes) makes the aligned
+    # subtraction fan out to a many-to-many join: it does NOT raise, it silently
+    # returns a mean over the wrong population while "n" reports the small
+    # number. Refuse instead. (audit 2026-07-28)
+    if not a.index.is_unique or not b.index.is_unique:
+        raise ValueError(f"duplicate task rows for {arm_a}/{arm_b} at B={budget} "
+                         "— filter by mode before pairing")
     common = a.index.intersection(b.index)
     if len(common) == 0:
         raise ValueError(f"no shared tasks between {arm_a} and {arm_b} at B={budget}")
@@ -76,16 +92,21 @@ def paired_delta(df: pd.DataFrame, arm_a: str, arm_b: str, budget: int,
 # ---------- sanity checks (F6: must pass before any number is reported) -----
 
 def check_row_counts(df: pd.DataFrame, expected_tasks: int) -> None:
-    for (arm, b), g in df.groupby(["arm", "budget_B"]):
+    # Group by mode as well as (arm, budget): F6's legitimate CSV holds a3 in
+    # two modes, and grouping without mode would false-fail it — while grouping
+    # WITH mode is exactly what catches a3 harness-on rows leaking into the
+    # harness-off population. (audit 2026-07-28)
+    for (arm, mode, b), g in df.groupby(["arm", "mode", "budget_B"]):
         if g.task_id.duplicated().any():
             dup = g[g.task_id.duplicated()].task_id.iloc[0]
-            raise AssertionError(f"{arm}/B={b}: duplicated task {dup}")
+            raise AssertionError(f"{arm}/{mode}/B={b}: duplicated task {dup}")
         if len(g) != expected_tasks:
-            raise AssertionError(f"{arm}/B={b}: {len(g)} rows, want {expected_tasks}")
+            raise AssertionError(f"{arm}/{mode}/B={b}: {len(g)} rows, "
+                                 f"want {expected_tasks}")
 
 
 def check_utility_recompute(df: pd.DataFrame, lam: float) -> None:
-    u = df.f1 - lam * (df.steps_used / df.budget_B)
+    u = df.f1 - lam * (df.steps_used / df.budget_B.clip(lower=1))
     bad = (u - df.utility).abs() > 1e-9
     if bad.any():
         raise AssertionError(f"stale utility in {int(bad.sum())} rows "

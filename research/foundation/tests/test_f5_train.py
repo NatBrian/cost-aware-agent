@@ -43,7 +43,8 @@ def test_advantages_shapes_match_variable_lengths():
 def test_divergence_log_records_and_saves(tmp_path):
     d = DivergenceLog()
     row = d.add([0.8, 0.6], [0.5], step=10)
-    assert row == {"step": 10, "judge_score_mean": pytest.approx(0.7),
+    assert row == {"step": 10, "scope": "round", "n": 2,
+                   "judge_score_mean": pytest.approx(0.7),
                    "f1_mean": pytest.approx(0.5)}
     p = tmp_path / "div.jsonl"
     d.save(p)
@@ -54,7 +55,9 @@ def test_dry_run_end_to_end():
     cfg = load_config()
     out = dry_run(cfg)
     assert out["episodes"] == 3 * cfg["grpo"]["group_size"]
-    assert out["nonzero_advantages"] and out["divergence_rows"] == 1
+    # one row per group + one round-level row: the round-only curve was a single
+    # point per round (3 for the whole run), useless as the Fig-3 hacking curve
+    assert out["nonzero_advantages"] and out["divergence_rows"] == 3 + 1
 
 
 def test_neutral_judge_is_nondegenerate():

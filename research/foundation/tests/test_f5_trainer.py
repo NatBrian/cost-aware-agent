@@ -12,7 +12,7 @@ class FakeTok:
         return [7] * len(text.split())
 
 
-def mk_ep(task="t1", n_steps=2, lps=True):
+def mk_ep(task="t1", n_steps=2, lps=True, budget_B=4):
     msgs = [{"role": "system", "content": "sys"},
             {"role": "user", "content": "Question: q?"}]
     steps, advs = [], []
@@ -26,13 +26,24 @@ def mk_ep(task="t1", n_steps=2, lps=True):
         advs.append(0.5 - t * 0.1)
         msgs.append({"role": "user", "content": "Results: ..."})
     return {"task_id": task, "messages": msgs, "steps": steps,
-            "advantages": advs}
+            "advantages": advs, "budget_B": budget_B}
 
 
-def test_group_episodes_by_task():
+def test_group_episodes_by_task_and_budget():
     eps = [mk_ep("a"), mk_ep("b"), mk_ep("a")]
     gs = group_episodes(eps)
     assert sorted(len(g) for g in gs) == [1, 2]
+
+
+def test_group_episodes_never_mixes_budgets():
+    """Same task at two wallets must NOT share an advantage group: z-scoring
+    '3 steps of 8' against '3 steps of 2' bakes budget luck into the advantage
+    (plan §2). One wallet per (task, group) makes this a tripwire, not a knob."""
+    eps = [mk_ep("a", budget_B=2), mk_ep("a", budget_B=8), mk_ep("a", budget_B=2)]
+    gs = group_episodes(eps)
+    assert sorted(len(g) for g in gs) == [1, 2]
+    for g in gs:
+        assert len({e["budget_B"] for e in g}) == 1
 
 
 def test_build_samples_aligns_tokens_and_advantages():

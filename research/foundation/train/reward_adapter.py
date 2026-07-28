@@ -23,10 +23,12 @@ class DivergenceLog:
     def __init__(self):
         self.batches: list[dict] = []
 
-    def add(self, judge_scores: list[float], f1s: list[float], step: int) -> dict:
-        row = {"step": step,
+    def add(self, judge_scores: list[float], f1s: list[float], step: int,
+            scope: str = "round") -> dict:
+        row = {"step": step, "scope": scope,
                "judge_score_mean": float(np.mean(judge_scores)) if judge_scores else 0.5,
-               "f1_mean": float(np.mean(f1s)) if f1s else 0.0}
+               "f1_mean": float(np.mean(f1s)) if f1s else 0.0,
+               "n": len(judge_scores)}
         self.batches.append(row)
         return row
 
@@ -66,6 +68,17 @@ def batch_rewards(groups: list[list[dict]], judge, cfg: dict,
         for e, a in zip(enriched, advs):
             e["advantages"] = a
         out.append(enriched)
+        # Per-group rows too: batch_rewards is called ONCE per round, so
+        # round-level rows alone give Fig 3 one point per round (3 total for the
+        # whole run) — not a curve. Group rows give ~300/round, enough to see
+        # judge score and realized F1 diverge WITHIN a round (audit 2026-07-28).
+        if divergence is not None:
+            g_scores = [step_score(bits, cfg["rubric"]["step_bits"])
+                        for e in enriched
+                        for s, bits in zip(e["steps"], e["bits"])
+                        if s["action_type"] == "search"]
+            divergence.add(g_scores, [e["final_f1"] for e in enriched],
+                           train_step, scope=f"group:{gi}")
     if divergence is not None:
-        divergence.add(judge_scores, f1s, train_step)
+        divergence.add(judge_scores, f1s, train_step, scope="round")
     return out

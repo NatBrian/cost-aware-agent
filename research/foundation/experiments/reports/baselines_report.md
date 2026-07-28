@@ -4,6 +4,15 @@
 (A0 once + A1/A2 at each frozen budget {2,4,8}), temperature 0, identical
 frozen 200 questions. Dev-200 look #1 of ≤3. Raw: `../results/baselines/`.
 
+> **Correction 2026-07-28 (code audit).** The `self-stop≤B` column below is
+> mislabeled for **A2**. `self_stopped` keyed only on `forced_stop`, so an
+> enforced episode that happened to answer before the cut was counted as a
+> self-stop — but A2 runs with the harness armed, so it cannot self-stop in the
+> sense the gate means. Read A2's .370/.765/.885 as *"answered before the harness
+> cut it"*, not as internalized stopping. A0/A1 (harness never armed) are
+> unaffected, and the gate reads A3 only, so no conclusion below changes. The
+> definition now requires `mode == "none"`; see `code_audit_2026-07-28.md`.
+
 ## The table (mean over 200 tasks; U = F1 − 0.3·steps/B)
 
 | arm | B | F1 | steps | utility | self-stop≤B | never-answered |

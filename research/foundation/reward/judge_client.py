@@ -60,7 +60,13 @@ class JudgeClient:
 
     # -- cache -------------------------------------------------------------
     def _cache_path(self, prompt: str) -> Path:
-        key = hashlib.sha256(f"{self.rubric_version}\n{prompt}".encode()).hexdigest()
+        # Key on the model and sampling params too, not just the rubric version:
+        # the served judge has already changed once (gemma-4-31B-it -> Qwen3.6-27B,
+        # 2026-07-28), and a version-only key silently serves the OLD judge's
+        # scores for the new one. (audit 2026-07-28)
+        ident = (f"{self.rubric_version}\n{self.model}\n{self.temperature}\n"
+                 f"{self.max_tokens}\n{prompt}")
+        key = hashlib.sha256(ident.encode()).hexdigest()
         return self.cache_dir / f"{key}.json"
 
     # -- transport ---------------------------------------------------------
@@ -78,7 +84,13 @@ class JudgeClient:
                     json={"model": self.model,
                           "messages": [{"role": "user", "content": prompt}],
                           "temperature": self.temperature,
-                          "max_tokens": self.max_tokens},
+                          "max_tokens": self.max_tokens,
+                          # Qwen3.6-27B emits chain-of-thought into content
+                          # unless thinking is disabled — verified 2026-07-28:
+                          # a bare "output only JSON" ask returned "Here's a
+                          # thinking process: ..." and hit the token cap, which
+                          # fails _parse and neutralises every step's reward.
+                          "chat_template_kwargs": {"enable_thinking": False}},
                     timeout=self.timeout)
             except requests.RequestException as e:
                 last_err = e
@@ -121,24 +133,42 @@ class JudgeClient:
             self.stats.cache_hits += 1
             return json.loads(cpath.read_text())
         attempt_prompt = prompt
-        bits = None
+        bits, why = None, ""
         for _ in range(1 + self.parse_retries):
             self.stats.calls += 1
             try:
                 text = self._complete(attempt_prompt)
-            except Exception:
+            except Exception as e:
                 # judge unreachable after all transport retries: neutral, never
                 # crash the reward pipeline (round-2 lesson)
                 self.stats.transport_failures += 1
-                bits = None
+                bits, why = None, f"transport: {type(e).__name__}: {e}"
                 break
             bits = self._parse(text, bit_names)
             if bits is not None:
                 break
+            why = f"parse: {text[:300]!r}"
             attempt_prompt = (prompt + "\n\nYour previous reply was not valid "
                               "JSON in the required schema. Reply with ONLY the JSON.")
         if bits is None:
-            self.stats.parse_failures += 1
+            # Count the two failure kinds disjointly — a transport failure is
+            # not a parse failure, and conflating them hides an outage.
+            if not why.startswith("transport"):
+                self.stats.parse_failures += 1
             bits = neutral_bits(bit_names)
+            self._log_failure(prompt, why)
+            # NEVER persist a neutral verdict. A shared-server outage would
+            # otherwise permanently pin those steps at reward 0, and no rerun
+            # could repair them: the poisoned entry is a cache hit. Leaving it
+            # uncached costs one retry later and keeps the run recoverable.
+            # (audit 2026-07-28)
+            return bits
         cpath.write_text(json.dumps(bits))
         return bits
+
+    def _log_failure(self, prompt: str, why: str) -> None:
+        """A counter says 'N failures'; it cannot say WHICH step went neutral.
+        Persist enough to diagnose one afterwards."""
+        with open(self.cache_dir.parent / "judge_failures.jsonl", "a") as f:
+            f.write(json.dumps({"model": self.model, "why": why,
+                                "prompt_head": prompt[:200]}) + "\n")

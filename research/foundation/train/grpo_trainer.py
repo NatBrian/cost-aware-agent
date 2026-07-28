@@ -37,10 +37,18 @@ from train.reward_adapter import DivergenceLog, batch_rewards
 # --------------------------------------------------------------------------
 
 def group_episodes(episodes: list[dict]) -> list[list[dict]]:
-    by_task: dict[str, list[dict]] = {}
+    """Group by (task_id, budget_B) — NEVER task_id alone.
+
+    Group advantages are z-scores within a group, so a group spanning two
+    wallets would score "used 3 steps of 8" against "used 3 steps of 2" and
+    bake budget luck into the advantage — the confound plan §2 forbids. One
+    round draws one wallet per (task, group), so the extra key is a no-op on
+    clean data and a tripwire on dirty data (resumed/merged/duplicated shards).
+    """
+    by_group: dict[tuple, list[dict]] = {}
     for ep in episodes:
-        by_task.setdefault(ep["task_id"], []).append(ep)
-    return list(by_task.values())
+        by_group.setdefault((ep["task_id"], ep["budget_B"]), []).append(ep)
+    return list(by_group.values())
 
 
 def _template_ids(tokenizer, msgs, **kwargs) -> list[int]:
@@ -105,7 +113,8 @@ def grpo_microbatch_loss(model, batch, device, clip_eps: float, kl_beta: float,
     """Clipped-ratio PG + k3 KL to rollout policy, Dr.GRPO constant norm.
     batch: list of samples. Returns (loss_tensor, metrics_dict)."""
     total = None
-    m = {"ratio_mean": 0.0, "kl": 0.0, "clipped_frac": 0.0, "n_tokens": 0}
+    m = {"ratio_mean": 0.0, "kl": 0.0, "clipped_frac": 0.0, "n_tokens": 0,
+         "entropy": 0.0}
     for s in batch:
         ids = torch.tensor([s["prompt_ids"] + s["reply_ids"]], device=device)
         n_p, n_r = len(s["prompt_ids"]), len(s["reply_ids"])
@@ -132,8 +141,13 @@ def grpo_microbatch_loss(model, batch, device, clip_eps: float, kl_beta: float,
             m["clipped_frac"] += float(((ratio < 1 - clip_eps) |
                                         (ratio > 1 + clip_eps)).float().mean())
             m["n_tokens"] += n_r
+            # Plan §7 requires an entropy curve, and round 1's collapse (71.6%
+            # malformed at temp 1.0) is exactly what a falling entropy shows
+            # BEFORE the post-round probe catches it. Cheap: logps is already
+            # materialized for the PG term.
+            m["entropy"] += float(-(logps.exp() * logps).sum(-1).mean())
     k = len(batch)
-    for key in ("ratio_mean", "kl", "clipped_frac"):
+    for key in ("ratio_mean", "kl", "clipped_frac", "entropy"):
         m[key] /= max(1, k)
     return total / max(1, k), m
 
@@ -184,8 +198,20 @@ def train_round(episodes_path: str, out_dir: str, cfg: dict,
     # template rendering must match vLLM's rollout-time rendering
     samples, stats = build_samples(
         enriched, tok,
+        max_ctx=int(cfg["executor"].get("max_model_len", 8192)),
         template_kwargs={"enable_thinking": cfg["executor"]["enable_thinking"]})
     print(f"[round] samples: {stats}")
+    # Dropped samples are not neutral: too_long correlates with long histories
+    # (late steps) and len_mismatch with template drift. Either one silently
+    # reshapes what the policy learns, so make them impossible to miss.
+    dropped = stats["len_mismatch"] + stats["too_long"] + stats["no_logprobs"]
+    if dropped:
+        frac = dropped / max(1, dropped + stats["kept"])
+        print(f"[round] WARNING dropped {dropped} samples ({frac:.1%}): {stats}")
+        if frac > 0.05:
+            raise SystemExit(
+                f"dropping {frac:.1%} of samples (>5%) — refusing to train on a "
+                f"biased subset; investigate {stats} first")
     if not samples:
         raise SystemExit("no trainable samples — check logprob capture")
 

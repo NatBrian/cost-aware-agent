@@ -11,8 +11,9 @@ from eval.metrics import (aggregate, bootstrap_ci, check_row_counts,
 LAM = 0.5
 
 
-def ep(task="t1", arm="a1", B=6, f1=0.8, steps=4, answered=4, forced=False):
-    return {"task_id": task, "arm": arm, "mode": "none", "budget_B": B,
+def ep(task="t1", arm="a1", B=6, f1=0.8, steps=4, answered=4, forced=False,
+       mode="none"):
+    return {"task_id": task, "arm": arm, "mode": mode, "budget_B": B,
             "rollout": 0, "final_f1": f1, "final_em": float(f1 == 1.0),
             "steps_used": steps, "answered_at": answered, "forced_stop": forced,
             "config_hash": "x"}
@@ -71,9 +72,11 @@ def test_sanity_checks_catch_corruption():
         check_utility_recompute(bad, LAM)
 
 
-def _gate_cfg():
+def _gate_cfg(dev_size=20):
     return {"gate": {"budget": "medium", "min_self_stop": 0.70,
                      "f1_margin": 0.05, "bootstrap_resamples": 100},
+            "economy": {"lambda": LAM},
+            "data": {"dev_size": dev_size},
             "episode": {"budgets": {"small": 3, "medium": 6, "large": 10}}}
 
 
@@ -82,7 +85,7 @@ def test_gate_go_and_nogo():
     for i in range(20):
         rows.append(ep(task=f"t{i}", arm="a1", f1=0.55, steps=8, answered=8))
         rows.append(ep(task=f"t{i}", arm="a2", f1=0.55, steps=6, answered=None,
-                       forced=True))
+                       forced=True, mode="enforce"))
         rows.append(ep(task=f"t{i}", arm="a3", f1=0.60, steps=4, answered=4))
     res = evaluate_gate(frame(rows), _gate_cfg())
     assert res["verdict"] == "GO"
@@ -101,4 +104,23 @@ def test_gate_go_and_nogo():
 def test_gate_requires_all_arms():
     rows = [ep(task="t1", arm="a1")]
     with pytest.raises(ValueError, match="no rows for arm"):
-        evaluate_gate(frame(rows), _gate_cfg())
+        evaluate_gate(frame(rows), _gate_cfg(dev_size=1))
+
+
+def test_gate_ignores_a3_harness_on_rows():
+    """A3 harness-off is the claim (plan §6). F6 also collects A3 harness-ON
+    into the same CSV; if the gate selected on arm alone, those rows would be
+    averaged into the headline and a losing A3 could be dragged over the line
+    (or a winning one under it)."""
+    rows = []
+    for i in range(20):
+        rows.append(ep(task=f"t{i}", arm="a1", f1=0.55, steps=8, answered=8))
+        rows.append(ep(task=f"t{i}", arm="a2", f1=0.55, steps=6, answered=None,
+                       forced=True, mode="enforce"))
+        rows.append(ep(task=f"t{i}", arm="a3", f1=0.60, steps=4, answered=4))
+        # same arm, harness ON: must not touch the verdict
+        rows.append(ep(task=f"t{i}", arm="a3", f1=0.10, steps=6, answered=None,
+                       forced=True, mode="enforce"))
+    res = evaluate_gate(frame(rows), _gate_cfg())
+    assert res["verdict"] == "GO"
+    assert res["cond3_no_collapse"]["a3_f1"] == pytest.approx(0.60)

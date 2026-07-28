@@ -12,7 +12,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd
 
 from common import load_config
-from eval.metrics import check_utility_recompute, rows_from_jsonl
+from eval.metrics import (check_row_counts, check_utility_recompute,
+                          rows_from_jsonl)
+
+
+def rescore_a0(df: pd.DataFrame, budgets: dict, lam: float) -> pd.DataFrame:
+    """A0 sees no budget, so its behaviour cannot depend on B — one run is
+    re-scored under every budget's utility (plan §3, F4 'three numbers for
+    free'). Without this A0 is absent from the gate budget entirely, and the
+    frontier figure has a single A0 point. Re-running A0 per budget instead
+    would add sampling noise to an arm whose behaviour is by construction
+    identical. (audit 2026-07-28)
+    """
+    a0, rest = df[df.arm == "a0"], df[df.arm != "a0"]
+    if a0.empty:
+        return df
+    out = []
+    for B in sorted(set(budgets.values())):
+        r = a0.copy()
+        r["budget_B"] = B
+        r["utility"] = r.f1 - lam * (r.steps_used / max(1, B))
+        r["self_stopped"] = ((r["mode"] == "none") & r.answered_at.notna()
+                             & (r.answered_at <= B)).astype(float)
+        out.append(r)
+    return pd.concat([rest] + out, ignore_index=True)
 
 
 def main() -> None:

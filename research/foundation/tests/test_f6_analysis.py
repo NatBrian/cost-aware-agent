@@ -19,7 +19,8 @@ def synthetic_rows() -> pd.DataFrame:
         for arm, f1, steps in (("a0", 0.50, 9), ("a1", 0.55, 8),
                                ("a2", 0.55, 6), ("a3", 0.62, 4)):
             for B in (3, 6, 10):
-                eps.append({"task_id": f"t{i}", "arm": arm, "mode": "none",
+                eps.append({"task_id": f"t{i}", "arm": arm,
+                            "mode": "enforce" if arm == "a2" else "none",
                             "budget_B": B, "rollout": 0, "final_f1": f1,
                             "final_em": 0.0, "steps_used": min(steps, B),
                             "answered_at": min(steps, B), "forced_stop": arm == "a2",
@@ -30,6 +31,8 @@ def synthetic_rows() -> pd.DataFrame:
 def cfg():
     return {"gate": {"budget": "medium", "min_self_stop": 0.70,
                      "f1_margin": 0.05, "bootstrap_resamples": 100},
+            "economy": {"lambda": LAM},
+            "data": {"dev_size": 15},
             "episode": {"budgets": {"small": 3, "medium": 6, "large": 10}}}
 
 

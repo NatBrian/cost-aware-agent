@@ -41,6 +41,12 @@ executor:
   eval_temperature: 0.0
   rollout_temperature: 1.0
   max_tokens_per_step: 512
+  max_model_len: 16384             # served ctx; trainer drops samples above it.
+                                   # MUST match scripts/e5_round.sh --max-model-len:
+                                   # a lower trainer cap silently drops long
+                                   # (= late-step) samples, biasing training
+                                   # against exactly the over-continuation we
+                                   # are trying to punish (audit 2026-07-28)
 
 judge:                             # the prompted reward model (lab vLLM server)
   model: gemma-4-31B-it            # ACTUAL served model (checked /v1/models 2026-07-22;
