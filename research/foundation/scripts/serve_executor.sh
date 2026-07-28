@@ -21,6 +21,16 @@ GPUS=${CUDA_VISIBLE_DEVICES:-$(grep -oP 'CUDA_VISIBLE_DEVICES=\K[0-9,]+' .gpu_ho
 echo "[serve] model=$MODEL port=$PORT ctx=$CTX gpus=$GPUS"
 # --served-model-name pins the hub id so the client's `model` field is identical
 # whether we are serving the base model or a trained checkpoint.
+# Qwen3.5's gated-delta-rule op has two implementations: forward_cuda calls
+# flashinfer's gdn_prefill, which JIT-compiles and therefore needs nvcc — and
+# this box has no /usr/local/cuda (the pip nvcc wheels are useless too: the 12.9
+# one ships nvcc 13.2 with clashing headers, the 12.8 one ships no nvcc at all).
+# forward_native is vLLM's own Triton FLA path and self-compiles.
+# Disabling the custom op flips CustomOp.dispatch_forward to forward_native.
+# The first run solved this by hand-editing qwen3_next.py inside the venv; that
+# patch died with the venv in the 2026-07-28 wipe. This flag is the same fix
+# expressed in a supported interface, and it lives in git. (2026-07-28)
 CUDA_VISIBLE_DEVICES=$GPUS exec "$VLLM" serve "$MODEL" \
   --served-model-name Qwen/Qwen3.5-9B \
+  --compilation-config '{"custom_ops":["-chunk_gated_delta_rule"]}' \
   --port "$PORT" --dtype auto --max-model-len "$CTX" "$@"
