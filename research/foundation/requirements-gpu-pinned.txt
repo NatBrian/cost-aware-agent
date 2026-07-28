@@ -1,3 +1,37 @@
+# GPU stacks — TWO venvs, and they cannot be merged. Verified 2026-07-28.
+#
+# .venv-gpu3  SERVING (vllm)          vllm 0.17.1 + torch 2.10.0+cu128 + transformers 4.57.6
+# .venv-train TRAINING (transformers) torch 2.10.0+cu128 + transformers >= 5
+#
+# WHY THE SPLIT IS MANDATORY:
+#   * This box's driver is 570.x = CUDA 12.8, so every wheel must be cu128.
+#     torch 2.11+cu130 aborts with "driver too old (found 12080)", and vllm
+#     0.25.x's own wheel links libcudart.so.13 with no cu128 build available.
+#     That pins vllm to 0.17.1, which pins torch==2.10.0 and transformers 4.57.6.
+#   * transformers 4.57.6 CANNOT LOAD Qwen3.5: AutoModelForCausalLM raises
+#     "model type `qwen3_5` not recognized". vLLM serves the model through its
+#     own registry, so serving is fine — but training needs transformers 5.
+#   * I merged the two venvs on 2026-07-28 reasoning that one environment would
+#     remove chat-template drift between rollout and training time. It does not
+#     work: the micro-round collected and judged fine, then died at model load.
+#     The first run's split (e5_round.sh's original .venv-gpu / .venv-train
+#     references) was load-bearing, not incidental. Re-split.
+#
+# Build serving:
+#   /mnt/src/python3.12.13/bin/python3 -m venv --without-pip .venv-gpu3
+#   curl -sS https://bootstrap.pypa.io/get-pip.py | .venv-gpu3/bin/python -
+#   .venv-gpu3/bin/pip install -r requirements-gpu-pinned.txt \
+#       --extra-index-url https://download.pytorch.org/whl/cu128
+#   .venv/bin/python scripts/patch_vllm_qwen3next.py .venv-gpu3   # REQUIRED
+#
+# Build training:
+#   /mnt/src/python3.12.13/bin/python3 -m venv --without-pip .venv-train
+#   curl -sS https://bootstrap.pypa.io/get-pip.py | .venv-train/bin/python -
+#   .venv-train/bin/pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+#   .venv-train/bin/pip install "transformers>=5" safetensors huggingface_hub \
+#       numpy pyyaml requests pandas bitsandbytes
+#
+# Serving venv (this file):
 faiss-cpu==1.14.3
 fastapi==0.136.3
 torch==2.10.0+cu128

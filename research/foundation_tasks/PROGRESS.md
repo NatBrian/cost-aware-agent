@@ -98,6 +98,30 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **MICRO-ROUND CAUGHT A BREAK I INTRODUCED — the two GPU venvs
+  cannot be merged.** Collection and judging passed (48 episodes / 12 groups,
+  177 samples kept, 0 dropped — the >5% drop guard clean), then training died at
+  model load: `ValueError: checkpoint has model type qwen3_5 but Transformers
+  does not recognize this architecture`. transformers 4.57.6 cannot load Qwen3.5;
+  vLLM serves it through its OWN registry, so serving never noticed. The chain is
+  forced: driver 570.x = CUDA 12.8 -> every wheel cu128 -> vllm pinned to 0.17.1
+  -> torch 2.10.0 + transformers 4.57.6 -> cannot train. Training needs
+  transformers >= 5.
+  **This was my error.** On 2026-07-28 I consolidated `.venv-gpu` and
+  `.venv-train` into one venv, reasoning that a single environment removes
+  chat-template drift between rollout and training time. e5_round.sh's original
+  `.venv-train/bin/python` for training and `.venv-gpu/bin/vllm` for serving was
+  LOAD-BEARING, not incidental clutter. Re-split: `.venv-gpu3` serves,
+  `.venv-train` (transformers 5) trains; e5_round.sh points training back at it;
+  requirements-gpu-pinned.txt now documents BOTH stacks and why merging fails.
+  Second time this session that "tidying" an artifact from the first run cost a
+  cycle (the other was rewriting the pin file). The first run's odd-looking
+  choices deserve a `git log` before they are improved.
+  Residual risk to watch at the re-run: the tokenizer now renders under
+  transformers 5 while rollouts were produced by vLLM's transformers 4 — if the
+  chat template drifts, samples get dropped, and the trainer aborts above 5%
+  rather than training on a biased subset.
+
 - 2026-07-28 **E-b RUN 2: GATE PASSED (mean+floor), FAILED strict per-bit.**
   New instrument: 150 steps from the run-2 pilot, labeled by 10 FRESH no-context
   subagents (data block + neutral bit definitions only — never the rubric prompt,

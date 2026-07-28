@@ -29,7 +29,7 @@ ARGS=""
 [ -n "$INIT" ] && ARGS="$ARGS --init-from $INIT"
 GPUS=$(grep -oP "CUDA_VISIBLE_DEVICES=\\K[0-9,]+" .gpu_hold)
 CUDA_VISIBLE_DEVICES=$GPUS PYTORCH_ALLOC_CONF=expandable_segments:True \
-  .venv-gpu3/bin/python -m train.grpo_trainer --episodes "$ROUND/rollouts.jsonl" \
+  .venv-train/bin/python -m train.grpo_trainer --episodes "$ROUND/rollouts.jsonl" \
     --out "$ROUND" $ARGS
 
 echo "== serve new checkpoint =="
