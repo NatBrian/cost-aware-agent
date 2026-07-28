@@ -98,6 +98,26 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **SMOKE PASSED (20 tasks x 3 modes), with one finding held open.**
+  Schema 0 errors in all three modes; retrievals sane (0 thin observations);
+  F1 .462/.414/.454 and mean steps 3.90/3.05/4.00 — close to the surviving
+  E-c baselines (A1 B=4: F1 .471, steps 3.55), so the rebuilt pipeline
+  reproduces prior behaviour.
+  **Finding: 20.5% of steps are malformed in mode=none** (16/78; 0% in enforce,
+  8% in forced_continuation). Root cause is NOT format disobedience: the
+  malformed steps have `raw_len` 1961–2228 chars against `max_tokens_per_step:
+  512`, i.e. the model writes a long multi-sentence THOUGHT, gets truncated
+  mid-sentence, and the required ACTION / BEST ANSWER lines never arrive.
+  **Decision: do NOT change the scaffold yet.** Raising max_tokens or tightening
+  the prompt would give A3 a scaffold the surviving A0/A1/A2 baselines never had,
+  and those baselines are the most valuable asset we still hold — re-collecting
+  them would spend one of the ≤3 dev looks. The scaffold must be a constant
+  across arms (plan §2). Re-decide from the E-a pilot's 200 episodes, where n is
+  large enough to tell a real rate from small-sample noise; if it stays ~20%,
+  weigh a scaffold change + baseline re-run against living with it (the reward's
+  format term already penalises malformed steps, so A3 should learn to avoid
+  them — which is a legitimate result, not a confound, as long as the arms share
+  the scaffold).
 - 2026-07-28 **TWO ROOT CAUSES FOUND (both had bitten the first run; both now
   understood rather than hand-patched).**
   1. **`wiki-18.jsonl.gz` from HuggingFace is a TAR.GZ, not a plain gzip.** It
