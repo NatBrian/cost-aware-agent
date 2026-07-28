@@ -98,6 +98,29 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **E-e ROUND 1 COMPLETE — health probe PASSED, round 2 launched.**
+  150 updates (hit the cap), **8160 samples kept / 1 dropped**, judge 7473 calls
+  with 1 parse failure and 0 transport failures (6.3M tokens).
+  **mean KL 0.052** — against the first run's round-1 blowup to ~626. One
+  transient spike is visible (a sampled update at KL 1.42, ratio 2.5, 30%
+  clipped); the log-ratio clamp bounded it and it did not propagate, which is
+  exactly what that clamp was added for.
+  **Entropy shows no collapse**: noisy per-update (single-sample logging) but
+  ends higher than it starts (0.13 -> 0.95), not decaying toward a degenerate
+  policy.
+  **HARD GATE — probe_policy_health at temp 1.0 on val-50: PASS.**
+  malformed 4.3% (gate <10%), hit_cap 0.0% (gate <15%), F1 .612, mean steps 3.48.
+  This is the gate the first run lacked: there, lr 5e-6 left 71.6% malformed at
+  temp 1.0 while temp-0 checks looked fine, and round 2 trained on the wreckage.
+  **Divergence baseline for the hacking read:** judge score mean .842 vs realized
+  F1 mean .591 across 300 group rows. A level gap is not evidence of hacking (the
+  two are not on one scale — the judge grades process, F1 grades the answer);
+  the diagnostic is the TREND over rounds. Given calibration showed this judge
+  over-approves stopping, the shape to watch in rounds 2-3 is judge score rising
+  while F1 stays flat or falls.
+  Round 1 rollouts + logs + checkpoint backed up to /mnt/src. Round 2 launched
+  from the round-1 checkpoint.
+
 - 2026-07-28 **MICRO-ROUND GATE PASSED — full training loop validated end to
   end** in the rebuilt environment. collect(--train, logprobs) -> judge ->
   advantages -> train -> save+merge -> SERVE, all green:
