@@ -98,6 +98,37 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-29 **E-e COMPLETE (3 rounds). Reward hacking DID NOT occur.**
+  Round 3: 150 updates, 8001 samples kept / 4 dropped, mean KL 0.0027.
+  **Three-round divergence trend — the predicted failure did not materialise:**
+  | round | judge | realized F1 | gap |
+  | 1 | .842 | .591 | +.251 |
+  | 2 | .841 | .611 | +.230 |
+  | 3 | .843 | .622 | +.221 |
+  Calibration showed the judge over-approves stopping, which predicts judge score
+  climbing against flat/falling F1. Observed: judge FLAT across all three rounds,
+  F1 monotonically RISING, gap monotonically NARROWING. The policy improved at
+  the task, not at pleasing the judge. This was the most likely route to a
+  MISLEADING GO, and it is closed.
+- 2026-07-29 **Round-3 probe PASSED but is trending wrong — checkpoint selection
+  moved to the validation slice.**
+  | probe | malformed | hit_cap | F1 | steps |
+  | after r1 | 4.3% | 0.0% | .612 | 3.48 |
+  | after r2 | 2.0% | 0.0% | .572 | 3.67 |
+  | after r3 | **9.0%** | **2.5%** | .598 | 3.62 |
+  Malformed nearly quintupled from round 2 and sits just under the 10% gate;
+  hit_cap went non-zero for the first time. That is the early signature of the
+  sampling-distribution damage that wasted the first run — passing, but pointed
+  the wrong way. So "evaluate the last round" is no longer a safe default.
+  **DECISION (logged): pick the checkpoint by UTILITY on val-50**
+  (`scripts/select_checkpoint.sh`, all three rounds, B=medium, temp 0, harness
+  off). Choosing a checkpoint IS a tuning decision, so it reads val-50 and never
+  dev-200 (anti-overfitting policy). Selection is on U = F1 - lambda*(steps/B),
+  the quantity the run optimises — selecting on F1 alone would reward exactly the
+  over-continuation the method exists to cure. The choice, and every round's
+  validation numbers, go in the final report so the selection is visible rather
+  than implied.
+
 - 2026-07-29 **E-e ROUND 2 COMPLETE — probe PASSED, round 3 launched.**
   150 updates, 8203 samples kept / 2 dropped, mean KL 0.081 (r1: 0.052) —
   rising slightly but an order of magnitude inside trouble. Entropy mean .412,
