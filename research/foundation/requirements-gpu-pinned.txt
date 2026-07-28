@@ -1,22 +1,6 @@
-# GPU stack, re-pinned 2026-07-28 from the environment that actually builds and
-# serves on this box. The previous contents (vllm 0.17.1 / torch 2.10.0 /
-# transformers 4.57.6) contradicted the PROGRESS log of the run that worked, and
-# the trainer's own comments assume transformers 5 — so they were stale.
-#
-# ONE venv for both serving and training: .venv-gpu2. e5_round.sh stops the
-# server before training and restarts it on the new checkpoint afterwards, so
-# they never contend, and a single env removes a whole class of
-# tokenizer/chat-template drift between rollout time and training time.
-#
-# Build:
-#   /mnt/src/python3.12.13/bin/python3 -m venv --without-pip .venv-gpu2
-#   curl -sS https://bootstrap.pypa.io/get-pip.py | .venv-gpu2/bin/python -
-#   .venv-gpu2/bin/pip install -r requirements-gpu-pinned.txt
-vllm==0.25.1
-faiss-cpu           # retrieval server: 64G flat index, CPU search
-bitsandbytes        # AdamW8bit optimizer state (a 9B full-FT otherwise wastes VRAM)
-# Resolved transitively by vllm — recorded so a rebuild can be VERIFIED, not so
-# pip resolves them independently:
-#   torch==2.11.0+cu130
-#   transformers==5.14.1
-#   fastapi==0.136.3
+faiss-cpu==1.14.3
+fastapi==0.136.3
+torch==2.10.0+cu128
+transformers==4.57.6
+uvicorn==0.51.0
+vllm==0.17.1

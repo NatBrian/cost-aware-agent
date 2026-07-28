@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=.venv/bin/python
-VLLM=.venv-gpu2/bin/vllm
+VLLM=.venv-gpu3/bin/vllm
 MODEL=$($PY -c "
 import os
 from common import load_config, FOUNDATION_ROOT

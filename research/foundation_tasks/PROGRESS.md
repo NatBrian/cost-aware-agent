@@ -120,6 +120,32 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
      — the log recorded versions without the CUDA variant, which is the part
      that actually matters here. Lesson logged: verify the environment
      empirically; neither the pin file nor the log was trustworthy alone.
+     **Swapping torch alone is not enough:** vllm 0.25.1's PyPI wheel is itself
+     compiled for CUDA 13 (`import vllm` -> `ImportError: libcudart.so.13`), and
+     no `+cu128` release wheel exists for 0.25.x (the documented GitHub release
+     URLs 404 — matching vllm issue #37847). Since `vllm==0.17.1` requires
+     exactly `torch==2.10.0`, the ORIGINAL pin set (vllm 0.17.1 / torch
+     2.10.0+cu128 / transformers 4.57.6 / faiss-cpu 1.14.3 / fastapi 0.136.3 /
+     uvicorn 0.51.0) is a coherent environment that empirically ran E-a and E-c
+     on this box. **Restored it verbatim via `git checkout` and rebuilt the venv
+     from it** (`.venv-gpu3`). My rewrite of that file was the error, not the
+     file. `requirements-gpu.txt` independently notes "vllm>=0.17 ... GDN kernels
+     for Qwen3.5", so 0.17.1 supports the executor.
+     **The first run had already solved all of this** — commit `28b2728`
+     ("executor serving SOLVED — full dependency saga resolved") records a chain
+     of five failures: (1) torch 2.11 needs a CUDA>=12.9 driver, box has 12.8 ->
+     pin vllm 0.17.1 + torch 2.10.0+cu128; (2) stale flashinfer-cubin 0.6.13 vs
+     flashinfer 0.6.4 -> align them; (3) Qwen3.5's GDN prefill kernel JIT needs
+     nvcc and there is no /usr/local/cuda on the box; (4) the pip nvcc wheels are
+     both useless (the 12.9 wheel ships nvcc 13.2 = header clash, the 12.8 wheel
+     ships no nvcc at all); (5) resolution: patch the venv's `qwen3_next.py` to
+     take vLLM's own Triton FLA path (`forward_native`, the standard non-Hopper
+     implementation, which self-compiles). I burned two turns rediscovering (1)
+     because I trusted the prose log over the lockfile and never read the commit
+     history for the file I was rewriting. **Read `git log -- <file>` before
+     declaring a committed artifact stale.** The venv is gitignored so the
+     `qwen3_next.py` patch itself was lost with it and must be re-applied; the
+     `.cuda_home/` shim in the repo is a survivor of failure (4).
 - 2026-07-28 **AUTONOMY MANDATE v2 (Brian):** "I will not prompt you. You must
   complete everything of the foundation paper plan until the end... You must
   advance and continue automatically and decide the best solution. Only ask me

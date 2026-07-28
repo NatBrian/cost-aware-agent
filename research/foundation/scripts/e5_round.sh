@@ -29,13 +29,13 @@ ARGS=""
 [ -n "$INIT" ] && ARGS="$ARGS --init-from $INIT"
 GPUS=$(grep -oP "CUDA_VISIBLE_DEVICES=\\K[0-9,]+" .gpu_hold)
 CUDA_VISIBLE_DEVICES=$GPUS PYTORCH_ALLOC_CONF=expandable_segments:True \
-  .venv-train/bin/python -m train.grpo_trainer --episodes "$ROUND/rollouts.jsonl" \
+  .venv-gpu3/bin/python -m train.grpo_trainer --episodes "$ROUND/rollouts.jsonl" \
     --out "$ROUND" $ARGS
 
 echo "== serve new checkpoint =="
 CKPT="$PWD/$ROUND/checkpoint"
 GPUS=$(grep -oP 'CUDA_VISIBLE_DEVICES=\K[0-9,]+' .gpu_hold)
-CUDA_VISIBLE_DEVICES=$GPUS nohup .venv-gpu/bin/vllm serve "$CKPT" \
+CUDA_VISIBLE_DEVICES=$GPUS nohup .venv-gpu3/bin/vllm serve "$CKPT" \
   --served-model-name Qwen/Qwen3.5-9B --port 8378 --dtype auto \
   --max-model-len 16384 --gpu-memory-utilization 0.85 \
   > "$ROUND/vllm_restart.log" 2>&1 &
