@@ -9,7 +9,7 @@ weights designed and frozen, not fitted.
 
 from agent.prompts import EMPTY_DRAFT
 
-RUBRIC_VERSION = "rubric_v3"
+RUBRIC_VERSION = "rubric_v4"
 
 STEP_BITS = ("new_info", "not_redundant", "was_needed")
 ANSWER_BITS = ("supported", "nothing_left")
@@ -104,11 +104,11 @@ ANSWER_INSTRUCTIONS = """Answer two YES/NO questions about stopping NOW with THI
 
 2. nothing_left — Was stopping now the right call, i.e. is further searching
    unlikely to change or improve this answer? Work in order: (a) list the facts
-   the question requires; (b) for each, say whether the history resolves it;
-   (c) answer. Answer NO only if you can NAME a specific required fact that is
-   still unresolved AND budget remained to pursue it. Otherwise answer YES —
-   including when the remaining budget is too small to close the gap, and when
-   you are undecided.
+   the question requires; (b) for each, point to where the history resolves it;
+   (c) answer. Answer YES only if EVERY required fact is resolved by evidence in
+   the history, or the remaining budget is too small to resolve what is missing.
+   Answer NO if any required fact rests on an assertion the history does not
+   support and budget remained. If you are undecided, answer NO.
    Example YES: both hops of the question are answered and confirmed.
    Example NO: the answer's second half is a guess and 4 steps remained.
 

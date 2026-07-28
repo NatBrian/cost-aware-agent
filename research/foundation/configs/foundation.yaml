@@ -78,7 +78,7 @@ judge:                             # the prompted reward model (lab vLLM server)
   cache_dir: cache/judge           # keyed (rubric_version, input_hash)
 
 rubric:
-  version: rubric_v3
+  version: rubric_v4
   step_bits: {new_info: 0.4, not_redundant: 0.3, was_needed: 0.3}
   answer_bits: {supported: 0.5, nothing_left: 0.5}
   alpha: 0.2                       # r_t = alpha * (score - 0.5)

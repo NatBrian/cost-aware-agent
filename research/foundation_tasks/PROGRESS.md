@@ -98,6 +98,32 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **E-b RUN 2: GATE PASSED (mean+floor), FAILED strict per-bit.**
+  New instrument: 150 steps from the run-2 pilot, labeled by 10 FRESH no-context
+  subagents (data block + neutral bit definitions only — never the rubric prompt,
+  judge output, or session context). n=70-80/bit, CI ~+-0.09 vs +-0.17 before.
+  rubric_v4: mean .847, bits — not_redundant .957, supported .863, new_info .843,
+  was_needed .800, nothing_left .775. Implemented gate (mean>=.80, floor .70)
+  PASSES; the plan's literal >=.80-per-bit FAILS on nothing_left.
+  **v3 -> v4 was one edit and it corrected MY error:** v3 told the judge to
+  answer YES on nothing_left when undecided, because the old anchored 50-row
+  sheet made it look too strict. On a trustworthy instrument the bias is the
+  opposite. v4 requires positive evidence; the bit moved .688 -> .775 and false
+  approvals halved (23 -> 12).
+  **Residual bias is the dangerous direction:** the judge still over-approves
+  stopping (nothing_left h0j1 12 vs h1j0 6; was_needed h1j0 14 vs h0j1 0). Since
+  nothing_left IS the stop decision, a reward that over-approves stopping teaches
+  premature stopping and would produce a GO for the wrong reason. Guards: gate
+  cond3 (A3 F1 >= A2 F1 - .05) and the per-group divergence curve.
+  **DECISION (logged): proceed to E-e on rubric_v4.** Run 1 was accepted at mean
+  .848 with nothing_left .769 — it also failed the strict reading, and was worse
+  on this bit; we are better calibrated on far better evidence. .775 vs .80 at
+  CI +-0.09 is not distinguishable from the line, and further prompt revision
+  would fit the sheet (already demonstrated at n=25/bit). BOTH readings go into
+  every downstream artifact. Report: experiments/reports/calibration_report_v2.md
+  **Honesty item: these are MODEL labels, not Brian's — the gate measures
+  judge-labeler consistency and F3's human-label requirement is formally unmet.**
+
 - 2026-07-28 **SMOKE PASSED (20 tasks x 3 modes), with one finding held open.**
   Schema 0 errors in all three modes; retrievals sane (0 thin observations);
   F1 .462/.414/.454 and mean steps 3.90/3.05/4.00 — close to the surviving

@@ -1,0 +1,17 @@
+[
+  {"sheet_id": "75", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "76", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "77", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "78", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "79", "supported": 1, "nothing_left": 1},
+  {"sheet_id": "80", "new_info": 0, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "81", "new_info": 1, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "82", "new_info": 0, "not_redundant": 0, "was_needed": 1},
+  {"sheet_id": "83", "new_info": 0, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "84", "new_info": 0, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "85", "new_info": 1, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "86", "new_info": 1, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "87", "new_info": 1, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "88", "new_info": 1, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "89", "new_info": 0, "not_redundant": 0, "was_needed": 1}
+]

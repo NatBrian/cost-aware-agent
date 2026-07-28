@@ -1,0 +1,17 @@
+[
+  {"sheet_id": "120", "new_info": 0, "not_redundant": 0, "was_needed": 1},
+  {"sheet_id": "121", "new_info": 0, "not_redundant": 0, "was_needed": 1},
+  {"sheet_id": "122", "new_info": 0, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "123", "new_info": 0, "not_redundant": 0, "was_needed": 1},
+  {"sheet_id": "124", "new_info": 1, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "125", "new_info": 0, "not_redundant": 0, "was_needed": 1},
+  {"sheet_id": "126", "new_info": 1, "not_redundant": 0, "was_needed": 1},
+  {"sheet_id": "127", "new_info": 1, "not_redundant": 0, "was_needed": 1},
+  {"sheet_id": "128", "new_info": 0, "not_redundant": 0, "was_needed": 1},
+  {"sheet_id": "129", "new_info": 0, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "130", "new_info": 0, "not_redundant": 0, "was_needed": 0},
+  {"sheet_id": "131", "new_info": 1, "not_redundant": 1, "was_needed": 0},
+  {"sheet_id": "132", "new_info": 1, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "133", "new_info": 1, "not_redundant": 1, "was_needed": 1},
+  {"sheet_id": "134", "new_info": 0, "not_redundant": 0, "was_needed": 1}
+]

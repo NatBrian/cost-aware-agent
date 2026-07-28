@@ -1,0 +1,17 @@
+[
+  {"sheet_id": "0", "supported": 0, "nothing_left": 1},
+  {"sheet_id": "1", "supported": 1, "nothing_left": 1},
+  {"sheet_id": "2", "supported": 1, "nothing_left": 1},
+  {"sheet_id": "3", "supported": 1, "nothing_left": 1},
+  {"sheet_id": "4", "supported": 0, "nothing_left": 1},
+  {"sheet_id": "5", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "6", "supported": 1, "nothing_left": 1},
+  {"sheet_id": "7", "supported": 1, "nothing_left": 1},
+  {"sheet_id": "8", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "9", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "10", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "11", "supported": 1, "nothing_left": 1},
+  {"sheet_id": "12", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "13", "supported": 0, "nothing_left": 0},
+  {"sheet_id": "14", "supported": 0, "nothing_left": 0}
+]
