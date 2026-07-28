@@ -98,6 +98,28 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **E-b RE-RUN: GATE NOT PASSED with the new judge.** Qwen3.6-27B
+  scores mean .769 (rubric_v1) / .764 (v2) / .792 (v3) against the surviving
+  50-label sheet — below .80 on both the strict per-bit reading the plan
+  specifies and the looser mean+floor the code had drifted to. v2 applied the
+  audit's rubric recommendations and was MEASURED, not assumed: `nothing_left`
+  +.116, `supported` −.115, so v3 keeps what helped and reverts what hurt, and
+  drops a verbatim-quote field that emitted invalid JSON. v3 runs with 0 parse
+  failures and 0 neutral fallbacks. **Blocking finding:** at n=24–26 per bit the
+  95% CI is ±0.17, so the v1/v2/v3 spread is noise — further prompt-tuning
+  against this sheet fits noise. Report: `calibration_report_qwen36.md`.
+- 2026-07-28 **DECISION (Brian): rebuild the calibration instrument, labeled by
+  a FRESH SUBAGENT with no session context.** ~150 steps drawn from the Phase 3
+  pilot; each batch goes to a newly spawned agent that sees only the bit
+  definitions and the step context — never any judge output, never the rubric
+  version history, never this conversation. Rationale: it removes the anchoring
+  that inflated the original .848 (labels there were revised while reading the
+  old judge's reasoning), it is independent of the judge under test
+  (Qwen3.6-27B, a different model family), and n=150 shrinks the per-bit CI from
+  ±0.17 to about ±0.07 — enough to actually arbitrate the gate. Honesty note for
+  the report: these are model labels, not Brian's, so the gate is evidence about
+  judge–labeler *consistency*, and the F3 requirement for human labels is
+  formally unmet.
 - 2026-07-28 **CONTAINER WIPE — all gitignored runtime state lost.** The pod came
   back fresh (every file dated 14:39); nothing was running and all 8 GPUs were
   idle, despite the E-e line above claiming RUNNING. `/home/liangsheng` is an
