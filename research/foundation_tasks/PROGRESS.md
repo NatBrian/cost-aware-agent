@@ -71,7 +71,10 @@
   samples zero token mismatch; update-1 ratio 1.003 / KL 6e-4 (math verified);
   KL-blowup tuned (shuffle + accum 32); multimodal-tensor merge at save;
   trained checkpoint SERVES ('READY')
-- [ ] E-e (RUNNING since 2026-07-23): 3 rounds × (300 tasks × G=8 sharded collect → judge → train → serve ckpt); round1 launched
+- [ ] E-e **INTERRUPTED by container wipe 2026-07-28** (was: round-1b retraining
+  from base on cached rollouts, launched 2026-07-23). Restarting from base —
+  see the 2026-07-28 log entry for the full inventory. 3 rounds ×
+  (300 tasks × G=8 sharded collect → judge → train → serve ckpt)
 - [ ] E-f: F6 eval (A3 harness-off/on × 3 budgets) + oracle replay → gate_check
 - [ ] E-g: F7 figures + report + GO/NO-GO verdict → tag `foundation-run-1`
 
@@ -95,6 +98,46 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **CONTAINER WIPE — all gitignored runtime state lost.** The pod came
+  back fresh (every file dated 14:39); nothing was running and all 8 GPUs were
+  idle, despite the E-e line above claiming RUNNING. `/home/liangsheng` is an
+  ephemeral overlay; only committed files survived.
+  - **Lost:** `research/data_shared/` (79G — HotpotQA sources incl. the
+    *decontaminated* train file, 21M-passage corpus, E5/FAISS index) ·
+    `foundation/data/` (frozen train-300/dev-200 + SHA256 manifest) · `.venv`
+    and the GPU venv (`.venv-gpu` is now an empty shell: pip only) · every
+    trajectory JSONL (pilot, baselines, E-e rollouts) · the judge cache · the
+    **round-1b checkpoint**.
+  - **Survived (committed):** all code and docs · all three reports ·
+    `baseline_rows.csv` (all 1,400 A0/A1/A2 rows) · `sheet_v1.csv` (the 50
+    calibration labels *with* each row's exact judge context).
+  - **Consequences:** (1) training restarts from base — E-d/E-e survive only as
+    code and commit messages; (2) **dev-200 is exactly recoverable** from the 200
+    HotpotQA ids in `baseline_rows.csv`, so the surviving baseline numbers stay
+    valid and comparable, and the gate is unaffected; (3) **train-300 is NOT
+    reproducible** — its decontaminated source is gone and the generator lives in
+    the read-banned archive, so it will be re-derived (same seed, same
+    stratification, own overlap check vs dev-200) and A3 will train on a slightly
+    different 300 questions than the lost run. Logged as a deviation.
+  - **Policy fixes adopted (Brian, 2026-07-28):** everything regenerable now
+    lives on `/mnt/src/liangsheng/` (persistent CPFS) and is symlinked into the
+    repo, so a future wipe costs one symlink; commit and push continuously rather
+    than at stage boundaries; GPU holds via `/home/liangsheng/brian/acquire_gpus.py`
+    (never takes a card another process is on), 2 held at all times.
+  - Dev-look ledger unchanged: **1 of ≤3 used** (E-c baselines).
+- 2026-07-28 **Judge changed: gemma-4-31B-it (:6102) → Qwen3.6-27B (:6101)**
+  (Brian). This invalidates the E-b gate, which was measured against gemma — so
+  calibration re-runs against the new judge before any RL. Cheap: `sheet_v1.csv`
+  carries the labels and the exact context, so `agreement()` re-judges from the
+  sheet (50 calls, no GPU, no pilot rerun). **Verified integration hazard:**
+  Qwen3.6-27B emits chain-of-thought into `message.content` (not
+  `reasoning_content`) — a bare "output only JSON" request returned "Here's a
+  thinking process: …" and hit the token cap. Strict-JSON parsing would fail on
+  every step and fall back to neutral 0.5, silently zeroing the per-step reward
+  while training continued on the terminal reward alone. Fix:
+  `chat_template_kwargs: {"enable_thinking": false}`, which returns clean JSON.
+  Also note `max_model_len` 32768 (gemma had 262144) — late-step prompt lengths
+  must be checked against it.
 - 2026-07-23 REFINEMENT ITERATION 1 (ladder tier: RL hyperparams): round-1
   training (lr 5e-6, 250 updates, full-FT) damaged the SAMPLING distribution —
   temp-0 val-50 healthy (F1 .607) but temp-1.0 rollouts 71.6% malformed, U

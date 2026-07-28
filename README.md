@@ -243,3 +243,47 @@ daemon and DB.
 - Planning / self-verification code paths exist but are dormant behind
   `enable_plan_verification: false` — they never demonstrated value in any
   experiment.
+
+---
+
+## Repository layout — two projects, one repo
+
+This repo holds **two separate projects**. Everything outside `research/` is the
+harness described above; everything inside `research/` is an independent research
+effort (RL training for cost-aware agents) that shares only the underlying idea.
+
+| Path | Belongs to | What it is |
+|---|---|---|
+| `cost_aware_agent/` | **harness** | The daemon, cost engine, ledger, adapters, CLI (table above). |
+| `tests/` | **harness** | Unit tests for the harness only (`python3 -m pytest tests/`). |
+| `experiments/` | **harness** | The harness's own A/B experiments — `swe_ab`, `real_cli`, `e2e_verify`, `cc_adapter`, `hotpotqa` — the runs behind [Results](#results). |
+| `VISION.md` | **harness** | The rationale for the harness. |
+| `research/` | **research** | The CASSI research project: paper plans, literature review, and the `foundation/` training codebase. Has its own tests, configs, and experiment outputs. |
+
+> [!IMPORTANT]
+> **Research code and research experiments live in `research/` — never in
+> `experiments/` or `tests/`.** Those two directories are the harness's; adding a
+> research run there mixes two projects with different dependencies (the harness
+> is FastAPI + SQLite on CPU; the research stack is vLLM/torch on GPUs), different
+> test suites, and different data policies. Conversely, harness experiments do not
+> go under `research/`.
+>
+> Concretely, when working on the research project:
+> - training/eval code → `research/foundation/` (its own package, tests, Makefile)
+> - experiment outputs and reports → `research/foundation/experiments/`
+> - tests → `research/foundation/tests/` (`cd research/foundation && make test`)
+> - every experiment constant → `research/foundation/configs/foundation.yaml`
+>
+> Note the name collision: `experiments/` at the repo root is the harness's, while
+> `research/foundation/experiments/` is the research project's. They are unrelated.
+
+**Start here for the research side:** [`research/README.md`](research/README.md) —
+it indexes every research directory. The active work is the pipeline-validation
+run planned in
+[`research/paper_plan_v2_1_foundation.md`](research/paper_plan_v2_1_foundation.md)
+with code in [`research/foundation/`](research/foundation/).
+
+The harness is not a dependency of the research code (and vice versa) — the two
+only share a design principle: budget information is delivered to the agent as
+*facts, not advice* (`cost_aware_agent/prompts.py` →
+`research/foundation/agent/prompts.py`).
