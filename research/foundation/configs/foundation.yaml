@@ -42,7 +42,13 @@ economy:
   # U = F1 - lambda * (steps_used / B)
 
 executor:
-  model: Qwen/Qwen3.5-9B
+  model: Qwen/Qwen3.5-9B           # hub id: identity in logs/reports
+  model_path: ../data_shared/models/Qwen3.5-9B   # local weights on persistent
+                                   # storage. Used for serving, tokenizer, init
+                                   # AND the untrained-tensor merge — the merge
+                                   # used to snapshot_download the hub repo every
+                                   # round, i.e. 19G per round for bytes already
+                                   # on disk. (2026-07-28)
   enable_thinking: false
   endpoint: http://127.0.0.1:8378/v1   # vLLM OpenAI-compatible (8000 too contested on this shared box)
   eval_temperature: 0.0

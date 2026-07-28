@@ -152,28 +152,51 @@ def grpo_microbatch_loss(model, batch, device, clip_eps: float, kl_beta: float,
     return total / max(1, k), m
 
 
-def merge_untrained_hub_weights(ckpt_dir, hub_model: str, torch) -> None:
-    """Qwen3.5-9B is multimodal; AutoModelForCausalLM trains/saves only the
-    text side. Serving with the hub config needs the untouched extras
-    (model.visual.*, mtp.*) — copy them from the hub shards into our save."""
+def merge_untrained_hub_weights(ckpt_dir, base_model: str, torch) -> None:
+    """Qwen3.5-9B is multimodal; AutoModelForCausalLM trains/saves only the text
+    side. Serving with the full config needs the untouched extras
+    (model.visual.*, mtp.* — 348 of the 775 tensors) so copy them from the base
+    shards into our save.
+
+    base_model may be a LOCAL directory (preferred: the weights are already on
+    persistent storage, and snapshot_download would otherwise re-fetch 19G every
+    round) or a hub id, which is fetched.
+    """
     import glob as _glob
-    import json as _json
-    from huggingface_hub import snapshot_download
     from safetensors import safe_open
     from safetensors.torch import load_file, save_file
-    ours = load_file(str(ckpt_dir / "model.safetensors"))
-    snap = snapshot_download(hub_model, allow_patterns=["*.safetensors*"])
+
+    # save_pretrained shards above ~5GB, so the checkpoint may be one file or
+    # several; collect whatever it wrote rather than assuming model.safetensors.
+    ours: dict = {}
+    ckpt_shards = sorted(_glob.glob(str(ckpt_dir / "*.safetensors")))
+    if not ckpt_shards:
+        raise FileNotFoundError(f"no safetensors written to {ckpt_dir}")
+    for shard in ckpt_shards:
+        ours.update(load_file(shard))
+    trained_keys = set(ours)
+
+    if Path(base_model).is_dir():
+        src = base_model
+    else:
+        from huggingface_hub import snapshot_download
+        src = snapshot_download(base_model, allow_patterns=["*.safetensors*"])
     added = 0
-    for shard in sorted(_glob.glob(snap + "/*.safetensors")):
+    for shard in sorted(_glob.glob(src + "/*.safetensors")):
         with safe_open(shard, "pt") as f:
             for k in f.keys():
                 if k not in ours:
                     ours[k] = f.get_tensor(k)
                     added += 1
-    save_file(ours, str(ckpt_dir / "model.safetensors"),
-              metadata={"format": "pt"})
+    if not added:
+        print("[round] WARNING merged 0 untrained tensors — expected the "
+              "multimodal extras; the served checkpoint may be incomplete")
+    for shard in ckpt_shards:                    # replaced by the merged file
+        Path(shard).unlink()
+    save_file(ours, str(ckpt_dir / "model.safetensors"), metadata={"format": "pt"})
     (ckpt_dir / "model.safetensors.index.json").unlink(missing_ok=True)
-    print(f"[round] merged {added} untrained hub tensors into checkpoint")
+    print(f"[round] merged {added} untrained tensors into checkpoint "
+          f"({len(trained_keys)} trained, {len(ours)} total)")
 
 
 def train_round(episodes_path: str, out_dir: str, cfg: dict,
@@ -194,7 +217,9 @@ def train_round(episodes_path: str, out_dir: str, cfg: dict,
     print(f"[round] {len(episodes)} episodes / {len(groups)} groups; judging...")
     enriched = batch_rewards(groups, judge, cfg, div, train_step=0)
 
-    tok = AutoTokenizer.from_pretrained(cfg["executor"]["model"])
+    base = cfg["executor"].get("model_path")
+    base = str((FOUNDATION_ROOT / base).resolve()) if base else cfg["executor"]["model"]
+    tok = AutoTokenizer.from_pretrained(base)
     # template rendering must match vLLM's rollout-time rendering
     samples, stats = build_samples(
         enriched, tok,
@@ -216,9 +241,8 @@ def train_round(episodes_path: str, out_dir: str, cfg: dict,
         raise SystemExit("no trainable samples — check logprob capture")
 
     model = AutoModelForCausalLM.from_pretrained(
-        init_from or cfg["executor"]["model"],
-        torch_dtype=torch.bfloat16).to(device)
-    print(f"[round] init from: {init_from or cfg['executor']['model']}")
+        init_from or base, torch_dtype=torch.bfloat16).to(device)
+    print(f"[round] init from: {init_from or base}")
     model.gradient_checkpointing_enable()
     model.train()
     try:
@@ -263,14 +287,17 @@ def train_round(episodes_path: str, out_dir: str, cfg: dict,
     # registry doesn't know; restore the hub original (same class, same keys).
     import glob as _glob
     import shutil
-    from huggingface_hub import snapshot_download
-    snap = snapshot_download(cfg["executor"]["model"],
-                             allow_patterns=["*.json", "*.txt", "*.jinja"])
+    if Path(base).is_dir():
+        snap = base
+    else:
+        from huggingface_hub import snapshot_download
+        snap = snapshot_download(base, allow_patterns=["*.json", "*.txt", "*.jinja"])
     for f in _glob.glob(snap + "/*"):
         b = f.rsplit("/", 1)[1]
-        if not b.endswith(".safetensors") and "safetensors.index" not in b:
+        if (not b.endswith(".safetensors") and "safetensors.index" not in b
+                and Path(f).is_file()):
             shutil.copy(f, out / "checkpoint" / b)
-    merge_untrained_hub_weights(out / "checkpoint", cfg["executor"]["model"], torch)
+    merge_untrained_hub_weights(out / "checkpoint", base, torch)
     div.save(out / "divergence.jsonl")
     with open(out / "train_log.jsonl", "w") as f:
         for row in log:
