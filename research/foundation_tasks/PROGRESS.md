@@ -98,6 +98,28 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **TWO ROOT CAUSES FOUND (both had bitten the first run; both now
+  understood rather than hand-patched).**
+  1. **`wiki-18.jsonl.gz` from HuggingFace is a TAR.GZ, not a plain gzip.** It
+     holds one member (`data00/.../wiki_dump.jsonl`), so `gunzip -c` yields the
+     tar stream: a 512-byte header fused onto record 0 and NUL padding at the
+     tail. The retrieval server's `ntotal == lines` assertion caught it again
+     (21,015,324 index rows vs 21,015,325 corpus lines). This is *exactly* the
+     "botched tar extraction" the first run diagnosed on 2026-07-22 and repaired
+     by hand — it was never a bad extraction on our side, it is what the file
+     is. Fix: `tar -xzOf`, recorded in `/mnt/src/.../extract.sh`. Note the
+     earlier `wc -l` "verification" was misleading: it counts newlines, so the
+     unterminated final padding line made a corrupt corpus look correct.
+  2. **The box cannot run cu130 builds.** Driver 570.172.08 reports CUDA 12.8;
+     `torch 2.11.0+cu130` (pip's default variant) aborts with "NVIDIA driver on
+     your system is too old (found version 12080)" and vLLM's engine core dies
+     with it. cu128 wheels are forward-compatible across 12.x, so the stack must
+     be pinned to cu128 via `--index-url .../whl/cu128`. **This vindicates the
+     ORIGINAL `requirements-gpu-pinned.txt` (torch 2.10.0+cu128) that I had
+     overwritten** on the strength of this log's "vllm 0.25.1/torch 2.11.0" line
+     — the log recorded versions without the CUDA variant, which is the part
+     that actually matters here. Lesson logged: verify the environment
+     empirically; neither the pin file nor the log was trustworthy alone.
 - 2026-07-28 **AUTONOMY MANDATE v2 (Brian):** "I will not prompt you. You must
   complete everything of the foundation paper plan until the end... You must
   advance and continue automatically and decide the best solution. Only ask me
