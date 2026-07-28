@@ -98,6 +98,24 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **AUTONOMY MANDATE v2 (Brian):** "I will not prompt you. You must
+  complete everything of the foundation paper plan until the end... You must
+  advance and continue automatically and decide the best solution. Only ask me
+  if you need clarification/questions." Self-scheduled loop keeps the run moving;
+  every judgement call is logged here.
+- 2026-07-28 **DATA REBUILT + VERIFIED.** `/mnt/src/liangsheng/cassi_foundation`
+  (persistent) holds corpus + index + weights; `research/data_shared` symlinks to
+  it. Assembly verified byte-exact against the values recorded in
+  `serve_retrieval.py`: `e5_Flat.index` = 64,559,075,373 bytes and
+  `wiki-18.jsonl` = 21,015,324 lines, so the index/corpus row-count assertion
+  holds and the tar-corruption that bit the first run did NOT recur.
+  Splits: **dev-200 EXACT MATCH by id to the pre-registered set** (verified
+  against baseline_rows.csv — the gate keeps its questions and the surviving
+  A0/A1/A2 numbers stay comparable); train-300 re-derived
+  (189 medium/60 easy/51 hard vs the lost run's 194/55/51 — logged deviation);
+  val-50 generated for the first time. Overlaps train/dev, val/dev, val/train
+  all zero; decontamination dropped 0 rows (HotpotQA train and dev are disjoint
+  splits, so the lost `*.decontaminated.jsonl` was belt-and-braces).
 - 2026-07-28 **E-b RE-RUN: GATE NOT PASSED with the new judge.** Qwen3.6-27B
   scores mean .769 (rubric_v1) / .764 (v2) / .792 (v3) against the surviving
   50-label sheet — below .80 on both the strict per-bit reading the plan
