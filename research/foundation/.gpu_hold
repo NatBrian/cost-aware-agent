@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=6  # + lock 7 reserved (occupied); zhanka pool 0-3 full
+CUDA_VISIBLE_DEVICES=0,1  # acquire_gpus.py -n 2, held since 2026-07-28 15:25

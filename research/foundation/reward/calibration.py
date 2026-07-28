@@ -14,7 +14,7 @@ import random
 from pathlib import Path
 
 from reward.rubric import (ANSWER_BITS, STEP_BITS, render_answer_prompt,
-                           render_step_prompt)
+                           render_step_prompt, upgrade_context)
 
 INSTRUCTIONS = ("Fill every label_* column with 0 or 1 per the bit definitions "
                 "in reward/rubric.py (answer steps use supported/nothing_left; "
@@ -76,7 +76,11 @@ def agreement(sheet_csv: str | Path, judge, cfg_rubric: dict) -> dict:
     neutral: dict[str, int] = {}
     for row in rows:
         bits = (ANSWER_BITS if row["action_type"] == "answer" else STEP_BITS)
-        got = judge.judge(row["context"], bits)
+        # Re-render the stored context under the CURRENT instructions. The human
+        # labels describe the step, not the prompt wording, so they survive a
+        # rubric bump — and the sheet stops being tied to the version that made
+        # it. No-op when the sheet already matches. (2026-07-28)
+        got = judge.judge(upgrade_context(row["context"], row["action_type"]), bits)
         for b in bits:
             human = row.get(f"label_{b}", "").strip()
             if human not in ("0", "1"):

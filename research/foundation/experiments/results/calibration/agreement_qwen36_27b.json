@@ -1,0 +1,74 @@
+{
+  "bits": {
+    "new_info": {
+      "n": 24,
+      "agreement": 0.792,
+      "confusion": {
+        "h1_j1": 8,
+        "h0_j0": 11,
+        "h1_j0": 4,
+        "h0_j1": 1
+      },
+      "neutral_dropped": 0
+    },
+    "not_redundant": {
+      "n": 24,
+      "agreement": 0.875,
+      "confusion": {
+        "h1_j1": 11,
+        "h0_j0": 10,
+        "h1_j0": 2,
+        "h0_j1": 1
+      },
+      "neutral_dropped": 0
+    },
+    "nothing_left": {
+      "n": 26,
+      "agreement": 0.615,
+      "confusion": {
+        "h1_j1": 11,
+        "h0_j0": 5,
+        "h1_j0": 6,
+        "h0_j1": 4
+      },
+      "neutral_dropped": 0
+    },
+    "supported": {
+      "n": 26,
+      "agreement": 0.769,
+      "confusion": {
+        "h1_j1": 10,
+        "h0_j0": 10,
+        "h1_j0": 4,
+        "h0_j1": 2
+      },
+      "neutral_dropped": 0
+    },
+    "was_needed": {
+      "n": 24,
+      "agreement": 0.792,
+      "confusion": {
+        "h1_j1": 16,
+        "h0_j0": 3,
+        "h1_j0": 5,
+        "h0_j1": 0
+      },
+      "neutral_dropped": 0
+    }
+  },
+  "gate": 0.8,
+  "floor": 0.7,
+  "mean_agreement": 0.769,
+  "neutral_dropped_total": 0,
+  "passed_strict_per_bit": false,
+  "passed_mean_and_floor": false,
+  "passed": false,
+  "judge_model": "Qwen3.6-27B",
+  "judge_stats": {
+    "calls": 25,
+    "cache_hits": 25,
+    "parse_failures": 0,
+    "transport_failures": 0,
+    "total_tokens": 21413
+  }
+}

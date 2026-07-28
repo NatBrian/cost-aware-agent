@@ -8,15 +8,22 @@ seed: 42
 data:
   train_size: 300
   dev_size: 200
+  val_size: 50                     # tuning slice: EVERY refinement decision reads
+                                   # this, never dev-200 (anti-overfitting policy).
+                                   # probe_policy_health.sh needs it; nothing
+                                   # generated it before 2026-07-28.
   sampling_seed: 42
   stratify_field: level            # HotpotQA official easy/medium/hard
-  data_dir: ../data_shared         # rescued from cassi at F0 (gitignored)
+  data_dir: ../data_shared         # -> /mnt/src/liangsheng/cassi_foundation
+                                   # (symlink; persistent CPFS, survives the
+                                   # container wipes that cost us the first run)
   out_dir: data                    # foundation/data/ (gitignored)
   train_file: data/hotpotqa_train_300.jsonl
   dev_file: data/hotpotqa_dev_200.jsonl
+  val_file: data/hotpotqa_val_50.jsonl
   manifest_file: data/manifest.json
-  source_train: ../data_shared/hotpotqa_train.decontaminated.jsonl
-  source_dev: ../data_shared/hotpotqa_dev.jsonl
+  source_train: ../data_shared/hotpotqa_train.jsonl   # built by scripts/f1_data.py
+  source_dev: ../data_shared/hotpotqa_dev.jsonl       # from the HF parquet
 
 retrieval:
   index_dir: ../data_shared/searchr1_index
@@ -49,17 +56,23 @@ executor:
                                    # are trying to punish (audit 2026-07-28)
 
 judge:                             # the prompted reward model (lab vLLM server)
-  model: gemma-4-31B-it            # ACTUAL served model (checked /v1/models 2026-07-22;
-                                   # docs said Qwen 27B/35B — server serves Gemma-4-31B-it)
-  endpoint: http://122.11.227.227:6102/v1
+  model: Qwen3.6-27B               # Brian 2026-07-28 (was gemma-4-31B-it on :6102).
+                                   # Emits CoT into content unless the client sends
+                                   # chat_template_kwargs.enable_thinking=false —
+                                   # judge_client does. max_model_len 32768 (gemma
+                                   # had 262144), so watch late-step prompt length.
+  endpoint: http://122.11.227.227:6101/v1
   temperature: 0.0
-  max_tokens: 512
+  max_tokens: 1024                 # was 512: with thinking off the reply is just
+                                   # JSON, but an undersized cap truncates the tail
+                                   # and a truncated reply reads as a parse failure
+                                   # = neutral 0.5 = a silent hole in the reward
   batch_size: 16
   parse_retries: 1                 # then neutral score 0.5, failure logged
   cache_dir: cache/judge           # keyed (rubric_version, input_hash)
 
 rubric:
-  version: rubric_v1
+  version: rubric_v3
   step_bits: {new_info: 0.4, not_redundant: 0.3, was_needed: 0.3}
   answer_bits: {supported: 0.5, nothing_left: 0.5}
   alpha: 0.2                       # r_t = alpha * (score - 0.5)
