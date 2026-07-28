@@ -98,6 +98,28 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-29 **E-e ROUND 2 COMPLETE — probe PASSED, round 3 launched.**
+  150 updates, 8203 samples kept / 2 dropped, mean KL 0.081 (r1: 0.052) —
+  rising slightly but an order of magnitude inside trouble. Entropy mean .412,
+  min .079, no decay toward collapse.
+  **HARD GATE — probe at temp 1.0 on val-50: PASS.** malformed 2.0% (r1 4.3%),
+  hit_cap 0.0%, F1 .572, steps 3.67.
+  **REWARD-HACKING DIAGNOSTIC — the predicted failure is NOT happening.**
+  Calibration showed the judge over-approves stopping, which predicts: judge
+  score climbs while realized F1 stays flat or falls. Observed instead:
+  | round | judge | realized F1 | gap |
+  | 1 | .842 | .591 | +.251 |
+  | 2 | .841 | .611 | +.230 |
+  Judge FLAT, F1 RISING, gap NARROWING — the policy is improving at the task,
+  not at pleasing the judge. Two points is not a trend; round 3 is where a
+  hacking signal has the most opportunity to appear, so the read stays open.
+  **Counter-signal to watch, logged now so it is not rationalised later:** the
+  probe's own F1 fell .612 -> .572 while mean steps rose 3.48 -> 3.67, i.e. the
+  opposite direction from the training-set trend. n=40 episodes at temp 1.0 makes
+  this well inside noise, but if round 3's probe repeats it, that is a real
+  divergence between train and validation behaviour and must be reported.
+  Round 2 rollouts + checkpoint backed up to /mnt/src.
+
 - 2026-07-28 **E-e ROUND 1 COMPLETE — health probe PASSED, round 2 launched.**
   150 updates (hit the cap), **8160 samples kept / 1 dropped**, judge 7473 calls
   with 1 parse failure and 0 transport failures (6.3M tokens).
