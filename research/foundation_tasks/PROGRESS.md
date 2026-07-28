@@ -98,6 +98,21 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-28 **MICRO-ROUND GATE PASSED — full training loop validated end to
+  end** in the rebuilt environment. collect(--train, logprobs) -> judge ->
+  advantages -> train -> save+merge -> SERVE, all green:
+  48 episodes / 12 groups; **177 samples kept, 0 dropped** (no chat-template
+  drift across the transformers 4 -> 5 boundary, which was the risk the venv
+  re-split reintroduced); judge 0 calls / 159 cache hits (persistent cache
+  working); 5 updates at ratio 1.009, mean KL 0.0025, 5% clipped — against the
+  first run's round-1 KL blowup to ~626, so the gentler hypers + log-ratio clamp
+  hold; **`merged 348 untrained tensors into checkpoint (427 trained, 775
+  total)`** — the audit's sharded-save fix works and reproduces the base model's
+  exact tensor count; trained checkpoint serves and generates.
+  This is the gate F5 mandates, and it earned its cost twice over: it caught the
+  venv merge AND validated a save path that had never run, either of which would
+  otherwise have surfaced only after a full 300-task collect+judge+train pass.
+
 - 2026-07-28 **MICRO-ROUND CAUGHT A BREAK I INTRODUCED — the two GPU venvs
   cannot be merged.** Collection and judging passed (48 episodes / 12 groups,
   177 samples kept, 0 dropped — the >5% drop guard clean), then training died at
