@@ -82,7 +82,8 @@ rubric:
   step_bits: {new_info: 0.4, not_redundant: 0.3, was_needed: 0.3}
   answer_bits: {supported: 0.5, nothing_left: 0.5}
   alpha: 0.2                       # r_t = alpha * (score - 0.5)
-  calibration: {n_steps: 50, per_bit_gate: 0.80, per_bit_floor: 0.70}
+  calibration: {n_steps: 150, per_bit_gate: 0.80, per_bit_floor: 0.70}   # 50 gave a per-bit 95% CI of +-0.17 —
+                                   # too wide to tell rubric revisions from noise (2026-07-28)
 
 reward:
   format_weight: 0.1
