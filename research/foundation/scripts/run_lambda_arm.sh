@@ -42,7 +42,7 @@ if [ "$START" -gt 3 ]; then echo "=== ARM $TAG ALREADY COMPLETE — $INIT ==="; 
 # ---- serve whatever the next round must collect from -------------------------
 SERVE=${INIT:-BASE}
 echo "=== serve $( [ -z "$INIT" ] && echo 'BASE model' || echo "$INIT" ) ==="
-PID=$(pgrep -u "$(whoami)" -f "[v]llm serve" | head -1) && [ -n "$PID" ] && kill "$PID" && sleep 20 || true
+PID=$(pgrep -u "$(whoami)" -f "[v]llm serve.*port 8378" | head -1) && [ -n "$PID" ] && kill "$PID" && sleep 20 || true
 if [ -z "$INIT" ]; then
   CUDA_VISIBLE_DEVICES=${GPU:-1} nohup bash scripts/serve_executor.sh > "$BACKUP/${TAG}_serve.log" 2>&1 &
 else

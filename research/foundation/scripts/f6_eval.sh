@@ -18,7 +18,7 @@ OUT=experiments/results/eval
 mkdir -p "$OUT"
 
 echo "== serving trained checkpoint =="
-PID=$(pgrep -u "$(whoami)" -f "[v]llm serve" | head -1) && [ -n "$PID" ] && kill "$PID" && sleep 20 || true
+PID=$(pgrep -u "$(whoami)" -f "[v]llm serve.*port 8378" | head -1) && [ -n "$PID" ] && kill "$PID" && sleep 20 || true
 GPUS=$(grep -oP 'CUDA_VISIBLE_DEVICES=\K[0-9,]+' .gpu_hold | cut -d, -f2)
 CUDA_VISIBLE_DEVICES=${GPUS:-1} nohup .venv-gpu3/bin/vllm serve "$CKPT" \
   --served-model-name Qwen/Qwen3.5-9B --port 8378 --dtype auto \

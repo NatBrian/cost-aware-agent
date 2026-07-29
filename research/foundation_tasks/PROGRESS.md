@@ -105,6 +105,31 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 00:20 **The arm killed our own judge — third instance of the same
+  process-matching bug.** Once the judge moved local, we run TWO of our own vLLM
+  servers (judge :6101 on GPU 0, executor :8378 on GPU 1). The arm script's
+  "stop the executor before serving a new checkpoint" step used
+  `pgrep -u $(whoami) -f "[v]llm serve" | head -1` and killed whichever matched
+  first — the judge. GPU 0 dropped 57G -> 2.2G seconds after the judge came up.
+  Fixed in `run_lambda_arm.sh`, `f6_eval.sh`, `select_checkpoint.sh`: the pattern
+  is now `[v]llm serve.*port 8378`, which cannot match the judge.
+  `e5_round.sh` was already port-scoped — the third time this run that the
+  correct version already existed in the repo and I copied the wrong one.
+  **Progression of this same defect:** unscoped across users (nearly killed
+  yongyue's job) -> scoped to user but not to service (killed our own judge) ->
+  scoped to the specific service. I had even written the two-servers hazard into
+  my own wake-up notes an hour earlier and still did not fix the scripts. Writing
+  a warning is not the same as removing the failure mode.
+- 2026-07-30 00:15 **Local judge needed `--max-num-seqs 32`.** First start died at
+  engine init: `assert num_cache_lines >= batch` in causal_conv1d.py via
+  qwen3_next.py. Qwen3.6-27B is the same Qwen3-Next hybrid (mamba + attention)
+  family as the executor, and its conv-state cache is per sequence slot — the
+  default slot count outnumbered the cache lines available while sharing GPU 0
+  with retrieval. Bounded concurrency instead of only raising memory (the judge
+  client drives at most 12 concurrent requests). Also confirms the model needs the
+  same `patch_vllm_qwen3next.py` Triton-path patch as the executor: that patch is
+  why init reached the cache assertion rather than dying earlier in flashinfer.
+
 - 2026-07-30 00:10 **SWITCHED TO A LOCAL JUDGE — external dependency removed.**
   The remote Qwen3.6-27B (122.11.227.227:6101) stayed down through the whole
   wait, so the pre-decided fallback fired: 52G of weights downloaded to

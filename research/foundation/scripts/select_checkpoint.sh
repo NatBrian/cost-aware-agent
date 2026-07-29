@@ -24,7 +24,7 @@ for R in 1 2 3; do
   CKPT="$PWD/experiments/results/train/round$R/checkpoint"
   [ -d "$CKPT" ] || { echo "skip round$R (no checkpoint)"; continue; }
   echo "== serving round$R =="
-  PID=$(pgrep -u "$(whoami)" -f "[v]llm serve" | head -1) && [ -n "$PID" ] && kill "$PID" && sleep 20 || true
+  PID=$(pgrep -u "$(whoami)" -f "[v]llm serve.*port 8378" | head -1) && [ -n "$PID" ] && kill "$PID" && sleep 20 || true
   CUDA_VISIBLE_DEVICES=${GPU:-1} nohup .venv-gpu3/bin/vllm serve "$CKPT" \
     --served-model-name Qwen/Qwen3.5-9B --port 8378 --dtype auto \
     --max-model-len 16384 --gpu-memory-utilization 0.85 \
