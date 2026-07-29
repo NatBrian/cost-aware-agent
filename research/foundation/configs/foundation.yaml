@@ -76,7 +76,7 @@ judge:                             # the prompted reward model (lab vLLM server)
                                    # chat_template_kwargs.enable_thinking=false —
                                    # judge_client does. max_model_len 32768 (gemma
                                    # had 262144), so watch late-step prompt length.
-  endpoint: http://122.11.227.227:6101/v1
+  endpoint: http://127.0.0.1:6101/v1   # LOCAL judge (remote 122.11.227.227 went down mid-run 2026-07-29)
   temperature: 0.0
   max_tokens: 1024                 # was 512: with thinking off the reply is just
                                    # JSON, but an undersized cap truncates the tail

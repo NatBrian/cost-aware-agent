@@ -105,6 +105,24 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 00:10 **SWITCHED TO A LOCAL JUDGE — external dependency removed.**
+  The remote Qwen3.6-27B (122.11.227.227:6101) stayed down through the whole
+  wait, so the pre-decided fallback fired: 52G of weights downloaded to
+  /mnt/src, served on GPU 0 beside the retrieval server via
+  `scripts/serve_judge_local.sh`, `judge.endpoint` repointed to
+  `http://127.0.0.1:6101/v1`. Poller stopped; the arm relaunches against the
+  local judge.
+  **Why this is safe for the experiment:** the served model id stays
+  `Qwen3.6-27B`, byte-identical to the remote, and the judge cache keys on model
+  name — so all ~18,000 judgements already computed against the remote server
+  remain valid and get reused rather than silently recomputed by a different
+  judge. Same weights, same rubric_v4, same temp 0 + enable_thinking=false, so
+  the λ=0 arm is judged by the same function the λ=0.3 arm was.
+  GPU layout now: GPU 0 = retrieval (~2G) + judge (~55G) of 143G; GPU 1 = free
+  for the executor and training. No contention.
+  This also permanently removes the pipeline's last dependence on a machine we do
+  not control — worth the 52G on its own, independent of this outage.
+
 - 2026-07-30 00:25 **Judge still down ~40min. Preparing the local-judge fallback
   IN PARALLEL rather than waiting out the clock.** The auto-resume poller
   (`wait_for_judge_then_run.sh`) is alive and will relaunch the arm the instant
