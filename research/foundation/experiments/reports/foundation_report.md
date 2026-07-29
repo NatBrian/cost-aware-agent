@@ -48,14 +48,17 @@ baselines — and A3 clears it.
 
 **The tight-budget result is the most striking.** At B=2, A2's hard cutoff
 collapses F1 to .221 while A3 reaches **.559 using the same 2.96 mean steps as
-A1**. External enforcement cannot make a draft ready early; changed behaviour
-can. That gap is exactly what internalization was supposed to close, and it is
-now measured.
+A1**. External enforcement cannot make a draft ready early. Note what this does
+and does not say: A3 gets more out of two steps than the other arms do, which is
+a real and useful property — but it achieves it by producing better answers per
+step, not by managing the budget differently (§4).
 
 **A3's quality is budget-insensitive**: F1 .559 / .560 / .548 across B = 2/4/8,
-against A1's .478 / .471 / .501. It reaches its answer quality early and then
-decides whether more search is worth it, rather than spending the wallet it is
-handed.
+against A1's .478 / .471 / .501. Its answers stop depending on how much budget it
+is given. The natural reading — "it reaches quality early and then judges whether
+more search is worth it" — is *not* supported by §4, since its step usage rises
+with budget just as A1's does; the flat F1 is better per-step performance, not
+better stopping.
 
 ## 4. Stopping behaviour: the claim this run does NOT support
 
