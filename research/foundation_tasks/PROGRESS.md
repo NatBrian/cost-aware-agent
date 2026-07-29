@@ -71,10 +71,15 @@
   samples zero token mismatch; update-1 ratio 1.003 / KL 6e-4 (math verified);
   KL-blowup tuned (shuffle + accum 32); multimodal-tensor merge at save;
   trained checkpoint SERVES ('READY')
-- [ ] E-e **INTERRUPTED by container wipe 2026-07-28** (was: round-1b retraining
-  from base on cached rollouts, launched 2026-07-23). Restarting from base —
-  see the 2026-07-28 log entry for the full inventory. 3 rounds ×
-  (300 tasks × G=8 sharded collect → judge → train → serve ckpt)
+- [x] E-e ✅ 2026-07-28/29: 3 rounds × (300 tasks × G=8), all health gates passed,
+  no reward hacking (judge flat .842/.841/.843 while realized F1 rose
+  .591/.611/.622). Checkpoint selected on val-50 utility: round 3.
+  (An earlier attempt on 2026-07-23 was lost to the container wipe; restarted
+  from base.)
+- [ ] **λ ABLATION (post-verdict, 2026-07-29)** — the GO's mechanism is not the
+  predicted one (steps did not fall), so arms at train_lambda ∈ {0, 0.3, 1.0}
+  test whether the step-cost term does anything. Pre-registered decision rule in
+  experiments/reports/ablation_preregistration.md. λ=0 arm running.
 - [x] E-f ✅ 2026-07-29 (**dev-200 look #2 of 3**): A3 harness-off/on × 3
   budgets + oracle replay, merged with surviving baseline rows → gate_check
 - [x] E-g ✅ 2026-07-29: figures + report + **GO verdict logged** → tagged
