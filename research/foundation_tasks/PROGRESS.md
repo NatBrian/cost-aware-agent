@@ -127,6 +127,13 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
   probe is not optional.
   TODO for the runner (do NOT edit while running): on resume, re-run the health
   probe for the last completed round before starting the next.
+  **Probe result (run by hand): PASS** — malformed 2.2%, hit_cap 0.0%, F1 .467,
+  steps 3.48. So the 7x KL is larger advantages from an unconstrained reward, not
+  policy damage. Early and NOT to be over-read: λ=0 round 1 gives mean steps 3.48
+  at temp 1.0, identical to the λ=0.3 arm's round-1 probe (3.48) — directionally
+  consistent with H0 (cost term inert), but n=40, temp 1.0, round 1 of 3. The
+  verdict comes from final checkpoints on val-50 at temp 0 under the
+  pre-registered rule.
 
 - 2026-07-30 00:35 **OOM: training landed on the judge's GPU.** Round-1 training
   died with `torch.OutOfMemoryError` — `e5_round.sh` passed the whole 2-GPU hold
