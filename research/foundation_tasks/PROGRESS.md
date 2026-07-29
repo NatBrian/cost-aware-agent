@@ -105,6 +105,37 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-29 23:45 **JUDGE SERVER OUTAGE — λ=0 round 1 training STOPPED
+  deliberately.** The shared Qwen3.6-27B at 122.11.227.227:6101 went down
+  mid-round: 791 logged failures, all `transport: ConnectionError`, confirmed by
+  three direct probes (the old gemma judge on :6102 still answers, so it is that
+  server, not our network).
+  **Why this had to be stopped rather than ridden out:** the judge client returns
+  a neutral 0.5 on transport failure — correct behaviour, it must never crash the
+  reward pipeline — but that silently removes the per-step reward. A round
+  trained through the outage is NOT the λ=0 condition (judge shaping present,
+  step COST absent); it is a terminal-reward-only run wearing the arm's label,
+  and it would have quietly invalidated the whole ablation. Killed the trainer
+  and the arm script.
+  **Cost of the interruption is small, by earlier design:** the 2400 collected
+  rollouts are judge-independent and preserved; good judgements are cached
+  (18,262 entries); and the 2026-07-28 audit fix means **neutral fallbacks are
+  never cached**, so a rerun re-queries exactly the failed steps and reuses the
+  rest. We lose training compute, not judgements — this is the concrete payoff of
+  that fix.
+  **Recovery is automatic:** `scripts/wait_for_judge_then_run.sh` polls the judge
+  once a minute for up to 48h and `exec`s the (restartable) arm the moment a real
+  judged completion succeeds. Readiness is a genuine completion, not /v1/models,
+  which can answer while an engine is dead — the same false-readiness trap found
+  on our own executor.
+  **Fallbacks if the outage is long** (decide at the next wake-up, in order):
+  (1) keep waiting — cheapest, preserves the judge that rubric_v4 was calibrated
+  against; (2) serve Qwen3.6-27B locally on GPU 0 alongside retrieval (27B bf16
+  ~54G, GPU 0 has 143G and retrieval uses ~2G) — costs a ~54G download but
+  removes the external dependency entirely; (3) switching to the gemma judge on
+  :6102 is REJECTED — rubric_v4 was calibrated against Qwen and the λ=0.3 arm was
+  trained with it, so changing judges mid-ablation would confound every arm.
+
 - 2026-07-29 **SESSION TEARDOWN KILLED THE RUN — and the GPU hold with it.**
   The λ=0 arm died mid-collection at 1167/2400 episodes when the previous session
   ended; `setsid nohup` did NOT protect it. Retrieval server, executor and the
