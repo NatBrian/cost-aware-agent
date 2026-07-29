@@ -98,6 +98,29 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-29 **CHECKPOINT SELECTED: round 3** (validation slice, utility).
+  | ckpt | U | F1 | steps | self_stop | malformed(temp 0) |
+  | r1 | .3884 | .664 | 3.68 | .78 | 3.8% |
+  | r2 | .3850 | .640 | 3.40 | .84 | 6.5% |
+  | **r3** | **.4738** | .733 | 3.46 | .82 | 5.2% |
+  Selection CONFIRMED the default rather than overriding it. The round-3 alarm
+  (temp-1.0 malformed 9.0%) did not reproduce at temp 0, which is the evaluation
+  setting: 5.2% there. Real signal, checked rather than assumed — assuming either
+  way is the mistake that cost the first run.
+  NOTE for the report: these val-50 numbers must NOT be read as a preview of the
+  verdict. val-50 is mixed easy/medium/hard; dev-200 is 100% hard by construction
+  (HotpotQA's dev split is all hard-level), so F1 .733 on val says nothing direct
+  about the .361 F1 floor on dev.
+- 2026-07-29 **E-f LAUNCHED — dev-200 look #2 of <=3.** Reason: the headline A3
+  evaluation, per plan §6, on the round-3 checkpoint selected above. A3
+  harness-off AND harness-on x budgets {2,4,8} at temp 0, plus the oracle
+  forced-continuation replay (analysis only, EXCLUDED from the gate population —
+  its answered_at is logged while the episode keeps running, so it is not a stop
+  decision). Merged with the surviving baseline rows via scripts/f6_build_eval.py
+  (they are per-task rows, not episodes, so re-collecting them would spend a
+  third dev look and break comparability with the bar).
+  Bar at B=4: U > .205 (A1) and .180 (A2), F1 >= .361, self-stop >= .70.
+
 - 2026-07-29 **E-e COMPLETE (3 rounds). Reward hacking DID NOT occur.**
   Round 3: 150 updates, 8001 samples kept / 4 dropped, mean KL 0.0027.
   **Three-round divergence trend — the predicted failure did not materialise:**
