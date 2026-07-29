@@ -44,3 +44,7 @@ experiments/swe_ab/*.log
 research/papers
 # foundation: shared regenerable data artifacts (indices, corpora, datasets) — see research/foundation_tasks/F0
 research/data_shared/
+
+# vLLM server logs written into results dirs by eval/selection scripts
+research/foundation/experiments/results/**/*.log
+research/foundation/experiments/results/select/
