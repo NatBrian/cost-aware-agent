@@ -21,7 +21,17 @@ PORT=${1:-6101}
 GPU=$(grep -oP 'CUDA_VISIBLE_DEVICES=\K[0-9,]+' .gpu_hold | cut -d, -f1)
 [ -f "$MODEL/config.json" ] || { echo "judge weights not downloaded yet: $MODEL"; exit 1; }
 echo "[judge] serving $MODEL on port $PORT, gpu ${GPU:-0}"
+# Qwen3.6-27B is a Qwen3-Next hybrid (mamba + attention). Its conv-state cache is
+# allocated per sequence slot, and vLLM asserts `num_cache_lines >= batch` in
+# causal_conv1d.py — with the default max_num_seqs the slots outnumber the cache
+# lines the leftover memory can buy, and the engine dies at init (seen 2026-07-30
+# at gpu-memory-utilization 0.55 sharing GPU 0 with retrieval). Bounding
+# max_num_seqs is the right lever, not just throwing memory at it: the judge
+# client drives at most 12 concurrent requests, so 32 slots is already generous.
+# Requires scripts/patch_vllm_qwen3next.py to have been applied to this venv —
+# the same Triton-path patch the executor needs, since this is the same family.
 CUDA_VISIBLE_DEVICES=${GPU:-0} exec .venv-gpu3/bin/vllm serve "$MODEL" \
   --served-model-name Qwen3.6-27B \
   --port "$PORT" --dtype auto --max-model-len 32768 \
-  --gpu-memory-utilization 0.55 "${@:2}"
+  --max-num-seqs 32 \
+  --gpu-memory-utilization 0.62 "${@:2}"
