@@ -105,6 +105,24 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 00:35 **OOM: training landed on the judge's GPU.** Round-1 training
+  died with `torch.OutOfMemoryError` — `e5_round.sh` passed the whole 2-GPU hold
+  (`0,1`) as CUDA_VISIBLE_DEVICES, so torch took `cuda:0`, which now holds the
+  local judge (~90G) plus retrieval. Harmless when GPU 0 carried only retrieval;
+  fatal once the judge moved there.
+  Fixed: training AND checkpoint-serving in `e5_round.sh` are pinned to the
+  SECOND held card (`cut -d, -f2`). GPU 0 = judge + retrieval, GPU 1 = executor
+  and training — and the executor is stopped before training, so GPU 1 is free
+  when the trainer needs it.
+  **Hardened at the same time:** `e5_round.sh`'s post-training readiness check
+  used `/v1/models`, which vLLM's API server answers even when the engine core is
+  dead — the same false-readiness trap that once reported a 500-ing executor as
+  healthy. It now requires a real completion.
+  Pattern worth naming: moving the judge on-box changed a *global* resource
+  assumption, and three separate places still encoded the old one (process
+  matching, GPU selection, readiness). A change of that shape needs a sweep of
+  everything that touched the old assumption, not a fix at the point of failure.
+
 - 2026-07-30 00:20 **The arm killed our own judge — third instance of the same
   process-matching bug.** Once the judge moved local, we run TWO of our own vLLM
   servers (judge :6101 on GPU 0, executor :8378 on GPU 1). The arm script's

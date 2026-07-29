@@ -27,21 +27,28 @@ echo "== train =="
 ARGS=""
 [ -n "$MAX" ] && ARGS="$ARGS --max-steps $MAX"
 [ -n "$INIT" ] && ARGS="$ARGS --init-from $INIT"
-GPUS=$(grep -oP "CUDA_VISIBLE_DEVICES=\\K[0-9,]+" .gpu_hold)
+# GPU 0 hosts the JUDGE (~90G) + retrieval; only the SECOND held card is free for
+# training and serving. Passing the whole hold made torch pick cuda:0 and OOM
+# against the judge (2026-07-30). Pin to the second card everywhere.
+GPUS=$(grep -oP "CUDA_VISIBLE_DEVICES=\\K[0-9,]+" .gpu_hold | cut -d, -f2)
 CUDA_VISIBLE_DEVICES=$GPUS PYTORCH_ALLOC_CONF=expandable_segments:True \
   .venv-train/bin/python -m train.grpo_trainer --episodes "$ROUND/rollouts.jsonl" \
     --out "$ROUND" $ARGS
 
 echo "== serve new checkpoint =="
 CKPT="$PWD/$ROUND/checkpoint"
-GPUS=$(grep -oP 'CUDA_VISIBLE_DEVICES=\K[0-9,]+' .gpu_hold)
+GPUS=$(grep -oP 'CUDA_VISIBLE_DEVICES=\K[0-9,]+' .gpu_hold | cut -d, -f2)
 CUDA_VISIBLE_DEVICES=$GPUS nohup .venv-gpu3/bin/vllm serve "$CKPT" \
   --served-model-name Qwen/Qwen3.5-9B --port 8378 --dtype auto \
   --max-model-len 16384 --gpu-memory-utilization 0.85 \
   > "$ROUND/vllm_restart.log" 2>&1 &
 echo "$CKPT" > .serve_model
 for i in $(seq 1 80); do
-  curl -s -m 5 http://127.0.0.1:8378/v1/models 2>/dev/null | grep -q "Qwen3.5-9B" && { echo "server UP on $CKPT"; exit 0; }
+  # a REAL completion, not /v1/models: the API server answers that even when the
+  # engine core is dead, which once reported a 500-ing executor as healthy
+  curl -s -m 10 http://127.0.0.1:8378/v1/chat/completions -H "Content-Type: application/json" \
+    -d '{"model":"Qwen/Qwen3.5-9B","messages":[{"role":"user","content":"hi"}],"max_tokens":4,"temperature":0,"chat_template_kwargs":{"enable_thinking":false}}' \
+    2>/dev/null | grep -q '"content"' && { echo "server UP on $CKPT"; exit 0; }
   sleep 15
 done
 echo "server failed to restart"; tail -5 "$ROUND/vllm_restart.log"; exit 1
