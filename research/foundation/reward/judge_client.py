@@ -8,6 +8,8 @@ the overhead report.
 """
 
 import hashlib
+import os
+import threading
 import json
 import re
 from pathlib import Path
@@ -23,13 +25,20 @@ class JudgeStats:
         self.cache_hits = 0
         self.parse_failures = 0
         self.transport_failures = 0
+        self.cache_corrupt = 0
         self.total_tokens = 0
 
     def as_dict(self):
         return dict(calls=self.calls, cache_hits=self.cache_hits,
                     parse_failures=self.parse_failures,
                     transport_failures=self.transport_failures,
+                    cache_corrupt=self.cache_corrupt,
                     total_tokens=self.total_tokens)
+
+
+def _with_hit(bits: dict, stats) -> dict:
+    stats.cache_hits += 1
+    return bits
 
 
 def neutral_bits(bit_names: tuple[str, ...]) -> dict:
@@ -130,8 +139,16 @@ class JudgeClient:
         """Returns {bit: 0|1, ...} (or 0.5s with _neutral=True on failure)."""
         cpath = self._cache_path(prompt)
         if cpath.exists():
-            self.stats.cache_hits += 1
-            return json.loads(cpath.read_text())
+            # A corrupt entry must degrade to a cache MISS, never crash the run.
+            # Two of the 12 judging threads can hit the same key concurrently, and
+            # a non-atomic write left two JSON objects concatenated in one file
+            # ("Extra data" at char 387), which killed a round after 2400 episodes
+            # had been collected and judged. (2026-07-30)
+            try:
+                return _with_hit(json.loads(cpath.read_text()), self.stats)
+            except (json.JSONDecodeError, OSError):
+                self.stats.cache_corrupt += 1
+                cpath.unlink(missing_ok=True)
         attempt_prompt = prompt
         bits, why = None, ""
         for _ in range(1 + self.parse_retries):
@@ -163,7 +180,12 @@ class JudgeClient:
             # uncached costs one retry later and keeps the run recoverable.
             # (audit 2026-07-28)
             return bits
-        cpath.write_text(json.dumps(bits))
+        # ATOMIC write: two threads judging the same prompt would otherwise
+        # interleave into one file and produce unparseable JSON. Write to a
+        # thread-unique temp path, then os.replace (atomic on POSIX).
+        tmp = cpath.with_suffix(f".tmp.{os.getpid()}.{threading.get_ident()}")
+        tmp.write_text(json.dumps(bits))
+        os.replace(tmp, cpath)
         return bits
 
     def _log_failure(self, prompt: str, why: str) -> None:

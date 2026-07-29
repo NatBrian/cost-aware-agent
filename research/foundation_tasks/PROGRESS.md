@@ -105,6 +105,27 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 04:25 **A CORRUPT JUDGE-CACHE ENTRY killed lam0 round 2 after all
+  2400 episodes were collected AND judged.** `json.decoder.JSONDecodeError: Extra
+  data: line 1 column 388`. Root cause: `judge_client` wrote cache entries with a
+  plain `write_text`, and with 12 judging threads two of them can hit the SAME
+  cache key concurrently — the interleaved writes left two JSON objects
+  concatenated in one file. One bad file out of 23,836 took down a round that had
+  already cost ~45 min of collection and ~30 min of judging.
+  **Two fixes, both tested (65 tests green):**
+  1. **Atomic writes** — temp file + `os.replace` (atomic on POSIX), so
+     concurrent writers can never interleave.
+  2. **Corrupt entries degrade to a cache MISS**, never an exception: the entry is
+     deleted, counted in a new `cache_corrupt` stat, and re-queried. A cache is an
+     optimisation; it must never be able to fail a run.
+  Scanned all 23,836 entries: exactly 1 corrupt, 0 stray temp files. Removed it.
+  Regression tests cover both the corrupt-read path and the no-.tmp-left-behind
+  property.
+  Reflection: this is the third failure of the same shape — a mechanism that
+  should only ever make things *faster* (cache) or *safer* (neutral fallback,
+  process kill) was able to make the run *fail* or *lie*. Worth auditing the
+  remaining helpers for that property rather than waiting for the next one.
+
 - 2026-07-30 03:50 **I corrupted a RUNNING shell script by editing it in place.**
   `e5_round.sh: line 37: hung: command not found` killed the arm right after
   round-1 training finished. The file was fine (`bash -n` clean) — bash reads

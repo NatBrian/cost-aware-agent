@@ -187,3 +187,43 @@ def test_terminal_reward_responds_to_training_lambda():
     assert free == pytest.approx(0.5)          # no step price at all
     assert dear == pytest.approx(-0.5)         # 4 steps of 4 at λ=1.0
     assert free > dear
+
+
+def test_corrupt_cache_entry_degrades_to_miss(tmp_path):
+    """A corrupt cache file must be a MISS, never an exception. Two of the 12
+    judging threads hit the same key and a non-atomic write concatenated two
+    JSON objects; the JSONDecodeError killed a round AFTER 2400 episodes had been
+    collected and judged."""
+    from reward.judge_client import JudgeClient
+    calls = {"n": 0}
+
+    class FakeJudge(JudgeClient):
+        def _complete(self, prompt):
+            calls["n"] += 1
+            return '{"reasoning":"x","new_info":1,"not_redundant":1,"was_needed":1}'
+
+    j = FakeJudge("http://x/v1", "m", "rv", tmp_path, max_tokens=64)
+    bits = ("new_info", "not_redundant", "was_needed")
+    first = j.judge("P", bits)                       # populates the cache
+    assert first["new_info"] == 1 and calls["n"] == 1
+    # simulate the interleaved double-write
+    j._cache_path("P").write_text('{"a":1}{"a":1}')
+    again = j.judge("P", bits)                       # must NOT raise
+    assert again["new_info"] == 1
+    assert j.stats.cache_corrupt == 1
+    assert calls["n"] == 2                           # re-queried, not crashed
+
+
+def test_cache_write_is_atomic(tmp_path):
+    """The write must land via a temp file + rename, leaving no partial file."""
+    from reward.judge_client import JudgeClient
+
+    class FakeJudge(JudgeClient):
+        def _complete(self, prompt):
+            return '{"reasoning":"x","new_info":0,"not_redundant":1,"was_needed":1}'
+
+    j = FakeJudge("http://x/v1", "m", "rv", tmp_path, max_tokens=64)
+    j.judge("Q", ("new_info", "not_redundant", "was_needed"))
+    files = list(tmp_path.iterdir())
+    assert len(files) == 1 and files[0].suffix == ".json"   # no .tmp left behind
+    json.loads(files[0].read_text())                        # parses cleanly
