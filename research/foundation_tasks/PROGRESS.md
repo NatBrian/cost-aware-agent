@@ -105,6 +105,25 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 00:25 **Judge still down ~40min. Preparing the local-judge fallback
+  IN PARALLEL rather than waiting out the clock.** The auto-resume poller
+  (`wait_for_judge_then_run.sh`) is alive and will relaunch the arm the instant
+  the remote returns, so nothing is lost by also getting ready to replace it.
+  Downloading `Qwen/Qwen3.6-27B` (~54G) to /mnt/src and added
+  `scripts/serve_judge_local.sh`: serves it on GPU 0 alongside retrieval (27B bf16
+  ~54G + retrieval ~2G on a 143G card; the executor keeps GPU 1), at
+  gpu-memory-utilization 0.55 so the two coexist.
+  **The load-bearing detail is `--served-model-name Qwen3.6-27B`** — identical to
+  the remote id. The judge cache key includes the model name (audit 2026-07-28),
+  so keeping the id byte-identical means all ~18,000 cached judgements stay valid
+  and are reused; changing it would silently re-judge everything AND mix two
+  judges' scores inside one experiment.
+  Rationale for doing this now rather than at the 4h mark: ~6h of ablation work
+  remains (2 arms × 3 rounds), and the judge is the pipeline's only external
+  dependency — it has already failed once mid-round. A 54G download costs nothing
+  but bandwidth and buys permanent independence. If the remote returns first, the
+  poller uses it and the local copy is simply insurance.
+
 - 2026-07-29 23:45 **JUDGE SERVER OUTAGE — λ=0 round 1 training STOPPED
   deliberately.** The shared Qwen3.6-27B at 122.11.227.227:6101 went down
   mid-round: 791 logged failures, all `transport: ConnectionError`, confirmed by
