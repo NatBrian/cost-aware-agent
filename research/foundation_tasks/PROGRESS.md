@@ -100,6 +100,24 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-29 **SESSION TEARDOWN KILLED THE RUN — and the GPU hold with it.**
+  The λ=0 arm died mid-collection at 1167/2400 episodes when the previous session
+  ended; `setsid nohup` did NOT protect it. Retrieval server, executor and the
+  `acquire_gpus.py` hold were all gone too. Recovered: re-acquired GPUs 0+1
+  immediately (**the other five cards are now at 124-143G under other users — we
+  took the last free pair**, which is exactly why Brian wants the hold standing),
+  restarted retrieval, relaunched the arm.
+  **Fix so this costs less next time: `run_lambda_arm.sh` is now RESTARTABLE.**
+  It detects which rounds already have a checkpoint (local or on /mnt/src),
+  resumes from the next one, serves the correct model for that round rather than
+  always the base, and exits cleanly if the arm is already complete. Collection
+  was already resumable (run_collection skips finished (task_id, rollout) pairs),
+  so the 1167 episodes were not wasted. Re-running the same command after any
+  interruption is now the intended recovery path.
+  Standing lesson: background work launched from a session is not durable, so
+  every long run needs (a) resumability and (b) a scheduled wake-up that
+  re-checks and relaunches, not just a watcher that dies with its parent.
+
 - 2026-07-29 **SAFETY NEAR-MISS: my scripts tried to kill another user's vLLM.**
   `run_lambda_arm.sh`, `f6_eval.sh` and `select_checkpoint.sh` all used
   `pgrep -f "[v]llm serve" | head -1` to find "the" server to stop before
