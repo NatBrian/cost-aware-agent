@@ -163,3 +163,27 @@ def test_labeling_sheet_and_agreement(tmp_path):
     assert rep["passed"] and rep["mean_agreement"] == 1.0
     rep_bad = agreement(sheet, ConstJudge(0), RUBRIC_CFG)
     assert not rep_bad["passed"]
+
+
+def test_training_lambda_is_separable_from_eval_lambda():
+    """The ablation trains arms at different λ but must SCORE them all on one
+    yardstick. If reward and evaluation shared a λ, 'which arm has higher
+    utility' would partly measure which yardstick was used."""
+    from reward.rewards import training_lambda
+    assert training_lambda({"economy": {"lambda": 0.3}}) == 0.3          # absent -> same
+    assert training_lambda({"economy": {"lambda": 0.3,
+                                        "train_lambda": 0.0}}) == 0.0    # ablation
+    assert training_lambda({"economy": {"lambda": 0.3,
+                                        "train_lambda": 1.0}}) == 1.0
+
+
+def test_terminal_reward_responds_to_training_lambda():
+    """A step must actually get cheaper/dearer when train_lambda moves."""
+    from reward.rewards import terminal_reward
+    ep = {"final_f1": 0.5, "steps_used": 4, "budget_B": 4, "final_answer": "x",
+          "steps": [{"action_type": "search"}]}
+    free = terminal_reward(ep, 0.0, 0.0)
+    dear = terminal_reward(ep, 1.0, 0.0)
+    assert free == pytest.approx(0.5)          # no step price at all
+    assert dear == pytest.approx(-0.5)         # 4 steps of 4 at λ=1.0
+    assert free > dear

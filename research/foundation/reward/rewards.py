@@ -60,11 +60,24 @@ def returns_to_go(rs: list[float], r_final: float) -> list[float]:
     return list(reversed(out))
 
 
+def training_lambda(cfg: dict) -> float:
+    """The λ the REWARD is computed with, which is not necessarily the λ results
+    are SCORED with.
+
+    The λ ablation trains arms at λ ∈ {0, 0.3, 1.0} but must score them all on
+    one fixed yardstick, or "which arm has higher utility" just measures which
+    yardstick was used. `economy.train_lambda` moves for the experiment;
+    `economy.lambda` stays put for evaluation and reporting. Absent the key,
+    they are the same number and nothing changes. (2026-07-29)
+    """
+    return float(cfg["economy"].get("train_lambda", cfg["economy"]["lambda"]))
+
+
 def episode_rewards(ep: dict, judge, cfg: dict) -> dict:
     """Everything F5 needs for one trajectory."""
     bits = judge_episode_steps(ep, judge)
     rs = step_rewards(ep, bits, cfg["rubric"])
-    r_final = terminal_reward(ep, cfg["economy"]["lambda"],
+    r_final = terminal_reward(ep, training_lambda(cfg),
                               cfg["reward"]["format_weight"])
     return {"bits": bits, "step_rewards": rs, "r_final": r_final,
             "returns_to_go": returns_to_go(rs, r_final)}

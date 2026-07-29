@@ -37,7 +37,16 @@ episode:
   draft_retry: 1                   # malformed draft line -> 1 retry -> EMPTY_DRAFT
 
 economy:
-  lambda: 0.3                      # FROZEN from pilot: knee at step 3 becomes interior optimum at B=4
+  lambda: 0.3                      # EVALUATION / reporting λ — the fixed yardstick.
+                                   # FROZEN from pilot: knee at step 3 becomes
+                                   # interior optimum at B=4. Do NOT move this for
+                                   # the ablation, or arms become incomparable.
+  train_lambda: 0.3                # the λ the REWARD is trained with. The ablation
+                                   # moves ONLY this: 0.0 (no step price) / 0.3
+                                   # (original) / 1.0 (steps clearly expensive).
+                                   # At λ=0.3, B=4 a step costs .075 while buying
+                                   # ~.06 F1 — near break-even, the suspected reason
+                                   # stopping behaviour never moved. (2026-07-29)
   lambda_spot: 0.1
   # U = F1 - lambda * (steps_used / B)
 
