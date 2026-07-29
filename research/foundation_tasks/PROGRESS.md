@@ -105,6 +105,29 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 03:50 **I corrupted a RUNNING shell script by editing it in place.**
+  `e5_round.sh: line 37: hung: command not found` killed the arm right after
+  round-1 training finished. The file was fine (`bash -n` clean) — bash reads
+  scripts LAZILY BY BYTE OFFSET, so inserting three comment lines while it was
+  executing shifted every subsequent offset and dropped the running shell into
+  the middle of a comment. **Never edit a shell script that is currently
+  running**; edit a copy, or wait for it to exit.
+  Cost was small: round-1 training had already completed and saved
+  (150 updates, 7994 samples, mean_kl .3837, final_loss .6958). The restartable
+  runner resumed cleanly — "RESUMING: rounds 1..1 already trained" — and is
+  serving the round-1 checkpoint for round-2 collection.
+  **Gap this exposed and I closed by hand:** the arm died INSIDE e5_round.sh, i.e.
+  before the health-probe gate, and on resume the script jumps straight to round
+  2 — so round 1's policy would never have been health-checked. Ran the probe
+  manually against the served round-1 checkpoint. This matters more than usual
+  here: **λ=0's round-1 mean_kl is 0.3837 against 0.052 for the λ=0.3 arm** (~7x),
+  which is what a reward with no step-cost term and therefore larger, less
+  constrained advantages would look like. Higher KL is not automatically bad, but
+  it is exactly the regime where the first run's policy damage happened, so the
+  probe is not optional.
+  TODO for the runner (do NOT edit while running): on resume, re-run the health
+  probe for the last completed round before starting the next.
+
 - 2026-07-30 00:35 **OOM: training landed on the judge's GPU.** Round-1 training
   died with `torch.OutOfMemoryError` — `e5_round.sh` passed the whole 2-GPU hold
   (`0,1`) as CUDA_VISIBLE_DEVICES, so torch took `cuda:0`, which now holds the
