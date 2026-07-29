@@ -100,6 +100,30 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-29 **SAFETY NEAR-MISS: my scripts tried to kill another user's vLLM.**
+  `run_lambda_arm.sh`, `f6_eval.sh` and `select_checkpoint.sh` all used
+  `pgrep -f "[v]llm serve" | head -1` to find "the" server to stop before
+  serving a new checkpoint. On this shared box that pattern matches ANY user's
+  vLLM. It selected PID 2105447, owned by **yongyue** — the user CLAUDE.md
+  explicitly says never to interrupt — and only Linux permissions stopped it
+  ("Operation not permitted"). Fixed in all three: `pgrep -u "$(whoami)" -f`.
+  `e5_round.sh` was already correctly scoped with `pkill -u "$(whoami)"`, which
+  is where the pattern should have been copied from.
+  Two lessons: (1) any process-matching command on a shared machine must be
+  user-scoped, always; (2) I wrote the unscoped version three times because I
+  copied my own earlier line instead of the safe one that already existed in the
+  repo. Same failure shape as the arm-blending bug — a defect propagated by
+  copy-paste rather than reasoned about once.
+- 2026-07-29 **λ ABLATION LAUNCHED (arm lam0, train_lambda=0.0).** Pre-registered
+  first (experiments/reports/ablation_preregistration.md, committed before the
+  run). `economy.train_lambda` now drives the reward while `economy.lambda` stays
+  at 0.3 as the fixed evaluation yardstick, so arms trained under different λ are
+  scored on one scale. scripts/run_lambda_arm.sh runs a whole arm unattended:
+  serve base -> 3 rounds -> health probe as a HARD gate after each -> back up
+  checkpoint/rollouts to /mnt/src -> keep only the newest local checkpoint (19G
+  each). Local round1/round2 checkpoints from the λ=0.3 run deleted after
+  verifying the /mnt/src copies carry weights + config.
+
 - 2026-07-29 **POST-VERDICT ANALYSIS — the GO is real but the MECHANISM is not
   the predicted one. Report §4 corrected.**
   Steps did NOT fall: A3 uses 2.96/3.61/4.32 vs A1's 2.96/3.54/3.98. Decomposing
