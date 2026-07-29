@@ -31,7 +31,10 @@ ARGS=""
 # training and serving. Passing the whole hold made torch pick cuda:0 and OOM
 # against the judge (2026-07-30). Pin to the second card everywhere.
 GPUS=$(grep -oP "CUDA_VISIBLE_DEVICES=\\K[0-9,]+" .gpu_hold | cut -d, -f2)
-CUDA_VISIBLE_DEVICES=$GPUS PYTORCH_ALLOC_CONF=expandable_segments:True \
+# PYTHONUNBUFFERED: python block-buffers stdout when redirected, so ~30 update
+# lines (1.8K) sit unseen in a 4K buffer until the process exits — a 2h round
+# looks identical to a hung one. Flush per line so progress is observable.
+CUDA_VISIBLE_DEVICES=$GPUS PYTORCH_ALLOC_CONF=expandable_segments:True PYTHONUNBUFFERED=1 \
   .venv-train/bin/python -m train.grpo_trainer --episodes "$ROUND/rollouts.jsonl" \
     --out "$ROUND" $ARGS
 
