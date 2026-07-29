@@ -12,6 +12,24 @@ import numpy as np
 import pandas as pd
 
 
+# The mode each arm is DEFINED by. F6 collects A3 in several modes (harness-off,
+# harness-on, oracle replay) and they all carry arm="a3", so any selection on arm
+# alone silently averages three populations. gate_check had this bug; report.py
+# and figures.py had it too (the A3 row read F1 .530 / self-stop 39% instead of
+# the harness-off .560 / .775). One helper, used everywhere. (2026-07-29)
+GATE_MODE = {"a0": "none", "a1": "none", "a2": "enforce", "a3": "none"}
+
+
+def canonical_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep only each arm's defining mode — the population every headline
+    number, figure and verdict must be computed on."""
+    keep = [(df.arm == a) & (df["mode"] == m) for a, m in GATE_MODE.items()]
+    mask = keep[0]
+    for k in keep[1:]:
+        mask = mask | k
+    return df[mask].copy()
+
+
 def episode_row(ep: dict, lam: float) -> dict:
     # self_stopped means the agent stopped ITSELF with nothing armed to stop it.
     # Requiring mode == "none" is load-bearing: in "enforce" the harness is armed

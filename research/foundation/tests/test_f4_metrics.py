@@ -124,3 +124,23 @@ def test_gate_ignores_a3_harness_on_rows():
     res = evaluate_gate(frame(rows), _gate_cfg())
     assert res["verdict"] == "GO"
     assert res["cond3_no_collapse"]["a3_f1"] == pytest.approx(0.60)
+
+
+def test_canonical_rows_excludes_offarm_modes():
+    """Every headline number must come from each arm's DEFINING mode. F6 emits
+    A3 in three modes under one arm label, and selecting on arm alone silently
+    averaged them — it hit gate_check, then report.py and figures.py (the A3 row
+    read F1 .530 / self-stop 39% instead of the harness-off .560 / .775)."""
+    from eval.metrics import canonical_rows
+    rows = []
+    for i in range(5):
+        rows.append(ep(task=f"t{i}", arm="a3", f1=0.9))                       # off
+        rows.append(ep(task=f"t{i}", arm="a3", f1=0.1, mode="enforce"))       # on
+        rows.append(ep(task=f"t{i}", arm="a3", f1=0.5,
+                       mode="forced_continuation"))                          # oracle
+        rows.append(ep(task=f"t{i}", arm="a2", f1=0.4, mode="enforce"))
+    out = canonical_rows(frame(rows))
+    a3 = out[out.arm == "a3"]
+    assert set(a3["mode"]) == {"none"} and len(a3) == 5
+    assert a3.f1.mean() == pytest.approx(0.9)      # not the 3-mode blend
+    assert set(out[out.arm == "a2"]["mode"]) == {"enforce"}

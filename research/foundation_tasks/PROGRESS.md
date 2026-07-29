@@ -75,8 +75,10 @@
   from base on cached rollouts, launched 2026-07-23). Restarting from base —
   see the 2026-07-28 log entry for the full inventory. 3 rounds ×
   (300 tasks × G=8 sharded collect → judge → train → serve ckpt)
-- [ ] E-f: F6 eval (A3 harness-off/on × 3 budgets) + oracle replay → gate_check
-- [ ] E-g: F7 figures + report + GO/NO-GO verdict → tag `foundation-run-1`
+- [x] E-f ✅ 2026-07-29 (**dev-200 look #2 of 3**): A3 harness-off/on × 3
+  budgets + oracle replay, merged with surviving baseline rows → gate_check
+- [x] E-g ✅ 2026-07-29: figures + report + **GO verdict logged** → tagged
+  `foundation-run-1`
 
 ## Autonomy mandate (Brian, 2026-07-22)
 
@@ -97,6 +99,33 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
    → data size (300→500). One change per iteration, logged.
 
 ## Log
+
+- 2026-07-29 **🎯 FOUNDATION VERDICT: GO** (dev-200, B=4, pre-registered gate).
+  | condition | requirement | result |
+  | 1 utility | A3 > A1 and A3 > A2 | **.2894** vs .2052 / .1796 PASS |
+  | 2 self-stop | >= .70 | **.775** PASS |
+  | 3 no collapse | F1 >= .361 | **.560** PASS |
+  A3 wins utility at EVERY budget (.116/.289/.386 vs A1 .035/.205/.352). Paired
+  deltas at B=4 exclude zero: vs A1 U +.084 [.025,.147], F1 +.089; vs A2 U +.110
+  [.048,.171], F1 +.149. A3's F1 (.560) is the HIGHEST of any arm — it improves
+  quality AND efficiency, not one at the other's expense.
+  **Tight-budget result is the headline:** at B=2 A2's cutoff collapses F1 to
+  .221 while A3 reaches .559 on the SAME 2.96 mean steps as A1. Enforcement
+  cannot make a draft ready early; changed behaviour can.
+  **Internalization:** A3 harness-off beats harness-on at every budget, gap
+  growing as the budget tightens (+.185 / +.023 / +.005). Arming the harness on
+  the trained policy at B=2 destroys F1 (.559 -> .231).
+  **Reward hacking ruled out:** judge flat .842/.841/.843 while realized F1 rose
+  .591/.611/.622. The failure calibration predicted did not occur.
+  Report: experiments/reports/foundation_report.md (§7 carries all limitations).
+- 2026-07-29 **THIRD instance of the arm-blending bug, found in E-g.** The first
+  generated report showed A3 at F1 .530 / self-stop 39% — it was averaging
+  harness-off, harness-on and oracle rows, exactly the bug the audit fixed in
+  `gate_check.py`. `report.py` and `figures.py` had it too and were never
+  checked. Fixed properly this time: one shared `eval.metrics.canonical_rows()`
+  used by the gate, the report and the figures, plus a regression test (61 green).
+  Lesson: when an audit finds a bug of a given SHAPE, grep for the shape, not
+  just fix the instance. Selecting on `arm` alone was wrong in three files.
 
 - 2026-07-29 **CHECKPOINT SELECTED: round 3** (validation slice, utility).
   | ckpt | U | F1 | steps | self_stop | malformed(temp 0) |

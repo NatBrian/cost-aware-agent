@@ -14,13 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd
 
 from common import load_config
-from eval.metrics import check_row_counts, check_utility_recompute
-
-# The gate is about A3 with the harness OFF (plan §6). F6 also collects A3
-# harness-ON and an oracle forced-continuation replay, and ALL of them carry
-# arm="a3" — selecting on arm alone silently averages the three populations
-# into the headline claim. Pin the mode per arm.
-GATE_MODE = {"a1": "none", "a2": "enforce", "a3": "none"}
+from eval.metrics import GATE_MODE, check_row_counts, check_utility_recompute
 
 
 def evaluate_gate(df: pd.DataFrame, cfg: dict) -> dict:

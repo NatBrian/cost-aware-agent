@@ -18,7 +18,7 @@ import pandas as pd
 
 from common import git_hash, load_config
 from eval.gate_check import evaluate_gate
-from eval.metrics import aggregate, paired_delta
+from eval.metrics import aggregate, canonical_rows, paired_delta
 
 
 def build_report(rows: pd.DataFrame, cfg: dict, run_date: str,
@@ -81,7 +81,9 @@ def main() -> None:
     div = None
     if args.divergence and Path(args.divergence).exists():
         div = [json.loads(l) for l in open(args.divergence) if l.strip()]
-    text = build_report(pd.read_csv(args.rows), load_config(),
+    # canonical_rows: every headline number must come from each arm's defining
+    # mode, never a blend of A3 harness-off/on/oracle (see eval/metrics.py)
+    text = build_report(canonical_rows(pd.read_csv(args.rows)), load_config(),
                         date.today().isoformat(), div)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(text)

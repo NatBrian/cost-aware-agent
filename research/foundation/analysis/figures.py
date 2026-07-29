@@ -21,7 +21,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from eval.metrics import aggregate
+from eval.metrics import aggregate, canonical_rows
 
 ARM_COLOR = {"a0": "#CC79A7", "a1": "#0072B2", "a2": "#E69F00", "a3": "#009E73"}
 ARM_MARKER = {"a0": "s", "a1": "o", "a2": "^", "a3": "D"}
@@ -127,7 +127,8 @@ def main() -> None:
     args = ap.parse_args()
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    rows = pd.read_csv(args.rows)
+    # each arm's defining mode only — never a blend (see eval/metrics.py)
+    rows = canonical_rows(pd.read_csv(args.rows))
     print(fig1_frontier(rows, out))
     print(fig2_internalization(rows, out))
     if args.divergence and Path(args.divergence).exists():
