@@ -100,6 +100,36 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-29 **POST-VERDICT ANALYSIS — the GO is real but the MECHANISM is not
+  the predicted one. Report §4 corrected.**
+  Steps did NOT fall: A3 uses 2.96/3.61/4.32 vs A1's 2.96/3.54/3.98. Decomposing
+  the utility gain: B=4 dU +.084 = quality +.089 + step-cost −.005. **All of the
+  gain is answer quality; the step term works slightly AGAINST A3.** Stop-step
+  distributions are near-identical (A1 47/79/31/31 vs A3 48/77/30/32 at steps
+  2/3/4/5) and self-stop is slightly LOWER after training (−.010 at B=4, −.060
+  at B=8).
+  **I had to withdraw a claim I made hours earlier.** The first report draft
+  presented the harness-off/on gap as internalization evidence. The control —
+  A1 vs A2 is the SAME untrained policy with the harness off vs on — shows
+  untrained gaps +.114/+.026/+.046 against trained +.185/+.023/+.005. At B=4 and
+  B=8 the trained gap is no larger. The gap measures "cutting an agent off
+  hurts", true of any agent. Not internalization. Report §4 rewritten, §8
+  amended.
+  **Diagnosis of why stopping did not move:** at B=4, λ=0.3 prices a step at
+  .075 utility while the pilot's 4th step buys ≈+.06 F1 — continuing is roughly
+  break-even, so there was almost no gradient toward stopping earlier. λ was set
+  to place the optimum at the knee; that is not the same as making the pull
+  toward it strong. **λ=0.3 is too weak to change behaviour.**
+  **Next experiments, in priority order (in FOUNDATION_EXPLAINED.md §11):**
+  (1) λ=0 ablation — if F1 and steps are unchanged, the economic term did
+  nothing and this is task-skill RL; (2) λ sweep to 1.0/1.5 — if behaviour moves,
+  that is the dose-response evidence the claim actually needs; (3) more seeds.
+  DO NOT spend the last dev-200 look until a genuinely new method is ready.
+- 2026-07-29 **Wrote research/FOUNDATION_EXPLAINED.md** — plain-language end-to-end
+  explanation for Brian as author: setup, how GRPO training works, results,
+  the step-count finding, the anti-overfitting design, the anti-hacking evidence,
+  what is solid vs shaky, and what to run next.
+
 - 2026-07-29 **🎯 FOUNDATION VERDICT: GO** (dev-200, B=4, pre-registered gate).
   | condition | requirement | result |
   | 1 utility | A3 > A1 and A3 > A2 | **.2894** vs .2052 / .1796 PASS |

@@ -57,18 +57,55 @@ against A1's .478 / .471 / .501. It reaches its answer quality early and then
 decides whether more search is worth it, rather than spending the wallet it is
 handed.
 
-## 4. Internalization: harness-off minus harness-on
+## 4. Stopping behaviour: the claim this run does NOT support
 
-| budget | U harness-off | U harness-on | gap |
+**Corrected 2026-07-29.** An earlier draft of this section presented the
+harness-off vs harness-on gap as evidence of internalization. Running the control
+withdraws that claim.
+
+**Steps did not fall.** A3 uses the same or slightly more steps than A1:
+
+| arm | B=2 | B=4 | B=8 |
 |---|---|---|---|
-| B=2 | .116 | −.069 | **+.185** |
-| B=4 | .289 | .267 | +.023 |
-| B=8 | .386 | .381 | +.005 |
+| A1 | 2.96 | 3.54 | 3.98 |
+| A3 | 2.96 | 3.61 | 4.32 |
 
-A3 is *better without the harness than with it*, and the advantage grows as the
-budget tightens — at B=2, arming the harness on the trained policy destroys F1
-(.559 → .231). The policy's own stopping decisions beat an external cutoff. That
-is the paper's core claim in one table.
+**All of A3's utility gain is answer quality, none is step savings:**
+
+| budget | ΔU vs A1 | from F1 | from step cost |
+|---|---|---|---|
+| B=2 | +.081 | +.081 | −.000 |
+| B=4 | +.084 | +.089 | −.005 |
+| B=8 | +.034 | +.047 | −.013 |
+
+**Stop-step distributions are nearly identical** at B=4 (A1 47/79/31/31 at steps
+2/3/4/5; A3 48/77/30/32), and A3's self-stop rate is slightly *lower* than A1's
+(−.010 at B=4, −.060 at B=8).
+
+**The harness-off/on gap fails its control.** A1 vs A2 is the same untrained
+policy with the harness off vs on:
+
+| budget | untrained off−on | trained off−on |
+|---|---|---|
+| B=2 | +.114 | +.185 |
+| B=4 | +.026 | +.023 |
+| B=8 | +.046 | +.005 |
+
+The untrained policy shows the same pattern, and at B=4/B=8 the trained gap is no
+larger. That gap therefore measures "cutting an agent off hurts" — true of any
+agent — not internalization.
+
+**Likely cause: the step price is too weak.** At B=4 with λ=0.3 a step costs
+`0.3/4 = .075` utility while the pilot's fourth step buys ≈ +.06 F1. Continuing
+is roughly break-even, so the policy had almost no gradient pushing it to stop
+earlier. λ was chosen to place the optimum at the pilot's knee; that is not the
+same as making the pull toward it strong.
+
+**Consequence for the claim:** this run demonstrates that per-step economic RL
+produces a better agent under a budget. It does **not** demonstrate that the
+agent learned to stop. The decisive follow-up is a λ=0 ablation (does the step
+term do anything at all?) and a λ sweep (does behaviour move when steps get
+expensive?).
 
 ## 5. Judge behaviour: the predicted failure did not occur
 
@@ -149,10 +186,16 @@ never decayed toward collapse.
 
 ## 8. What this GO does and does not prove
 
-**It proves**, in this setup: per-step economic RL beats both prompting and
-enforcement on utility, without sacrificing answer quality — A3 improves quality
-*and* efficiency simultaneously — and the trained policy stops better on its own
-than an external harness makes it stop.
+**It proves**, in this setup: per-step economic RL produces an agent that beats
+both prompting and enforcement on utility, and it does so while *improving*
+answer quality rather than trading quality for cost.
+
+**It does NOT prove the stopping claim** (§4). Steps did not fall, the stop-step
+distribution is unchanged, self-stop rate is slightly lower, and the
+harness-off/on gap fails its control. Since F1 is part of the reward, the
+available evidence is equally consistent with "RL fine-tuned the model on
+HotpotQA" — a reviewer will raise this immediately and it cannot currently be
+answered. The λ=0 ablation decides it.
 
 **It does not prove** v2.1's potential-based shaping mechanism. That math
 requires the trained reward model, which the foundation deliberately deferred;
