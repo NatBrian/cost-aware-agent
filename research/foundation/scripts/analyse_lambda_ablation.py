@@ -28,7 +28,10 @@ import numpy as np
 from common import load_config
 from eval.metrics import bootstrap_ci
 
-ARMS = [("lam0", 0.0), ("lam03", 0.3), ("lam10", 1.0)]
+ARMS = [("lam0", 0.0), ("lam03", 0.3), ("lam10", 1.0), ("lam10_r2", 1.0)]
+# lam10_r2 = λ=1.0 at its last HEALTHY checkpoint (round 3 failed its probe).
+# Reported for sensitivity; the pre-registered rule uses lam10 (round 3),
+# which is protocol-matched to the other arms.
 BUDGETS = {"small": 2, "medium": 4, "large": 8}
 THRESHOLD = 0.5          # pre-registered
 RESAMPLES = 10000        # pre-registered
@@ -118,13 +121,18 @@ def main() -> None:
 
     # ---- secondary, supporting only -----------------------------------------
     print("\nsecondary (supporting, not decisive):")
+    PROTOCOL = {"lam0", "lam03", "lam10"}   # sensitivity arm excluded: it is a
+                                            # second point at λ=1.0 and would
+                                            # break a monotonicity test by design
     steps_by_lam = [(lam, per_arm[tag][4]["steps"].mean())
-                    for tag, lam in ARMS if per_arm.get(tag, {}).get(4)]
+                    for tag, lam in ARMS
+                    if tag in PROTOCOL and per_arm.get(tag, {}).get(4)]
     mono = all(b[1] <= a[1] + 1e-9 for a, b in zip(steps_by_lam, steps_by_lam[1:]))
     print("  steps-vs-λ @ B=4: " + "  ".join(f"λ={l}:{s:.3f}" for l, s in steps_by_lam)
           + f"   monotone decreasing: {mono}")
     stop_by_lam = [(lam, per_arm[tag][4]["stop"].mean())
-                   for tag, lam in ARMS if per_arm.get(tag, {}).get(4)]
+                   for tag, lam in ARMS
+                   if tag in PROTOCOL and per_arm.get(tag, {}).get(4)]
     rising = all(b[1] >= a[1] - 1e-9 for a, b in zip(stop_by_lam, stop_by_lam[1:]))
     print("  self-stop-vs-λ  : " + "  ".join(f"λ={l}:{s:.3f}" for l, s in stop_by_lam)
           + f"   rising with λ: {rising}")

@@ -20,13 +20,20 @@ mkdir -p "$OUT"
 GPU=$(grep -oP 'CUDA_VISIBLE_DEVICES=\K[0-9,]+' .gpu_hold | cut -d, -f2)
 
 # tag -> checkpoint. λ=0.3 is the ORIGINAL foundation run's round-3 checkpoint.
+# lam10_r2 is a SENSITIVITY arm, not a protocol arm. λ=1.0's round-3 probe FAILED
+# (malformed 11.0% vs the 10% gate; the trend was 5.8% -> 2.4% -> 11.0%), so its
+# final checkpoint is mildly damaged. Evaluating λ=1.0 only at round 2 would be an
+# asymmetric comparison — the other arms are measured at round 3 — so BOTH are
+# evaluated: round 3 answers the pre-registered rule on protocol-matched
+# checkpoints, round 2 shows what the arm looks like at its last healthy point.
 declare -A ARMS=(
   [lam0]="$PWD/experiments/results/train/lam0_round3/checkpoint"
   [lam03]="$PWD/experiments/results/train/round3/checkpoint"
   [lam10]="$PWD/experiments/results/train/lam10_round3/checkpoint"
+  [lam10_r2]="$PWD/experiments/results/train/lam10_round2/checkpoint"
 )
 
-for TAG in lam0 lam03 lam10; do
+for TAG in lam0 lam03 lam10 lam10_r2; do
   CKPT="${ARMS[$TAG]}"
   if [ ! -f "$CKPT/config.json" ]; then
     echo "!! $TAG checkpoint missing ($CKPT) — skipping, will show as absent in the analysis"

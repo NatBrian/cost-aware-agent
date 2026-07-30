@@ -105,6 +105,27 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 23:05 **lam10 (λ=1.0) round 3: HEALTH PROBE FAILED — and that is a
+  result, not just an incident.** malformed **11.0%** against the 10% gate
+  (hit_cap 5.0%, within its 15% gate). The arm stopped itself: "refusing to train
+  on a damaged policy". Round 3 was the final round, so nothing trained on the
+  damage.
+  Malformed across the arm: **5.8% -> 2.4% -> 11.0%**. Compare λ=0 (2.2 -> 3.5 ->
+  5.8) and λ=0.3 (4.3 -> 2.0 -> 9.0). The λ=1.0 arm ends worst, and it is the arm
+  whose steps were falling — consistent with an aggressive cost term buying step
+  reductions partly by degrading output quality rather than by better stopping.
+  **Evaluation design decision (logged):** evaluating λ=1.0 only at its round-2
+  checkpoint would be asymmetric — every other arm is measured at round 3. So the
+  harness now evaluates BOTH:
+  * `lam10` = round 3 (protocol-matched) → this is what the PRE-REGISTERED RULE
+    reads, unchanged;
+  * `lam10_r2` = round 2, the arm's last HEALTHY checkpoint → reported as a
+    labelled SENSITIVITY arm, excluded from the monotonicity tests (it is a second
+    point at the same λ and would break them by construction).
+  Reporting both is the honest option: picking whichever checkpoint favours a
+  conclusion is exactly the freedom pre-registration exists to remove.
+  Evaluation launched: val-50, budgets {2,4,8}, temp 0, harness off, 4 arms.
+
 - 2026-07-30 19:50 **lam10 round 2 done — and it PARTLY CONTRADICTS my logged
   prediction. Recording that before the final data, as I did the prediction.**
   Round-2 probes (val-50, temp 1.0, n=40), same protocol across arms:
