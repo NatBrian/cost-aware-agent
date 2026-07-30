@@ -105,6 +105,37 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 19:50 **lam10 round 2 done — and it PARTLY CONTRADICTS my logged
+  prediction. Recording that before the final data, as I did the prediction.**
+  Round-2 probes (val-50, temp 1.0, n=40), same protocol across arms:
+  | arm | r1 steps | r2 steps | direction |
+  | λ=0.0 | 3.48 | 3.55 | up |
+  | λ=0.3 | 3.48 | 3.67 | up |
+  | λ=1.0 | 3.45 | **3.17** | **down** |
+  λ=1.0 is the ONLY arm whose step count is falling, and the λ=0 − λ=1.0 gap is
+  now **0.38 steps** — under the pre-registered 0.5 threshold, but no longer the
+  ~0.03 that made me predict a flat null. Round-2 probe was healthy (malformed
+  2.4%, hit_cap 0.0%, F1 .471).
+  **What this does to the earlier reasoning:** the difficulty-confound analysis
+  stands on its own (it is measured, not inferred) — stop step IS substantially
+  question-determined, between/within SD ratio 1.83. But "therefore no λ can move
+  mean steps" was my *extrapolation* from that, and the λ=1.0 trend is evidence
+  against the strong form of it. A confound can suppress an effect without
+  abolishing it. The honest position: difficulty explains why the effect is SMALL
+  and hard to price, not that it must be exactly zero.
+  **Consequences I am holding to:**
+  * the pre-registered rule still decides the verdict, unchanged, on final
+    checkpoints at temp 0 with paired bootstrap CIs — not on these probes;
+  * **λ=1.5 is now back ON the table.** I logged a decision to skip it because
+    "the mechanism explains why no λ will work". That justification is weakened by
+    this trend. Decide after the final val-50 numbers: if the λ=0→1.0 slope is
+    real but under-threshold, a 4th point at 1.5 becomes the difference between
+    "no effect" and "a real but weak dose-response", which is worth 10h.
+  Noting for my own discipline: I had a satisfying mechanism and used it to
+  pre-justify skipping an experiment. The trend arrived one round later and
+  undercut it. Explanations should not retire experiments that are already
+  scheduled.
+
 - 2026-07-30 18:50 **MECHANISM FOUND — and it is not the one I predicted. Three
   diagnostics on already-collected rollouts, no new compute.**
   I suspected GRPO's group-relative advantage was cancelling the cost term (any
