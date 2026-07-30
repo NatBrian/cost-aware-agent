@@ -105,6 +105,27 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-31 **RUN CLOSED — both experiments complete, autonomous loop stopped.**
+  Verified: verdict recorded, `ablation_report.md` (211 lines) +
+  `ablation_preregistration.md` + `FOUNDATION_EXPLAINED.md` §14 all written;
+  0 unpushed commits, 0 dirty files; tags `foundation-run-1` and
+  `lambda-ablation-1`; 12/12 eval files backed up to /mnt/src (354G total).
+  **Idle GPU memory released, hold retained.** The evaluation left the executor
+  (~124G) and judge (~90G) allocated and idle. `acquire_gpus.py` (2 cards, 552M
+  each) is the agreed reservation and stays up per Brian's standing rule, but
+  sitting on 217G of idle allocations on a box where other users are queueing is
+  a different thing. Freed both; kept the retrieval server warm (~2G, and a cold
+  start re-reads the 64G index for ~10 min). GPUs 0+1 remain held and are
+  instantly usable for follow-ups.
+  **Loop stopped deliberately.** With no work outstanding, hourly wake-ups would
+  burn tokens and produce nothing. Restarting is one command — the servers'
+  start-up lines are all in this file and in the report.
+  **State for whoever picks this up:** dev-200 has **1 of 3 looks unused**,
+  reserved for a final headline method. The two follow-up designs in
+  `ablation_report.md` §8 (price steps relative to the per-question minimum;
+  or reward the stop decision against an oracle continuation) are cheap because
+  the pipeline, the trajectories and the judge are all already built.
+
 - 2026-07-31 **λ ABLATION COMPLETE — PRE-REGISTERED VERDICT: NOT EFFECTIVE.**
   At B=4: mean steps 3.500 (λ=0) vs 3.460 (λ=1.0), **paired Δ +0.040**, CI
   [−0.140, +0.300]. Threshold was 0.5 with disjoint CIs — **both conditions
