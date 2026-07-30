@@ -41,7 +41,7 @@ economy:
                                    # FROZEN from pilot: knee at step 3 becomes
                                    # interior optimum at B=4. Do NOT move this for
                                    # the ablation, or arms become incomparable.
-  train_lambda: 0.0                # ablation arm lam0
+  train_lambda: 1.0                # ablation arm lam10
                                    # moves ONLY this: 0.0 (no step price) / 0.3
                                    # (original) / 1.0 (steps clearly expensive).
                                    # At λ=0.3, B=4 a step costs .075 while buying

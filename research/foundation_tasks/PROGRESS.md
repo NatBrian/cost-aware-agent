@@ -105,6 +105,28 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 11:20 **ARM lam0 (train_lambda=0.0) COMPLETE — 3 rounds, every
+  health probe PASSED.**
+  | round | mean_kl | probe malformed | hit_cap | probe F1 | probe steps |
+  | 1 | .3837 | 2.2% | 0.0% | .467 | 3.48 |
+  | 2 | .0032 | 3.5% | 0.0% | .540 | 3.55 |
+  | 3 | — | 5.8% | 2.5% | .672 | 3.88 |
+  Round 1's elevated KL (.3837 vs the λ=0.3 arm's .052) settled to .0032 by round
+  2 — consistent with larger early advantages from a reward carrying no
+  step-cost term, not with policy damage, and the probes confirm health
+  throughout. Judge stayed clean: 0 parse failures, 0 transport failures, 0
+  corrupt cache reads across the arm (the atomic-write fix holding).
+  All three checkpoints + rollouts backed up to /mnt/src.
+  **Still NOT the verdict.** The probe numbers are n=40 at temp 1.0; the
+  pre-registered rule compares final checkpoints on val-50 at temp 0 against the
+  λ=1.0 arm. Recording only that λ=0's probe steps (3.48/3.55/3.88) sit in the
+  same band as λ=0.3's (3.48/3.67/3.62).
+- 2026-07-30 11:22 **ARM lam10 (train_lambda=1.0) LAUNCHED.** Steps priced ~3x
+  the original: at B=4 a step costs .25 utility against the ~.06 F1 a 4th step
+  buys, so continuing should be clearly unprofitable — the regime the λ=0.3 run
+  never tested. Evaluation λ stays pinned at 0.3 so all three arms are scored on
+  one yardstick. ~10h expected.
+
 - 2026-07-30 04:25 **A CORRUPT JUDGE-CACHE ENTRY killed lam0 round 2 after all
   2400 episodes were collected AND judged.** `json.decoder.JSONDecodeError: Extra
   data: line 1 column 388`. Root cause: `judge_client` wrote cache entries with a
