@@ -105,6 +105,43 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 18:50 **MECHANISM FOUND — and it is not the one I predicted. Three
+  diagnostics on already-collected rollouts, no new compute.**
+  I suspected GRPO's group-relative advantage was cancelling the cost term (any
+  reward component roughly constant within a group vanishes in the mean
+  subtraction). **That hypothesis is WRONG:**
+  | arm | within-group SD of steps | cost term as % of the F1 term in the advantage |
+  | λ=0.3 | 0.638 | 24.5% |
+  | λ=1.0 | 0.703 | **81.7%** |
+  Siblings differ by ~0.7 steps, so at λ=1.0 the cost term carries 82% of the
+  advantage signal. The incentive is present and strong. "Signal too weak" is
+  ELIMINATED as the explanation.
+  **Is stopping earlier actually rewarded? Yes, enormously.** On the λ=1.0
+  policy's OWN rollouts at B=4: U(stop@2)=+0.131, U(stop@3)=−0.211,
+  U(stop@4)=−0.442. Utility-optimal stop is step 2; the policy stops at 3.29. So
+  a +0.34 utility gain sits unclaimed after 150 updates x 3 rounds.
+  **Why it cannot claim it — the actual mechanism.** F1 is HIGHEST among episodes
+  that stopped at 2 (.631, vs .539 at step 3). Early stops are not quality
+  sacrifices; they are the EASY QUESTIONS. Decomposing stop-step variance over
+  109 groups of 8 rollouts on the same question:
+  * WITHIN-question SD (what the policy varies) = **0.666**
+  * BETWEEN-question SD (what the question dictates) = **1.220**
+  * ratio 1.83
+  **Stop step is substantially a CONSEQUENCE of task difficulty, not a free choice
+  the policy makes.** Stopping earlier on a hard question means answering it
+  wrong, and the model cannot know difficulty before searching. No value of λ can
+  price away a variable the policy only partly controls.
+  **This is the paper's real finding**, and it is a much better one than "λ was
+  too small": *in a step-budget formulation, "when to stop" is confounded with
+  "how hard the question turned out to be", so a per-step cost term cannot move
+  mean steps however strongly it is priced.* It also explains the original
+  result cleanly — RL improved F1 because F1 is learnable, and left steps alone
+  because steps are mostly not the policy's to choose.
+  Implication for v2.1: the cost signal needs to attach to something the policy
+  actually controls, or the metric needs to condition on difficulty (e.g. steps
+  relative to the minimum needed for THAT question, or a stop-decision reward
+  evaluated against an oracle continuation). Logged for the report.
+
 - 2026-07-30 17:45 **lam10 (λ=1.0) round 1 done, probe PASS — and the
   accumulating signal now points hard at H0.**
   Round-1 probes, identical protocol, val-50 @ temp 1.0, n=40:
