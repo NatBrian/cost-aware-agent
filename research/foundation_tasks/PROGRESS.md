@@ -105,6 +105,32 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-30 17:45 **lam10 (λ=1.0) round 1 done, probe PASS — and the
+  accumulating signal now points hard at H0.**
+  Round-1 probes, identical protocol, val-50 @ temp 1.0, n=40:
+  | train λ | step price at B=4 | probe steps | probe F1 | malformed |
+  | 0.0 | free | 3.48 | .467 | 2.2% |
+  | 0.3 | .075 | 3.48 | .612 | 4.3% |
+  | 1.0 | **.25** | **3.45** | .574 | 5.8% |
+  At λ=1.0 a step costs .25 utility while a 4th step buys ~.06 F1 — more than 4x
+  unprofitable — and the policy takes the SAME number of steps as the arm with no
+  step price at all. Across a 0 -> 1.0 sweep of the cost coefficient, mean steps
+  moves by 0.03. Round 1 health fine (mean_kl .1173, 8028 samples kept, judge
+  0 parse / 0 transport / 0 corrupt).
+  **This is not the verdict and must not be used as one.** n=40, temp 1.0, round 1
+  of 3; the pre-registered rule compares FINAL checkpoints on val-50 at temp 0
+  with paired bootstrap CIs. But it is now three independent arms spanning the
+  whole λ range landing within 0.03 steps of each other, so I am recording the
+  prediction in advance of the data: **I expect the pre-registered rule to FAIL
+  and the honest outcome to be a NEGATIVE result — per-step economic rewards at
+  this scale do not change stopping behaviour.** Writing that down now so the
+  eventual report cannot be accused of post-hoc framing either way.
+  If that is the outcome, the useful contributions become: (a) prompting beats
+  enforcement (A1 > A2 at every budget); (b) a reward term can be correctly
+  calibrated to place the optimum and still exert no behavioural pull — a
+  concrete warning about reward design; (c) a working, reproducible pipeline plus
+  a reward-hacking protocol that made a falsifiable prediction and checked it.
+
 - 2026-07-30 11:20 **ARM lam0 (train_lambda=0.0) COMPLETE — 3 rounds, every
   health probe PASSED.**
   | round | mean_kl | probe malformed | hit_cap | probe F1 | probe steps |
