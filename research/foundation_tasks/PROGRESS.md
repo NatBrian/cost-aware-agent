@@ -105,6 +105,33 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-31 **λ ABLATION COMPLETE — PRE-REGISTERED VERDICT: NOT EFFECTIVE.**
+  At B=4: mean steps 3.500 (λ=0) vs 3.460 (λ=1.0), **paired Δ +0.040**, CI
+  [−0.140, +0.300]. Threshold was 0.5 with disjoint CIs — **both conditions
+  FAIL**. Power: Δ CI half-width 0.220 steps, and the observed effect is far
+  below even that.
+  Utility on the fixed yardstick *falls* with λ at B=4 (.431 → .424 → .400) and
+  B=8 (.569 → .545 → .541) — not a significant harm (CIs overlap), but certainly
+  not a benefit. The sensitivity arm (λ=1.0 round 2, last healthy checkpoint) is
+  worse on every metric, so the verdict does not depend on the checkpoint choice.
+  **The one significant behavioural effect in the sweep is at B=2**: λ=1.0 cuts
+  **−0.700 steps, CI [−1.26,−0.24] (excludes zero), F1 intact**. EXPLORATORY —
+  the rule was specified at B=4 — and labelled as such everywhere. It locates the
+  mechanism: with the harness off, the λ=0 policy takes 3.28 steps at a budget of
+  2, i.e. it OVERSPENDS, so the cost term has something to pull against. At B=4
+  (3.5 of 4) and B=8 (3.8 of 8) it is already inside budget and no λ has leverage.
+  **The determinant is whether the budget binds, not the size of λ.**
+  **λ=1.5 NOT RUN.** The pre-registered "real but weak" flag needed Δ>0.15; Δ is
+  0.040. Also λ=1.0 already breached the health gate (11.0% malformed, only arm
+  to do so, lowest F1 at B=4), and the B=2 result shows the right variable is
+  budget-bindingness, not λ. ~10 GPU-hours avoided. Note: earlier in this run I
+  pre-justified skipping λ=1.5 from a mechanism argument and a later round
+  undercut it — this time the numeric pre-registered condition decides and the
+  mechanism only corroborates.
+  Reports: `experiments/reports/ablation_report.md` (full),
+  `research/FOUNDATION_EXPLAINED.md` §14 (plain language). Tag
+  `lambda-ablation-1`.
+
 - 2026-07-30 23:05 **lam10 (λ=1.0) round 3: HEALTH PROBE FAILED — and that is a
   result, not just an incident.** malformed **11.0%** against the 10% gate
   (hit_cap 5.0%, within its 15% gate). The arm stopped itself: "refusing to train

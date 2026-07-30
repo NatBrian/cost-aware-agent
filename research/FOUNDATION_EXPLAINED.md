@@ -405,3 +405,51 @@ untrained agent.** The most likely reason is that we priced steps too cheaply fo
 the agent to care. The pipeline is proven and the result is real — the claim just
 needs to be either re-framed around answer quality, or re-tested with a stronger
 step price before it can be about economic stopping.
+
+---
+
+## 14. UPDATE — the λ ablation answered §11's first question (2026-07-31)
+
+§11 said the highest-value next step was a λ=0 ablation, because we could not
+tell "the economics did something" from "this is ordinary task training". **We
+ran it, plus a λ=1.0 arm. The answer is: the step-cost term does not change
+stopping.**
+
+Pre-registered rule (fixed before the data): the cost term counts as effective
+only if mean steps at B=4 drops ≥0.5 between λ=0 and λ=1.0 with non-overlapping
+confidence intervals.
+
+| training λ | what a step costs at B=4 | mean steps |
+|---|---|---|
+| 0.0 | nothing | 3.500 |
+| 0.3 | .075 | 3.500 |
+| 1.0 | .25 (≈4× what it buys) | 3.460 |
+
+**Δ = 0.040 steps. Verdict: NOT EFFECTIVE**, on both conditions.
+
+**Why — and this is the useful part.** It is not that the penalty was too weak
+(it is 82% of the training signal at λ=1.0) and not that the algorithm cancelled
+it (checked). It is that **when the agent stops is mostly decided by the
+question, not the agent**: easy questions finish in 2 steps, hard ones take 4,
+and stopping early on a hard question just means answering wrong. Measured over
+109 groups of 8 attempts at the same question — between-question SD of stop step
+**1.220** vs within-question **0.666**. There is no free "stop sooner" behaviour
+for a price to buy.
+
+Two real findings alongside it:
+
+- **Where the budget genuinely binds, the price does work.** At B=2 — where the
+  untrained-cost policy overspends, taking 3.28 steps for a budget of 2 — λ=1.0
+  cuts 0.70 steps with quality intact (CI excludes zero). Exploratory, not
+  pre-registered, so weaker evidence; but it locates the regime where such
+  rewards are worth using.
+- **Too high a price damages the model.** λ=1.0 was the only arm to fail its
+  health gate (11% malformed output), and had the lowest F1 of the three.
+
+**What changes for the paper:** the "we taught economic stopping" claim is not
+supported and should not be made. What replaces it is stronger than a null:
+*pricing raw step count fails on step-budget benchmarks, and here is the variance
+decomposition showing why.* Full detail, including the recommended fixes (price
+steps relative to the minimum needed for **that** question, or reward the stop
+decision against an oracle continuation), is in
+`foundation/experiments/reports/ablation_report.md`.
