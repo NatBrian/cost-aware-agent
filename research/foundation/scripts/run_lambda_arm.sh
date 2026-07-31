@@ -65,18 +65,25 @@ for R in $(seq "$START" 3); do
   if [ -z "$INIT" ]; then bash scripts/e5_round.sh "$DIR" 300 8 150
   else                    bash scripts/e5_round.sh "$DIR" 300 8 150 "$INIT"; fi
 
-  echo "=== $TAG round $R HEALTH GATE ==="
-  if ! bash scripts/probe_policy_health.sh "/tmp/probe_${TAG}_r$R.jsonl"; then
-    echo "ARM $TAG STOPPED: health probe FAILED after round $R — refusing to train on a damaged policy"
-    exit 1
-  fi
-
+  # BACK UP BEFORE THE GATE. Ordering these the other way round lost the
+  # λ=1.0 round-3 checkpoint from /mnt/src on 2026-07-30: its probe failed, the
+  # script exited, and the artefact that the pre-registered verdict was computed
+  # from survived only on the ephemeral overlay. A failed probe is exactly when
+  # you most want the evidence kept — it is a result, not a discard.
   mkdir -p "$BACKUP/checkpoints" "$BACKUP/trajectories"
   cp "$DIR/rollouts.jsonl" "$BACKUP/trajectories/${TAG}_round${R}_rollouts.jsonl" 2>/dev/null || true
   for f in round_summary.json train_log.jsonl divergence.jsonl; do
     [ -f "$DIR/$f" ] && cp "$DIR/$f" "$BACKUP/trajectories/${TAG}_r${R}_$f" || true
   done
   cp -r "$DIR/checkpoint" "$BACKUP/checkpoints/${TAG}_round$R" 2>/dev/null || true
+
+  echo "=== $TAG round $R HEALTH GATE ==="
+  if ! bash scripts/probe_policy_health.sh "/tmp/probe_${TAG}_r$R.jsonl"; then
+    echo "ARM $TAG STOPPED: health probe FAILED after round $R — refusing to train on a damaged policy"
+    echo "(round $R artefacts ARE backed up to $BACKUP — a failed probe is a result)"
+    exit 1
+  fi
+
   INIT="$PWD/$DIR/checkpoint"
   # keep only the newest local checkpoint: 19G each, all are on /mnt/src
   [ "$R" -gt 1 ] && rm -rf "experiments/results/train/${TAG}_round$((R-1))/checkpoint" || true

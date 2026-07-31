@@ -105,6 +105,27 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-31 **BACKUP GAP FOUND AND CLOSED — the λ=1.0 final checkpoint was never
+  on /mnt/src.** Audit of "is everything backed up?" turned up 8 of 9 checkpoints:
+  `lam10_round3` was missing — **the very artefact the pre-registered verdict was
+  computed from.**
+  Cause: `run_lambda_arm.sh` backed up AFTER the health probe, and λ=1.0's round-3
+  probe FAILED (malformed 11.0%), so the script exited before reaching the backup.
+  The one round whose result was most unusual was the one round left unprotected.
+  It survived only because the ephemeral overlay had not been wiped.
+  **Fixed in the script: backup now runs BEFORE the gate**, with the reasoning
+  in-file — a failed probe is a RESULT, not a discard, and is exactly when you
+  most want the evidence kept. The failure message now states that artefacts are
+  backed up.
+  Also mirrored all 14 reports (+ PROGRESS.md, README.md, FOUNDATION_EXPLAINED.md)
+  to `/mnt/src/.../reports/`. They were already safe on GitHub; the mirror means a
+  reader with only the storage mount gets the findings alongside the artefacts.
+  **Verified final backup state: 9/9 checkpoints (19G each, weights + config
+  present), 32 trajectory files, 12 eval outputs, 14 reports — 372G total.**
+  Lesson, third of its kind this run: a safety mechanism placed AFTER the thing it
+  protects is not a safety mechanism. (Cf. the neutral-judge fallback that would
+  have mislabelled an arm, and the cache that could fail a run.)
+
 - 2026-07-31 **RUN CLOSED — both experiments complete, autonomous loop stopped.**
   Verified: verdict recorded, `ablation_report.md` (211 lines) +
   `ablation_preregistration.md` + `FOUNDATION_EXPLAINED.md` §14 all written;
