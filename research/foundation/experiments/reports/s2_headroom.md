@@ -110,6 +110,28 @@ lowest F1 of the three arms. λ=0.568 is untested territory between a known-safe
 0.3 and a known-harmful 1.0, so **S4 runs the temp-1.0 health probe after round 1
 and aborts on breach** rather than discovering it at round 3.
 
+## 5b. Validation: λ\* actually exerts pressure
+
+A calibrated λ is worthless if GRPO cannot see it. Group-relative advantages
+remove anything constant within a group, so only *within-group* variation counts.
+Measured on the λ=0 rollouts:
+
+| B | SD(F1) within group | SD(λ·steps/B) | **cost share of the signal** |
+|---|---|---|---|
+| 2 | 0.215 | 0.088 | 29.1% (λ=0.3) |
+| **2** | **0.215** | **0.167** | **43.7% (λ\*=0.568)** |
+| 4 | 0.186 | 0.042 | 18.5% (λ=0.3) |
+| 4 | 0.186 | 0.080 | 30.1% (λ\*=0.568) |
+
+At the gate budget the cost term carries **43.7%** of the advantage signal — a
+real share, and comfortably below the **81.7%** at λ=1.0 that came with a
+breached health gate. λ\* sits in the intended middle.
+
+This also re-confirms the FOUNDATION-1 diagnostic: the term was never being
+cancelled by GRPO. At λ=0.3 it was already 29% of the signal at B=2 and still
+moved nothing there — because the *measurement* (mean steps at n=50, B=4) could
+not have seen it.
+
 ## 6. Consequence: a new frozen eval set
 
 n ≥ 479 makes dev-200 unusable as the eval set. Built **eval-600**
