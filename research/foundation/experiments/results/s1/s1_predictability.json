@@ -1,0 +1,180 @@
+{
+  "rollouts": "experiments/results/train/lam0_round1/rollouts.jsonl",
+  "n_episodes": 2400,
+  "base_rate": 0.7575,
+  "gate": 0.65,
+  "by_k": {
+    "1": {
+      "n": 2400,
+      "n_positive": 1818,
+      "logreg_auc_mean": 0.5976998655450412,
+      "logreg_auc_std": 0.023791097022079464,
+      "gbm_auc_mean": 0.5576000335543869,
+      "gbm_auc_std": 0.027457080070681,
+      "top_features": [
+        {
+          "name": "q_coverage",
+          "importance": 0.2675544159591491
+        },
+        {
+          "name": "query_len_mean",
+          "importance": 0.1157319894612064
+        },
+        {
+          "name": "obs_len_last",
+          "importance": 0.09099102961667929
+        },
+        {
+          "name": "logprob_min",
+          "importance": 0.08983384115599469
+        },
+        {
+          "name": "logprob_mean",
+          "importance": 0.08615449311131777
+        },
+        {
+          "name": "obs_len_mean",
+          "importance": 0.08412245235604478
+        }
+      ]
+    },
+    "2": {
+      "n": 2383,
+      "n_positive": 1802,
+      "logreg_auc_mean": 0.7077864353405107,
+      "logreg_auc_std": 0.021359606652201362,
+      "gbm_auc_mean": 0.6887869439964368,
+      "gbm_auc_std": 0.02410660877001893,
+      "top_features": [
+        {
+          "name": "logprob_last",
+          "importance": 0.22887479072480293
+        },
+        {
+          "name": "q_coverage",
+          "importance": 0.17740460871054514
+        },
+        {
+          "name": "obs_len_mean",
+          "importance": 0.07920665726855851
+        },
+        {
+          "name": "query_len_mean",
+          "importance": 0.07040689423349221
+        },
+        {
+          "name": "logprob_mean",
+          "importance": 0.06777240127542417
+        },
+        {
+          "name": "raw_len_mean",
+          "importance": 0.06128018335306401
+        }
+      ]
+    },
+    "3": {
+      "n": 1555,
+      "n_positive": 1107,
+      "logreg_auc_mean": 0.8126462999113689,
+      "logreg_auc_std": 0.026230510351985394,
+      "gbm_auc_mean": 0.7794152815598222,
+      "gbm_auc_std": 0.02396657298818949,
+      "top_features": [
+        {
+          "name": "logprob_last",
+          "importance": 0.25278374942665843
+        },
+        {
+          "name": "q_coverage",
+          "importance": 0.137230030065631
+        },
+        {
+          "name": "obs_len_mean",
+          "importance": 0.07843671852330937
+        },
+        {
+          "name": "logprob_mean",
+          "importance": 0.06697535733717233
+        },
+        {
+          "name": "obs_len_last",
+          "importance": 0.06019426440971966
+        },
+        {
+          "name": "logprob_min",
+          "importance": 0.05575452779185765
+        }
+      ]
+    },
+    "4": {
+      "n": 613,
+      "n_positive": 315,
+      "logreg_auc_mean": 0.728325688095768,
+      "logreg_auc_std": 0.031169054956575355,
+      "gbm_auc_mean": 0.7182799475009823,
+      "gbm_auc_std": 0.017355200811400746,
+      "top_features": [
+        {
+          "name": "raw_len_mean",
+          "importance": 0.1329610626146906
+        },
+        {
+          "name": "logprob_last",
+          "importance": 0.1303390636402461
+        },
+        {
+          "name": "obs_len_mean",
+          "importance": 0.11414992287370847
+        },
+        {
+          "name": "q_coverage",
+          "importance": 0.08061472409753917
+        },
+        {
+          "name": "logprob_min",
+          "importance": 0.0740594885564541
+        },
+        {
+          "name": "draft_in_obs",
+          "importance": 0.07300550889678196
+        }
+      ]
+    },
+    "5": {
+      "n": 412,
+      "n_positive": 169,
+      "logreg_auc_mean": 0.6941372211292108,
+      "logreg_auc_std": 0.06802979490866447,
+      "gbm_auc_mean": 0.6397996803857268,
+      "gbm_auc_std": 0.04928263710552801,
+      "top_features": [
+        {
+          "name": "logprob_min",
+          "importance": 0.1274836408979096
+        },
+        {
+          "name": "logprob_last",
+          "importance": 0.12361728808122936
+        },
+        {
+          "name": "q_coverage",
+          "importance": 0.10595391469186657
+        },
+        {
+          "name": "query_len_mean",
+          "importance": 0.09413941557879263
+        },
+        {
+          "name": "obs_len_mean",
+          "importance": 0.09036557212882708
+        },
+        {
+          "name": "draft_in_obs",
+          "importance": 0.07227604598973596
+        }
+      ]
+    }
+  },
+  "best_auc": 0.8126462999113689,
+  "verdict": "PASS"
+}
