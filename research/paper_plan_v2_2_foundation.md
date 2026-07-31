@@ -1,15 +1,19 @@
 # Paper Plan v2.2 — FOUNDATION-2, the redesigned pipeline-validation run
 
-> **Status:** DRAFT for review (2026-07-31) — no code written yet. This document
-> supersedes `paper_plan_v2_1_foundation.md` (FOUNDATION-1) as the active plan.
-> FOUNDATION-1 is **not deleted**: it ran to completion, produced a GO, and its
-> results and failure modes are the entire input to this redesign. Read it for
-> history; build from this.
+> **Status:** implementation-ready (2026-07-31, rewritten). Supersedes
+> `paper_plan_v2_1_foundation.md` (FOUNDATION-1) as the active plan. FOUNDATION-1
+> is **not deleted**: it ran to completion, produced a GO, and its results and
+> failure modes are the entire input to this redesign.
 >
 > **Relationship to `paper_plan_v2_1.md`:** v2.1 remains the full ICLR paper plan.
-> FOUNDATION-2 moves *back toward* it — the redesign is largely a matter of
-> restoring two things FOUNDATION-1 simplified away (§4). Where they conflict,
-> this document governs foundation work only.
+> Where they conflict, this document governs foundation work only.
+>
+> **Rewrite note (2026-07-31).** The first draft of this document proposed ~12
+> simultaneous changes. That was over-scoped and reproduced, at larger scale, the
+> attribution error that already cost us a claim: change everything at once and no
+> outcome is interpretable. This version is a **staircase** — one minimal
+> experiment, then two conditional expansions, each triggered by a specific
+> result. §5 explains why, §7 is the experiment we actually run first.
 
 ---
 
@@ -23,20 +27,19 @@ by 0.04 steps.
 
 The obvious conclusion was "the method doesn't work." The diagnostics say
 something more useful: **the experiment could not have detected the effect even if
-the method worked perfectly.** Three independent design errors each guaranteed a
-null (§2). None of them is a property of the method.
+the method worked perfectly.** Three design errors each guaranteed a null (§2).
+None of them is a property of the method.
 
-FOUNDATION-2 fixes all three and re-asks the question on a design that can
-actually answer it.
+FOUNDATION-2 fixes them **in order of cost**, starting with the four cheapest
+(§7), and only builds new machinery if the cheap fixes are not enough.
 
 ---
 
 ## 1. What FOUNDATION-1 established (keep these; they are real)
 
-Run to completion 2026-07-22 → 2026-07-31. Full records:
-`foundation/experiments/reports/`.
+Run 2026-07-22 → 2026-07-31. Records: `foundation/experiments/reports/`.
 
-**Gate verdict: GO**, on the frozen dev-200 at B=4, harness off:
+**Gate verdict: GO**, frozen dev-200 at B=4, harness off:
 
 | arm | B=4 utility | B=4 F1 | B=4 steps | self-stop |
 |---|---|---|---|---|
@@ -47,72 +50,90 @@ Run to completion 2026-07-22 → 2026-07-31. Full records:
 
 Paired deltas at B=4 exclude zero (A3−A1 utility +.084, CI +.025…+.147).
 
-**Findings that survive and carry into the paper:**
+**Findings that survive into the paper:**
 
 1. **Prompting beats enforcement.** A1 > A2 at every budget; at B=2 enforcement is
-   catastrophic (F1 .221 vs .478). Telling a capable model a constraint beats
-   mechanically cutting it off.
+   catastrophic (F1 .221 vs .478).
 2. **The GO came from answer quality, not stopping.** A3's steps did not fall
    (3.61 vs A1's 3.54). Reported honestly in `foundation_report.md` §4 after the
-   control (A1 vs A2, same policy) withdrew an earlier internalization claim.
+   A1-vs-A2 control withdrew an earlier internalization claim.
 3. **A correctly-calibrated cost term can exert no behavioural pull.** λ was
    calibrated so the utility optimum sat exactly at the observed quality knee —
    and moved nothing. *Where the optimum sits is not how hard the policy is pulled
    toward it.*
 4. **A cost term works where the budget binds.** At B=2 only: −0.70 steps, CI
-   excludes zero, F1 intact.
+   excludes zero, F1 intact. **This is the positive result Step 1 is built on.**
 5. **The pipeline and its honesty machinery work.** Pre-registration, calibration
-   gates, a frozen dev set with a look budget, a reward-hacking protocol that made
-   a falsifiable prediction and then refuted it against its own data.
-
-**Also established (infrastructure, all reusable):** GRPO trainer, ReAct harness
-with three modes, retrieval env, judge client, eval/gate machinery, ~52 CPU tests.
-FOUNDATION-2 changes what we *measure and reward*, not what we *run on* (§14).
+   gates, a frozen dev set with a look budget, and a reward-hacking protocol that
+   made a falsifiable prediction and then refuted it against its own data.
 
 ---
 
-## 2. The diagnosis — three design errors, each alone sufficient to force a null
+## 2. The diagnosis — three design errors
 
 ### Error 1 — we targeted the wrong behaviour
 
-We priced *"one step too many at the end."* The diagnostic (D1,
-`pre_redesign_diagnostics.md`) measured how much of that exists on HotpotQA:
-**0.31 steps mean, 0.00 median.** Our pre-registered threshold was 0.5 steps.
+We priced *"one step too many at the end."* D1
+(`pre_redesign_diagnostics.md`) measured how much of that exists on HotpotQA:
+**0.31 steps mean, 0.00 median**, against a pre-registered threshold of 0.5.
 **The test required an effect larger than the effect that can physically exist.**
 
-But D1 only looked at episodes that *succeeded*. Re-reading the per-step draft
-curves (§3) shows the real cost sink is a different behaviour entirely:
-**episodes that never get anywhere and keep going.**
+D1 only looked at episodes that *succeeded*. The per-step draft curves (§3) show
+the real cost sink is a different behaviour: **episodes that never get anywhere
+and keep going.**
 
-### Error 2 — a scalar price cannot express a state-dependent rule
+### Error 2 — the budget did not bind
 
-`λ·steps/B` applies identical pressure in every state. The optimal policy is
-violently state-dependent: *keep going while progress is happening, quit fast when
-it is not.* **No value of λ can encode that** — which is precisely what a 0→1.0
-sweep found, and it is a stronger statement than the "difficulty confound" framing
-in `ablation_report.md` §4.
+A budget can only change behaviour if the policy would otherwise exceed it.
+Measured against the policy's own stopping distribution (n=195):
 
-Diagnostics ruled out the alternatives: GRPO is not cancelling the term (it is
-81.7% of the advantage signal at λ=1.0), and stopping earlier *is* richly rewarded
-(U(stop@2) = +0.131 vs U(stop@4) = −0.442). The signal was present, strong,
-correctly signed — and structurally incapable of expressing the target behaviour.
+| budget | % of episodes that would overspend it | verdict |
+|---|---|---|
+| B=2 | 75% | **binds** |
+| B=3 | 41% | **binds** |
+| B=4 | 33% | borderline |
+| B=8 | **6%** | dead — irrelevant to 94% of episodes |
 
-**This is the argument for a value function instead of a price**, i.e. for the
-mechanism v2.1 §2.2 specifies and FOUNDATION-1 simplified away.
+We ran `{2, 4, 8}` and **gated at B=4**. A third of the evaluation went to a
+condition where the budget was a no-op, and the gate sat on the borderline. The
+one clearly-binding budget, B=2, is **the only place the cost term worked.**
 
-### Error 3 — the objective was scaled so that success was invisible
+### Error 3 — the objective was scaled so success was invisible
 
 At λ=0.3, B=4 one step costs 0.075 utility while a lost answer costs ~0.8 F1.
-Consequence, measured (§3): **even a perfect oracle quit rule is worth +0.012
+Consequence, measured (§3.3): **even a perfect oracle quit rule is worth +0.012
 utility.** Our economy said "essentially never quit," and the policy complied.
 
-Compounding it: budgets {2, 4, 8} against a natural stopping point of ~3.5 meant
-**two of three budget conditions could not bind.** The only binding one (B=2) is
-the only place the cost term worked.
+### A fourth, secondary error — the cost function had the wrong shape
+
+Every step re-reads the whole conversation, so cost per step grows:
+
+| step | total chars charged | vs step 1 |
+|---|---|---|
+| 1 | 1,674 | 1.00× |
+| 5 | 9,742 | 5.82× |
+| 10 | 16,281 | **9.73×** |
+
+Flat `λ·steps/B` charges step 10 the same as step 1, **underpricing late steps by
+up to 10×** — exactly the steps we want the agent to avoid. *(Upper bound: assumes
+no prefix caching. The direction holds; the magnitude is smaller with vLLM prefix
+caching, and must be measured once token counts are recorded — §12.)* This is
+**deferred to Step 3**; it is a refinement, not a blocker.
+
+### What is NOT the explanation
+
+Ruled out by diagnostics on collected rollouts:
+
+- **GRPO is not cancelling the cost term** — it is 81.7% of the advantage signal
+  at λ=1.0, 24.5% at λ=0.3.
+- **Stopping earlier is not under-rewarded** — U(stop@2) = +0.131 vs
+  U(stop@4) = −0.442 on λ=1.0's own rollouts.
+- **The executor is not too weak** — merely *telling* the 9B its budget moves it
+  1.02 steps (D4), 25× the λ effect.
 
 ---
 
-## 3. The corrected empirical picture (measured 2026-07-31, existing rollouts)
+## 3. The corrected empirical picture
 
 Source: `experiments/results/pilot/pilot.jsonl` — 195 episodes with a self-chosen
 ANSWER, arm A1 (frozen, untrained), `forced_continuation` to T_max = 10, so the
@@ -137,8 +158,7 @@ Given the draft is still worthless after *k* steps:
 | steps it will still spend | 3.16 | 2.98 | 3.58 | 3.16 | 2.64 | 2.11 | 1.56 |
 
 By step 3 an unproductive episode has a 32% chance of ever working and burns
-another 3.6 steps chasing it. **This is a decaying hazard, not noise** — it is the
-signal an optimal-stopping rule consumes.
+another 3.6 steps chasing it. **A decaying hazard, not noise.**
 
 ### 3.3 The headroom, valued under our own economy
 
@@ -155,430 +175,360 @@ Oracle quit rule "give up if no progress by step *k*", scored at λ=0.3, B=4:
 
 ### 3.4 What is honest about this, and what is not
 
-- **The step saving is real and large enough to detect. The utility gain is not**
-  (+0.012, far under noise). Under the *current* economy the oracle rule is
-  roughly Pareto-neutral: it trades −0.94 steps for −0.058 F1. That is Error 3
-  restated, and it is why FOUNDATION-2 must fix the economy (§8) and report a
-  frontier rather than one scalar (§9).
-- **A global threshold rule is the crudest possible policy.** −0.94 steps is a
-  *floor* on what a learned, per-episode rule could achieve, not a ceiling.
-- **The rule as measured uses gold** (detecting "no progress" needs
-  `draft_f1_vs_gold`). That is legitimate for *training labels* — it is exactly
-  the privileged-information asymmetry v2.1 §2.3 argues for — but a deployed
-  policy needs a gold-free proxy. **Whether that proxy exists is unproven and is
-  the first thing FOUNDATION-2 tests (G0, §11).**
-- **n = 195, one untrained arm, one dataset.** Must be replicated on the 2400
-  λ=0 training rollouts (`experiments/results/train/`, on disk) before anything is
-  pre-registered.
+- **The step saving is real and detectable. The utility gain is not** (+0.012).
+  Under the *current* economy the oracle rule is roughly Pareto-neutral. That is
+  Error 3 restated and it is what §7.4 fixes.
+- **A global threshold rule is the crudest possible policy.** −0.94 is a *floor*
+  on what a learned per-episode rule could achieve, not a ceiling.
+- **The rule as measured uses gold.** Legitimate for training labels (the
+  privileged-information asymmetry of v2.1 §2.3), but a deployed policy needs a
+  gold-free proxy. **Whether that proxy exists is unproven and is stage S1.**
+- **n = 195, one untrained arm, one dataset.** Replicated at scale in S2 before
+  anything is pre-registered.
 
 ### 3.5 Amendment to `pre_redesign_diagnostics.md`
 
 That report concluded *"HotpotQA cannot support a cost-aware-stopping claim."*
 **Too broad.** Corrected: HotpotQA cannot support a **stop-when-done** claim
-(0.23–0.31 steps of headroom, median 0). It **can** support a
-**quit-when-hopeless** claim (~0.94 steps). D1 itself stands; the dataset verdict
-does not.
+(0.23–0.31 steps, median 0). It **can** support a **quit-when-hopeless** claim
+(~0.94 steps). D1 itself stands; the dataset verdict does not.
 
 ---
 
 ## 4. What FOUNDATION-1 actually tested
 
 FOUNDATION-1 replaced the trained stopping-value model with a frozen prompted
-judge (simplification #4 in `paper_plan_v2_1_foundation.md` §1). In the full plan
-that configuration already has a name: **baseline B10(b)** — *"executor GRPO
-trained with RM-P rubric rewards in place of RM-T's V̂."*
-
-And v2.1 §5.2 pre-registered a prediction for it:
+judge (simplification #4 of the FOUNDATION-1 plan). In the full plan that
+configuration already has a name: **baseline B10(b)** — *"executor GRPO trained
+with RM-P rubric rewards in place of RM-T's V̂."* And v2.1 §5.2 pre-registered a
+prediction for it:
 
 > *Predicted outcome: RM-P loses — LLM step-redundancy judgment is ≤24.9% F1
 > (RedundancyBench) and frozen judges get hacked under RL; binary rubric bits
 > also cannot supply the continuous per-step differences r_t needs.*
 
 **We ran the plan's own predicted-to-fail baseline, and it failed as predicted.**
-That is a confirmed prediction, not a refuted method. The mechanism in v2.1 §2.2
-— the Snell envelope / continuation value — **has never been run.**
-
-This matters for framing: FOUNDATION-2 is not a rescue attempt after a negative
-result. It is the experiment FOUNDATION-1 was supposed to de-risk, now run with
-the component whose absence explains the null.
+That is a confirmed prediction, not a refuted method. The mechanism v2.1 §2.2
+specifies — the Snell continuation value — **has never been run**, and is Step 2
+here.
 
 ---
 
-## 5. The redesigned question
+## 5. The design principle: minimal first
+
+**A foundation run exists to de-risk cheaply.** Twelve simultaneous changes have a
+specific failure mode: if the result is positive we cannot attribute it, and if it
+is negative we cannot localise it. FOUNDATION-1 already paid that price once — the
+internalization claim had to be withdrawn because a control was missing.
+
+**The minimal path is not a guess.** The λ ablation is routinely read as
+condemning the scalar price. Look at where it ran (§2, Error 2): the price
+**worked** at the one budget that bound (B=2: −0.70 steps, CI excludes zero,
+quality intact) and did nothing at the two that did not. The ablation is evidence
+that *pricing fails when the budget does not bind* — plus positive evidence that
+it works when it does. Our gate happened to sit at B=4, one of the dead
+conditions.
+
+So Step 1 changes the **economy and the measurement** while holding the **method**
+fixed. Whatever happens is attributable.
+
+**Both outcomes are useful.** If Step 1 works, the paper's claim gets *stronger* —
+"cost-aware stopping is learnable with a simple price, provided the budget binds
+and you measure the right behaviour" beats a result that needs novel machinery. If
+it fails, Step 2 has earned its complexity, with a clean argument: we fixed the
+economy and the measurement and a price still could not do it.
+
+---
+
+## 6. Research question and hypotheses
 
 > **Can an agent be trained to abandon unproductive work — to quit when the
-> expected value of continuing falls below its cost — and does a learned
-> continuation value do this where a scalar per-step price provably cannot?**
+> expected value of continuing falls below its cost?**
 
-Two claims, one of which is a control on the other:
-
-- **H1 (main).** A policy trained against a state-dependent continuation value
-  spends materially fewer steps at matched answer quality than the same policy
-  trained against a scalar per-step price.
+- **H1 (primary).** Under a binding budget and a correctly-scaled economy, a
+  cost-trained policy spends materially less on episodes that yield nothing, at
+  no cost to answer quality.
 - **H2 (mechanism).** The saving concentrates on episodes that would have failed —
-  i.e. it comes from *abandonment*, not from truncating successful work. Falsified
-  if the step reduction is uniform across succeeded/failed episodes.
+  abandonment, not truncation of successful work. **Falsified if the reduction is
+  uniform across succeeded and failed episodes.**
 
-H2 is what makes H1 interesting and is measurable per-episode.
+H2 is what makes H1 interesting, is measurable per episode, and is reported
+whatever it says.
 
 ---
 
-## 6. Method — the continuation-value reward
+## 7. STEP 1 — the minimal experiment
 
-### 6.1 The quantity
+### 7.1 Everything that changes
 
-For each state `x_t` in a rollout, with the running-draft quality curve `q_t`
-already recorded:
+| # | change | where |
+|---|---|---|
+| **1** | **Budgets `{2, 4, 8}` → `{2, 3, 4}`; gate budget B=4 → B=3** so every condition binds | `configs/foundation.yaml` |
+| **2** | **λ recalibrated** so the oracle quit rule is worth **≥ 0.05 utility** (it was worth +0.012) | `configs/foundation.yaml` |
+| **3** | **Headline metric → wasted spend** (§7.5), replacing mean steps and single-λ utility | `eval/metrics.py`, `eval/gate_check.py` |
+| **4** | **Detection threshold derived from S2-measured headroom**, not intuition | `ablation_preregistration` successor, written at S3 |
+
+Plus two schema additions that cost nothing now and prevent re-collection later
+(§12): **per-step token counts** and **retriever similarity scores**.
+
+### 7.2 Everything that deliberately does NOT change
+
+Dataset (HotpotQA 300/200/50) · reward form (scalar `F1 − λ·steps/B + format`) ·
+per-step reward source (**the prompted judge stays**) · cost definition (steps) ·
+GRPO trainer · executor (Qwen3.5-9B) · retrieval env · ReAct loop and harness
+modes · frozen-dev discipline · config-as-single-source-of-truth.
+
+**Byte-identical to what already ran, except the four rows above.**
+
+### 7.3 Budgets
+
+New: **`{small: 2, medium: 3, large: 4}`**, gate at **medium = 3** (41% of
+episodes would overspend it). Derivation in §2 Error 2; re-measured at S2 against
+the *current* policy before freezing.
+
+**Freeze policy:** budgets are measured once, at round 0, and **frozen for the
+whole run.** Re-deriving them per checkpoint would move the budget as the policy
+improves and make arms incomparable. Named here because it is an easy trap.
+
+Within a GRPO group all G rollouts share the same B — unchanged, and correct.
+
+### 7.4 λ calibration
+
+Replace *"put the utility optimum at the quality knee"* with a target on the
+**size of the incentive**:
 
 ```
-U_t   = q_t − cost(≤t)                      realized utility if we stop at t
-V_T   = U_T
-V_t   = max( U_t , Ê[ V_{t+1} | x_t ] )     Snell backward recursion
-Cont(x_t) = Ê[ V_{t+1} | x_t ]              continuation value
-Δ*_t  = Cont(x_t) − U_t                     stop margin; > 0 ⇒ continue
-τ*    = min{ t : U_t ≥ Cont(x_t) }          optimal non-anticipating stop
+choose λ such that   ΔU(oracle quit rule)  ≥  0.05
+where                ΔU = λ·(Δsteps / B) − ΔF1_loss
 ```
 
-`Ê[·|x_t]` is fitted cross-sectionally across the batch (Longstaff–Schwartz /
-fitted value iteration), **not** taken as the max of one realized path. This is
-the whole point: `argmax_t U_t` over a single trajectory is foresight-biased and
-provably upper-bounds every implementable rule (Krengel–Sucheston; v2.1 §2.2).
-Anything reported as achievable headroom must come from the Snell recursion, never
-from a path maximum.
+With the pilot's Δsteps = 0.94 and ΔF1_loss = 0.058, this gives λ ≥ 0.345 at B=3
+and λ ≥ 0.459 at B=4 — **provisionally λ ≈ 0.5**, recomputed at S2 from measured
+values and frozen before training.
 
-### 6.2 Why this fixes Error 2
+**Hard cap λ ≤ 0.6.** λ = 1.0 breached the policy-health gate (11% malformed vs
+the 10% limit) and produced the lowest F1 of the three arms. We are not
+re-discovering that.
 
-`Δ*_t` compares continuing against stopping **from the same state**. Question
-difficulty enters both terms identically and cancels by construction — the exact
-confound `ablation_report.md` §4 quantified (between-question SD 1.220 vs
-within-question 0.666) and could not remove with any λ.
+### 7.5 The primary estimand — wasted spend
 
-### 6.3 Why the judge leaves the critical path
+```
+W  =  E[ steps_used × 1(final_F1 = 0) ]        over ALL episodes
+```
 
-The per-step quality signal we need is **exactly computable from gold at training
-time** — `q_t = draft_f1_vs_gold`, already logged. FOUNDATION-1 applied the
-plan's own rule ("anything computable exactly is computed exactly, never judged")
-only to the terminal reward. Applying it per-step:
+"How much of my budget went to nothing." Current value ≈ **2.20 steps/episode**
+(5.16 × 0.426).
 
-- removes our single largest failure risk (the frozen judge — which cost a full
-  recalibration cycle when the judge changed, and whose stop-decision bit was the
-  only one to fail calibration at .775);
-- removes the calibration gate from the critical path entirely;
-- removes ~24k judge calls per round of GPU-served inference.
+Why this and not the alternatives:
 
-**The judge is not deleted — it is demoted to where v2.1 §5.2 always had it:**
-the RM-P baseline (B10), run as a comparison arm rather than as the reward source.
-That converts a liability into a paper table.
+- **Unconditional**, so no selection bias — conditioning on failure would let a
+  policy look good by failing more.
+- **Directly measures the 52.7%** that §3.1 identified.
+- **Only two ways to improve it:** succeed more often (good) or abandon failures
+  faster (the target behaviour).
 
-### 6.4 The counterfactual data already exists
+**Mandatory guard: F1 must not fall.** W can be gamed by quitting everything
+immediately, so the gate pairs W with an F1 floor (§7.7). Reported at iso-F1.
 
-`forced_continuation` mode (`agent/harness.py:104`) logs the agent's chosen
-`answered_at` while continuing the episode to T_max — i.e. it records *what would
-have happened had the agent not stopped*. That is precisely the input the Snell
-recursion needs, and 195 such episodes are already on disk.
+**Secondary metrics:**
 
----
-
-## 7. The arms
-
-| Arm | Name | What it is | What it answers |
-|---|---|---|---|
-| **C0** | Plain ReAct | No budget information anywhere | The no-signal floor (carried from A0) |
-| **C1** | Prompted budget | Budget tracker injected, nothing enforced | Is telling it enough? (the real bar — it beat enforcement in FOUNDATION-1) |
-| **C2** | **Scalar-price RL** | GRPO on `R = F1 − λ·steps/B` — **FOUNDATION-1's A3** | The control that isolates the redesign. Without it, any C3 gain is confounded with "more training" |
-| **C3** | **Continuation-value RL** (the method) | GRPO on the Snell-derived per-step signal (§6) | Does a state-dependent value do what a price cannot? |
-| **C4** | Prompted-judge RL (**RM-P / B10**) | FOUNDATION-1's reward source, as a baseline | Trained-vs-prompted reward model, answered in our own table |
-
-**C2 is non-negotiable.** FOUNDATION-1's headline error was attributing a gain to
-the wrong cause because the control was missing; the internalization claim had to
-be withdrawn when A1-vs-A2 was finally run. C2 is that control, pre-committed.
-
-Enforcement (old A2) drops to an appendix — FOUNDATION-1 answered it decisively
-(prompting beats it everywhere) and it need not be re-run at headline cost.
-
----
-
-## 8. The economy — fixing Error 3
-
-### 8.1 Cost becomes multi-dimensional
-
-Cost = **tokens + tool calls + steps**, priced in real dollars via the harness's
-own price map (`cost_aware_agent/cost.py`) — restoring v2.1 §2.1 and undoing
-FOUNDATION-1 simplification #1.
-
-Two reasons, one evidential and one structural:
-
-- **Tokens carry unconfounded headroom.** At equal best quality the cheapest
-  attempt uses **28% fewer characters** (D2) — same question, same outcome, pure
-  verbosity. Steps and tool calls carry the difficulty confound; tokens do not.
-- **Real prices make quitting worth it.** A long doomed episode costs
-  quadratically in a growing context window, which a flat λ·steps/B cannot see.
-
-**Reporting rule: always decompose.** A single dollar figure is the right *reward*
-but the wrong *analysis unit* — merging one clean dimension with two confounded
-ones hides the clean signal. Report $, tokens, tool calls and steps separately in
-every table.
-
-### 8.2 Budgets become policy-relative
-
-Budgets are set as **percentiles of the policy's own unconstrained stopping
-distribution** (50th / 75th / 100th), re-measured per dataset and per checkpoint,
-instead of fixed integers.
-
-Rationale: fixed {2,4,8} against a natural stop of ~3.5 left two of three
-conditions non-binding, and the one binding condition is the only one where the
-cost term worked (−0.70 steps, CI excludes zero). Policy-relative budgets make
-binding a design invariant rather than an accident, and survive a dataset change
-automatically.
-
-### 8.3 λ is calibrated to the decision, not to the knee
-
-FOUNDATION-1 set λ so the utility optimum sat at the observed quality knee. That
-is a statement about *where* the optimum is, and §1.3 above is the lesson: it says
-nothing about how hard the policy is pulled there. FOUNDATION-2 instead calibrates
-λ so that **the oracle quit rule is worth a pre-specified, detectable amount of
-utility** (target: ≥ 0.05, versus the +0.012 it was worth in FOUNDATION-1). λ is
-frozen before training and reported with its derivation.
-
----
-
-## 9. Metrics and the estimand
-
-**The headline estimand changes from "mean steps" to two quantities:**
-
-1. **Wasted spend** — cost incurred after `τ*` (the Snell-optimal stop), per
-   episode. Paired within-question, so difficulty cancels.
-2. **Cost at iso-F1** — read off a frontier swept over each method's own cost
-   knob (v2.1 §5.3 protocol), not a single scalar U at one λ.
-
-Mean steps is demoted to a descriptive statistic. It is substantially a
-*consequence* of the question drawn (between-question SD 1.220) and should never
-again be a headline.
-
-**Full metric set:**
-
-- Wasted spend vs τ*; **stopping regret** (utility gap, not |t − τ*|)
-- Cost-at-iso-F1 and F1-at-iso-cost; Pareto AUC; all costs decomposed per §8.1
-- **Abandonment rate** and **abandonment precision** — of episodes quit early, what
-  fraction would have failed anyway? This is H2's test statistic
-- F1 / EM with 95% bootstrap CIs (10k, paired per task)
-- Distribution of stop steps, split by eventual success — the split is the point
-- Internalization: % self-stopped, harness-off vs harness-on gap **with the
-  same-policy control run alongside** (the FOUNDATION-1 lesson)
-- Reward-hacking diagnostic: predicted-value vs realized-utility divergence
-- Billing symmetry: every arm pays for all auxiliary inference it uses, including
-  C4's judge calls and C3's value-fitting cost
-
----
-
-## 10. Data
-
-*(Revised 2026-07-31 after a literature check. The first draft justified MuSiQue
-on infrastructure convenience — a convenience argument, not evidence. The
-evidence below is stronger and also explains FOUNDATION-1's null.)*
-
-### 10.1 Why HotpotQA had no slack — an independent explanation
-
-**DiRe** (Disconnected Reasoning) measures how much of a "multi-hop" benchmark is
-answerable *without* doing the multi-hop work:
-
-| dataset | DiRe answer-F1 (lower = less shortcuttable) | human–model gap | train split |
-|---|---|---|---|
-| **HotpotQA** | **68.8** | 9.6 | 90K |
-| 2WikiMultihopQA | — | **3.7** (near-saturated) | 167K |
-| **MuSiQue-Ans** | **37.8** | **28.2** | **19,938** (+2,417 dev) |
-
-**~69 F1 of HotpotQA is reachable without genuine multi-hop reasoning.** That is a
-mechanistic, independently-sourced explanation for our measured 0.31-step
-headroom: most questions do not require the second hop, so there is no
-discretionary work to price. We measured the ceiling; the dataset literature
-predicted it.
-
-MuSiQue was built by *composing* single-hop questions specifically to eliminate
-those shortcuts. The case for it is therefore not convenience — **it has the
-required-work structure HotpotQA lacks** — and it runs on the existing retrieval
-index. 2WikiMultihopQA has 8× the training data but a human–model gap of 3.7; it
-is too easy to be the headline and is demoted to an extra eval.
-
-### 10.2 The roster
-
-| dataset | role | why |
+| metric | definition | purpose |
 |---|---|---|
-| **HotpotQA** | training (continuity arm) | Every FOUNDATION-1 number is on it; keeping it makes C2-vs-C3 directly comparable to what we already ran |
-| **MuSiQue** | **training (primary)** | DiRe 37.8, 2–4 hop, real train split, existing index. Also supplies v2.1's E6 difficulty-stopping check free |
-| **SimpleQA** | **low-slack negative control** (new) | §10.3 |
-| **BrowseComp-Plus** | long-horizon transfer eval | 830 queries over a fixed local 100K-doc corpus (ACL 2026) — reproducible, and the tool type matches training. **Not** a training set: §10.4 |
-| 2WikiMultihopQA · FRAMES · GAIA | extra transfer evals | No train split (GAIA 466 total / FRAMES 824), or too easy (2Wiki) |
+| abandonment rate | % of episodes self-stopping early with F1 = 0 | is it quitting at all? |
+| **abandonment precision** | of episodes quit early, % that would have failed anyway (from `forced_continuation` replay) | **H2's test statistic** |
+| stop-step distribution **split by eventual success** | — | the split *is* the finding |
+| mean steps | — | **demoted to descriptive** (between-question SD 1.220 vs within 0.666) |
+| judge-score vs realized-F1 divergence | unchanged | reward-hacking diagnostic |
 
-### 10.3 SimpleQA as the negative control
+### 7.6 Arms
 
-4,326 single-answer short fact questions, **single-hop by construction**, no
-official train/test split. As a training set it is the worst possible choice: the
-optimal trajectory is one search, so there is no stopping *policy* to learn — and
-the harness project already ran this experiment (`real_cli` on HotpotQA-distractor,
-chosen for being low-slack: **+2.8%, not significant**).
-
-But it is the *right* negative control, and better than v2.1's MATH-500 slot
-because it is the **same domain and same tool** as training, so it isolates slack
-rather than confounding it with domain shift.
-
-> **Pre-registered prediction: our method shows ~zero step savings on SimpleQA.**
-> If it *does* show savings there, we are truncating necessary work and something
-> is wrong. This converts a null result into a falsification test.
-
-### 10.4 Why BrowseComp-Plus is not the training set
-
-It is the ideal long-horizon target — gpt-5 and o3 issue **>20 search calls per
-query** on it, ~6× our horizon. But **Qwen3-32B and SearchR1-32B issue fewer than
-2 calls despite being explicitly prompted to use the tool.** A 9B executor would
-very likely not engage the horizon at all, and we would have swapped a *no-slack*
-dataset for a *no-engagement* one — the same null from the opposite direction.
-
-This is also the one place D4's finding ("capability is not binding") could
-reverse: it may well bind at a 20-step horizon. Hence transfer eval now, and a
-capability retest there before any decision to train on it.
-
-### 10.5 The dataset decision is made by measurement, not by literature
-
-The rule from `pre_redesign_diagnostics.md` applies to this choice too. **G1 runs
-the headroom audit on each training candidate** — 300 questions, forced
-continuation, no training, ~2 GPU-hours each — and reports quit-headroom, step
-distribution, and failure rate. Literature says MuSiQue should be better; G1 says
-whether it is, before any threshold is written down.
-
-### 10.6 Dev discipline
-
-Carries over unchanged, with one addition: FOUNDATION-1's dev-200 has **1 of 3
-looks remaining**, and FOUNDATION-2 starts a **fresh look ledger** on its own dev
-set. Refinement happens on a val slice; every dev evaluation is logged in
-`PROGRESS.md` with date and reason.
-
----
-
-## 11. Stage sequence
-
-Each stage has a gate. Stages G0–G2 are **CPU-only, on data already on disk**, and
-together cost roughly a day — they decide whether the expensive stages are worth
-running at all.
-
-| Stage | What happens | Gate to pass |
+| arm | what | source |
 |---|---|---|
-| **G0** | **Gold-free predictability check.** Fit a classifier on the 2400 existing λ=0 rollouts: gold-free features (retrieval scores, draft churn/stability, repeated queries, entity coverage, step index) → eventual success. No GPU. | **AUC ≥ 0.65 held-out.** Below that, hopelessness is only visible in hindsight, H1 is unreachable on this data, and the dataset change becomes mandatory rather than optional — **this gate can kill the redesign, cheaply, in a day** |
-| **G1** | **Headroom audit.** Replicate §3 at scale on the 2400 rollouts + MuSiQue pilot. Snell recursion offline; report τ*, wasted spend, and the achievable frontier | Measured headroom reported **before** any threshold is written down (§12) |
-| **G2** | **Economy calibration.** Set λ and the policy-relative budgets so the oracle quit rule is worth ≥ 0.05 utility; freeze and commit | λ, budgets, and their derivation committed before any training |
-| **G3** | **Reward implementation.** Snell/Longstaff–Schwartz label pipeline + per-step exact quality; CPU dry-run through the full reward path | `make test` green; dry-run reproduces hand-computed τ* on a fixture |
-| **G4** | **Pre-registration.** Hypotheses, estimands, thresholds (derived from G1), decision rule, and the analysis script — committed before data | Committed, with the analysis script that will read the results |
-| **G5** | **Training.** C2 and C3 trained identically except for the reward; C4 from FOUNDATION-1's existing checkpoints | Post-round temp-1.0 health probe passes (malformed < 10%) |
-| **G6** | **Evaluation.** All arms on the frozen dev set × policy-relative budgets, harness off and on, frontier swept | All numbers as CSVs with a generation script |
-| **G7** | **Analysis + verdict.** Figures, plain-language report, GO/NO-GO logged with date | The pre-registered rule applied by the G4 script, verbatim |
+| **λ=0 control** | steps free, same everything else | **checkpoint exists** (`lam0_round3`) |
+| **λ=λ\* treatment** | λ from §7.4 | one new training run |
+| A1 prompted | reference | rows exist |
+| A0 no-info | floor | rows exist |
 
----
+**Primary comparison: treatment vs the λ=0 control**, paired per task. Both are
+the same method, same data, same seeds, same rounds — only λ differs.
 
-## 12. The pre-registered gate
+Enforcement (old A2) is **not re-run**; FOUNDATION-1 answered it decisively.
 
-**The thresholds are deliberately left blank here.** They are set at G4 **from the
-headroom measured at G1**, and this ordering is itself the pre-registration.
+### 7.7 The pre-registered gate
 
-FOUNDATION-1's threshold (0.5 steps) was chosen as "~14% of a 3.6-step baseline" —
-a reasonable-sounding number that turned out to exceed the achievable maximum of
-0.31. **A threshold picked before the ceiling is measured is a coin flip.**
+Thresholds are **deliberately blank here** and are set at S3 from headroom
+measured at S2. That ordering *is* the pre-registration. FOUNDATION-1's 0.5-step
+threshold was picked as "~14% of a 3.6-step baseline" and turned out to exceed the
+achievable maximum of 0.31.
 
 Binding rules, fixed now:
 
-1. **Detection threshold must be below the measured achievable headroom** — with
-   the derivation shown, and above the CI half-width at the planned *n* (a
-   threshold under the noise floor is equally useless: FOUNDATION-1's n=50 gave a
-   half-width of 0.220 steps).
-2. **Power is checked before running**, not reported after.
-3. **The primary comparison is C3 vs C2**, not C3 vs prompting. The scalar-price
-   control is what isolates the contribution.
-4. **H2 is tested and reported whatever it says.** If the saving does not
-   concentrate on failed episodes, the mechanism story is wrong even if H1 passes,
-   and the report says so.
-5. **The analysis script is committed before the data exists** and run unmodified.
+1. **Threshold ≤ 50% of the S2-measured oracle ΔW**, and **> the CI half-width at
+   the planned n** (FOUNDATION-1's n=50 gave a 0.220-step half-width — a threshold
+   under the noise floor is as useless as one above the ceiling).
+2. **Power checked before running**, not reported after.
+3. **Primary comparison is treatment vs λ=0 control.**
+4. **F1 guard:** F1 ≥ control − 0.02, paired. A W improvement bought with quality
+   is not a pass.
+5. **H2 reported whatever it says.** If the saving does not concentrate on failed
+   episodes, the mechanism story is wrong even if H1 passes.
+6. **The analysis script is committed before the data exists** and run unmodified.
 
-**Scope of the verdict, stated before running:** a GO establishes that a learned
-continuation value beats a scalar price *for abandonment behaviour, in this
-setup*. It does not establish the full v2.1 potential-based shaping result (that
-still needs the trained RM-T), and the report must say so.
+---
+
+## 8. Stage sequence
+
+| stage | what happens | cost | gate |
+|---|---|---|---|
+| **S0** | **Re-score the existing λ = {0, 0.3, 1.0} checkpoints at binding budgets** with the wasted-spend metric. No training | **eval only, ~½ day** | Is there already a signal? A clear separation here is most of the answer for almost nothing |
+| **S1** | **Gold-free predictability check.** Classifier on the 2400 existing rollouts: gold-free features (retriever scores, draft churn, repeated queries, entity coverage, step index) → eventual success | **CPU only, ~1 day** | **held-out AUC ≥ 0.65.** Below that, hopelessness is visible only in hindsight, H1 is unreachable on this data, and the dataset change is promoted from Step 3 to mandatory. **This gate can end the redesign in a day** |
+| **S2** | **Headroom audit + economy calibration.** Replicate §3 at scale on the 2400 rollouts; measure oracle ΔW; derive λ and budgets; freeze and commit | ~2 GPU-h | Numbers committed **before** any threshold is written |
+| **S3** | **Pre-registration.** Hypotheses, estimands, thresholds (from S2), decision rule, and the analysis script | — | Committed before data exists |
+| **S4** | **Training.** One treatment run; λ=0 control reused | ~1 week | Post-round temp-1.0 health probe (malformed < 10%) |
+| **S5** | **Evaluation + verdict.** Frozen dev, 3 binding budgets, harness off and on | ~1 day | The S3 rule, applied verbatim by the S3 script |
+
+**S0 + S1 together are ~1.5 days on data already on disk, and either can end the
+whole thing early.** Nothing downstream starts until both clear.
+
+---
+
+## 9. STEP 2 — conditional, only if Step 1 is null
+
+**Trigger:** Step 1's gate fails *and* S1 cleared (AUC ≥ 0.65, so the signal
+exists and the price simply cannot exploit it). That combination is a strong,
+specific argument — *we fixed the economy and the measurement, and a scalar price
+still could not do it* — and it is exactly the motivation the machinery needs.
+
+| change | detail |
+|---|---|
+| **Reward form: price → value** | Snell backward recursion with cross-sectional regression: `V_t = max(U_t, Ê[V_{t+1}|x_t])`, `Δ*_t = Cont(x_t) − U_t`, `τ* = min{t : U_t ≥ Cont(x_t)}`. `Ê[·|x_t]` fitted across the batch (Longstaff–Schwartz), **never** a single path's max — that is the prophet bias v2.1 §2.2 warns about |
+| **Why it fixes Error 2 structurally** | `Δ*_t` compares continuing against stopping **from the same state**, so difficulty cancels by construction — the confound quantified at between-question SD 1.220 vs within-question 0.666 |
+| **Per-step signal: judge → exact** | `q_t = draft_f1_vs_gold`, already logged. Removes our most fragile component (it broke twice), removes the calibration gate from the critical path, removes ~24k judge calls per round, and frees a GPU |
+| **Judge demoted to a baseline** | Where v2.1 §5.2 always had it (RM-P / B10) — converting a liability into a paper table |
+| **Add the scalar-price control arm** | Step 1's treatment becomes Step 2's control, so the reward-form change is isolated |
+| **Add stopping regret vs τ\*** | Utility gap, not `|t − τ*|` |
+
+The counterfactual data this needs already exists: `forced_continuation`
+(`agent/harness.py:104`) logs the agent's chosen `answered_at` while continuing to
+T_max — precisely the Snell input, and 195 such episodes are on disk.
+
+---
+
+## 10. STEP 3 — the full paper (deferred, not abandoned)
+
+| item | evidence it will matter | why deferred |
+|---|---|---|
+| **MuSiQue as primary training set** | **DiRe 68.8 for HotpotQA vs 37.8 for MuSiQue** — ~69 F1 of HotpotQA is reachable *without* multi-hop work, independently explaining our 0.31-step ceiling. Human–model gap 28.2 vs 9.6. 19,938 train / 2,417 dev, existing index | Changing the dataset and the economy at once makes Step 1 unattributable |
+| **SimpleQA as low-slack negative control** | Single-hop by construction; the harness project's `real_cli` already found +2.8% (ns) on a low-slack set. **Pre-registered prediction: ~zero savings.** A positive result there means we are truncating necessary work | Needs a working positive result first to be a meaningful control |
+| **BrowseComp-Plus transfer eval** | gpt-5/o3 issue **>20 search calls**; fixed local 100K-doc corpus (ACL 2026). **But** Qwen3-32B and SearchR1-32B issue **<2** despite prompting — a 9B may not engage the horizon, swapping a no-slack dataset for a no-engagement one. Also the one place D4 could reverse | Capability retest required first |
+| **Cost = tokens + tool calls** | Step 10 costs 9.73× step 1 (§2); tokens carry **28% unconfounded headroom** (D2) at equal quality. Note tool calls ≡ steps in the current single-tool loop, so they are one dimension until a second tool exists | Needs token counts (§12) and a cached-cost measurement first |
+| Dollar denomination | v2.1 §2.1 | Reintroduces the price map and normalization pilot FOUNDATION-1 dropped for good reasons; keep λ model-independent for now |
+| Frontier sweep (cost-at-iso-F1) | v2.1 §5.3 | Many eval runs; needs a positive operating point to sweep around |
+| Negative controls (random-value, shuffled-label coach) | v2.1 A9 | Only meaningful once a value function exists (Step 2) |
+| 2WikiMultihopQA · FRAMES · GAIA | extra transfer evals | No train split, or human–model gap 3.7 (near-saturated) |
+
+---
+
+## 11. Data — Step 1
+
+**Unchanged from FOUNDATION-1:** HotpotQA, frozen train-300 / dev-200, val-50
+refinement slice, same retrieval index, same manifest discipline. Comparability
+with the existing baseline rows is the point.
+
+**Dev discipline:** FOUNDATION-1's dev-200 has **1 of 3 looks remaining**.
+FOUNDATION-2 starts a **fresh look ledger** on its own dev set. Refinement happens
+on val-50; every dev evaluation is logged in `PROGRESS.md` with date and reason.
+
+The dataset roster and its evidence live in §10 and activate at Step 3.
+
+---
+
+## 12. Implementation manifest — Step 1
+
+| file | change | kind |
+|---|---|---|
+| `configs/foundation.yaml` | `budgets: {small: 2, medium: 3, large: 4}`; `gate_budget: medium`; `economy.train_lambda` ← S2 value; new `gate:` thresholds ← S3 | edit |
+| `envs/retrieval_client.py:31` | **stop discarding retriever scores** — currently keeps only `title`/`text`. Likely the strongest gold-free "am I finding anything?" feature, and S1 needs it | **bug-grade fix** |
+| `agent/llm_client.py` | capture `usage` (prompt/completion tokens) from the vLLM response | edit |
+| `agent/harness.py` | record per-step `prompt_tokens`, `completion_tokens`, and retrieval scores in the step dict | edit |
+| `collect/schema.py` | add the new step fields; bump schema version; extend `validate_episode` | edit |
+| `eval/metrics.py` | add `wasted_spend`, `abandonment_rate`, `abandonment_precision`; keep mean steps as descriptive | add |
+| `eval/gate_check.py` | rewrite for the W estimand + F1 guard; thresholds from config | rewrite |
+| `scripts/s0_rescore.sh` | re-score existing λ checkpoints at binding budgets | **new** |
+| `scripts/s1_predictability.py` | gold-free feature extractor + classifier + held-out AUC | **new** |
+| `scripts/s2_headroom.py` | scale replication of §3; oracle ΔW; λ and budget derivation | **new** |
+| `analysis/figures.py` | figures for W and the success-split stop distribution | add |
+| `tests/` | W and abandonment-precision unit tests on fixtures; schema round-trip with the new fields | add |
+
+**No changes to:** `train/` (GRPO untouched), `reward/` (judge and rubric stay as
+they are), `collect/sampling.py`, `scripts/f1_data.py`, the retrieval server.
 
 ---
 
 ## 13. Risks and kill conditions
 
-| Risk | Evidence it is real | Response |
+| risk | evidence | response |
 |---|---|---|
-| **Hopelessness is not predictable gold-free** | Untested — the single biggest unknown | **G0 kills the redesign in one CPU-day** if AUC < 0.65 |
-| **The saving is Pareto-neutral** | Measured: oracle quit trades −0.94 steps for −0.058 F1 | §8.3 re-calibrates λ; §9 reports a frontier. If the frontier shows no Pareto improvement at any λ, that is a genuine negative result and is publishable as one |
-| **Abandonment is just answering early with a bad draft** | Plausible; would make H1 pass trivially | H2 + abandonment precision are pre-registered as required reporting, not optional |
-| **Snell labels are noisy at our batch size** | Fitted value iteration compounds error | Per-step backup residuals on held-out trajectories (v2.1 §5.3); G3 fixture test |
-| **Aggressive pricing degrades the policy** | Measured: λ=1.0 breached the health gate at 11% malformed | Health probe stays a hard gate between rounds; λ chosen at G2, not escalated ad hoc |
-| **We attribute a gain to the wrong cause again** | Happened once (withdrawn internalization claim) | C2 control + same-policy harness control, both pre-committed |
-| **Machine wipe** | Happened once, 79G lost | Unchanged policy: commit continuously to NatBrian; regenerables on `/mnt/src/liangsheng/` |
+| **Hopelessness is not predictable gold-free** | untested — the biggest unknown | **S1 ends it in one CPU-day** if AUC < 0.65 |
+| **The saving is Pareto-neutral** | measured: oracle quit trades −0.94 steps for −0.058 F1 | §7.4 re-scales λ so the trade is worth ≥0.05; the F1 guard (§7.7 rule 4) makes a quality-bought win a fail |
+| **Abandonment is just answering early with a bad draft** | plausible; would make H1 pass trivially | H2 + abandonment precision are **required** reporting, not optional |
+| **W is gamed by quitting everything** | structural | F1 floor in the gate; W reported at iso-F1 |
+| **Aggressive pricing degrades the policy** | measured: λ=1.0 → 11% malformed, gate breached | λ ≤ 0.6 hard cap; health probe stays a hard gate between rounds |
+| **We attribute a gain to the wrong cause again** | happened once | λ=0 control is the primary comparison; minimal change set keeps it attributable |
+| **The judge breaks again** | happened twice | If calibration fails, **promote the exact-quality reward from Step 2 to Step 1** — the one pre-authorised scope change |
+| **Machine wipe** | happened once, 79G lost | Unchanged: commit continuously to NatBrian; regenerables on `/mnt/src/liangsheng/` |
 
 ---
 
 ## 14. What carries over unchanged
 
-FOUNDATION-2 changes the *reward and the measurement*, not the *machinery*. Reused
-as-is:
-
-| Component | Path | Change |
+| component | path | status |
 |---|---|---|
-| ReAct episode loop, 3 harness modes | `agent/harness.py` | none — `forced_continuation` is now load-bearing (§6.4) |
-| Per-step draft quality | `collect/schema.py` `draft_f1_vs_gold` | none — becomes the primary reward input |
-| Retrieval env + E5/FAISS index | `envs/`, `scripts/serve_retrieval.py` | none |
-| GRPO trainer, advantages, health probe | `train/` | reward source swapped; algorithm untouched |
-| Eval, bootstrap CIs, paired deltas, gate-as-code | `eval/` | new estimands added |
-| Judge client + rubric | `reward/` | demoted from reward source to the C4 baseline |
-| Config single-source-of-truth | `configs/foundation.yaml` | extended, never bypassed |
+| ReAct loop, 3 harness modes | `agent/harness.py` | unchanged; `forced_continuation` becomes load-bearing |
+| Per-step draft quality | `collect/schema.py` `draft_f1_vs_gold` | unchanged; becomes the primary reward input at Step 2 |
+| Retrieval env + E5/FAISS index | `envs/`, `scripts/serve_retrieval.py` | unchanged apart from the score fix |
+| GRPO trainer, advantages, health probe | `train/` | **unchanged** |
+| Judge client + rubric | `reward/` | **unchanged in Step 1**; demoted at Step 2 |
+| Eval scoring path, bootstrap CIs, paired deltas | `eval/` | extended |
+| Config single source of truth | `configs/foundation.yaml` | extended, never bypassed |
 | CPU test suite | `tests/` | extended; must stay green |
-
-**New code required:** the Snell/Longstaff–Schwartz label pipeline, the gold-free
-feature extractor (G0), the multi-dimensional cost accounting, and the frontier
-sweep. Everything else is configuration.
+| Executor Qwen3.5-9B | — | unchanged (D4: already responds by 1.02 steps) |
 
 ---
 
-## 15. Changelog — FOUNDATION-1 → FOUNDATION-2
+## 15. Changelog
 
-| # | FOUNDATION-1 | FOUNDATION-2 | Forced by |
+### FOUNDATION-1 → Step 1 (what we run now)
+
+| # | FOUNDATION-1 | Step 1 | forced by |
 |---|---|---|---|
-| 1 | Target: stop-when-done | **Target: quit-when-hopeless** | §3.1 — 52.7% of steps buy zero quality; stop-when-done headroom is 0.23–0.31 steps, median 0 |
-| 2 | Reward: scalar `λ·steps/B` | **Reward: Snell continuation value** | §2 Error 2 — a price cannot express a state-dependent rule; λ sweep 0→1.0 moved 0.04 steps |
-| 3 | Per-step signal: prompted judge | **Per-step signal: exact `draft_f1_vs_gold`**; judge → C4 baseline | §6.3 — computable exactly; also removes the top failure risk |
-| 4 | Cost = steps | **Cost = tokens + tool calls + steps, in dollars** | D2 — 28% verbosity headroom, unconfounded |
-| 5 | Budgets fixed {2,4,8} | **Budgets = policy-stop-distribution percentiles** | §2 Error 3 — 2 of 3 conditions never bound; the binding one is the only one that worked |
-| 6 | Headline metric: mean steps, single U | **Wasted spend vs τ*, cost-at-iso-F1 frontier** | Mean steps is dominated by question difficulty (SD 1.220 vs 0.666) |
-| 7 | λ calibrated to the quality knee | **λ calibrated so the oracle rule is worth ≥ 0.05 U** | §3.3 — oracle rule was worth +0.012, under the noise floor |
-| 8 | Thresholds from intuition | **Thresholds from measured headroom (G1 before G4)** | Required 0.5 steps where 0.31 existed |
-| 9 | No same-method control arm | **C2 scalar-price control, pre-committed** | An internalization claim had to be withdrawn for exactly this reason |
-| 10 | HotpotQA only | **HotpotQA + MuSiQue**; GAIA/BrowseComp/FRAMES transfer-eval only | §10.1 — HotpotQA's DiRe is 68.8 (≈69 F1 reachable *without* multi-hop work), which independently explains the 0.31-step ceiling; MuSiQue's is 37.8 |
-| 11 | No negative control | **SimpleQA as a pre-registered low-slack control** | §10.3 — same domain, same tool, single-hop; predicts ~zero savings, so a positive result there falsifies us |
-| 12 | Cost recorded as characters (`raw_len`) | **Per-step prompt/completion token counts in the schema** | §8.1 needs dollars; `collect/schema.py` has no token fields today |
+| 1 | Budgets `{2,4,8}`, gate B=4 | **`{2,3,4}`, gate B=3** | §2 Error 2 — B=8 was irrelevant to 94% of episodes; B=2 (the only binding one) is the only place the price worked |
+| 2 | λ set so the optimum sits at the quality knee | **λ set so the oracle rule is worth ≥0.05 U** (λ ≈ 0.5, cap 0.6) | §3.3 — it was worth +0.012, under the noise floor |
+| 3 | Headline: mean steps + single-λ utility | **Wasted spend W + abandonment precision** | §3.1 — 52.7% of steps buy zero quality; mean steps is dominated by question difficulty |
+| 4 | Thresholds from intuition | **Thresholds from S2-measured headroom** | Required 0.5 steps where 0.31 existed |
+| 5 | No same-method control | **λ=0 control is the primary comparison** | An internalization claim had to be withdrawn for exactly this reason |
+| 6 | `raw_len` chars; retriever scores discarded | **Token counts + retriever scores recorded** | Cheap now, prevents re-collection; S1 needs the scores |
 
-**Not changed, deliberately:** GRPO, the 9B executor (D4: it already responds to
-budget signals by 1.02 steps — capability is not the binding constraint), the
-retrieval env, the frozen-dev discipline, and the pre-registration culture.
+### Deferred, with triggers
+
+| step | trigger |
+|---|---|
+| **Step 2** — Snell value reward, exact per-step quality, judge → baseline | Step 1 gate fails **and** S1 AUC ≥ 0.65 |
+| **Step 3** — MuSiQue, SimpleQA control, BrowseComp transfer, token/dollar cost, frontier, negative controls | Step 1 or Step 2 passes |
+| **Promoted early** — exact per-step quality replaces the judge in Step 1 | The judge fails calibration again |
+| **Promoted early** — dataset change becomes mandatory | S1 AUC < 0.65 |
 
 ---
 
 ## 16. Open items for review
 
-1. **G0's AUC ≥ 0.65 threshold** is my judgement call. Too strict kills a viable
-   redesign; too loose lets us spend weeks on an unlearnable signal. Confirm or
-   move it.
-2. **Dropping enforcement (old A2) to an appendix** — saves a full arm's compute.
-   Confirm you are happy not re-running it at headline cost.
-3. ~~MuSiQue as the second training set~~ — **resolved 2026-07-31, §10.** MuSiQue
-   primary (DiRe 37.8 vs HotpotQA's 68.8), HotpotQA kept for continuity, SimpleQA
-   added as the negative control, BrowseComp-Plus held as transfer eval because
-   weak models issue <2 tool calls on it. Still open within this: whether the
-   headline should eventually move to BrowseComp-Plus, decided by the capability
-   retest in G1.
-4. **Dollar-denominated cost now vs steps-plus-tokens now.** Full dollars restores
-   v2.1 fidelity but reintroduces the price map and its normalization pilot, which
-   FOUNDATION-1 simplified away for good reasons.
-5. **Whether C4 (prompted-judge RL) is worth re-running** or whether
-   FOUNDATION-1's existing numbers can be cited directly. Re-running is cleaner;
-   citing is free.
+1. **S1's AUC ≥ 0.65 threshold** is my judgement call. Too strict kills a viable
+   redesign; too loose spends a week on an unlearnable signal.
+2. **The F1 guard at −0.02** (§7.7 rule 4) — tight enough that a quality-bought
+   saving fails, loose enough to allow noise. Confirm the tolerance.
+3. **λ cap at 0.6** — derived from λ=1.0 breaching the health gate, but 0.6 itself
+   is untested. The alternative is to run a health probe at the chosen λ before
+   committing to a full run.
+4. **Whether S0 alone could be enough to decide.** If re-scoring the existing
+   checkpoints at binding budgets already shows clean separation, we may be able
+   to skip straight to writing rather than retraining — decide when S0 lands.

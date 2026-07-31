@@ -23,10 +23,28 @@
 > `pilot.jsonl`, n=195, arm A1 untrained, `forced_continuation`. **Must be
 > replicated on the 2400 λ=0 rollouts before anything is pre-registered (G1).**
 >
-> **Next action: G0** — the gold-free predictability check (fit eventual-success
-> classifier on existing rollouts, CPU only, ~1 day). Gate: held-out AUC ≥ 0.65.
-> **This gate can kill the redesign cheaply** — if hopelessness is only visible in
-> hindsight, the dataset change becomes mandatory rather than optional.
+> **Plan rewritten 2026-07-31 as a STAIRCASE, not a big bang.** The first v2.2
+> draft proposed ~12 simultaneous changes — over-scoped, and it reproduced at
+> larger scale the attribution error that already cost us a claim. Step 1 now
+> changes **four things** (budgets, λ, headline metric, threshold-derivation rule)
+> and holds the dataset, reward form, judge, trainer and executor **byte-identical
+> to what already ran**. Steps 2 and 3 are conditional, each with a named trigger.
+>
+> Key re-reading that makes minimal viable: the λ ablation does **not** condemn
+> the scalar price. It worked at the one budget that bound (B=2: −0.70 steps, CI
+> excludes zero, quality intact) and did nothing at the two that did not. Measured
+> against the policy's own stop distribution: B=2 binds for 75% of episodes, B=3
+> for 41%, B=4 for 33%, **B=8 for 6%**. We gated at B=4.
+>
+> **Next actions, in order — both on data already on disk:**
+> - **S0** (~½ day, eval only): re-score existing λ={0,0.3,1.0} checkpoints at
+>   binding budgets with the wasted-spend metric. Is there already a signal?
+> - **S1** (~1 day, CPU only): gold-free predictability check. Gate: held-out
+>   **AUC ≥ 0.65**. **This gate can end the redesign in a day** — if hopelessness
+>   is visible only in hindsight, the dataset change is promoted from Step 3 to
+>   mandatory.
+>
+> Nothing downstream starts until both clear.
 >
 > **Dev-look ledger:** FOUNDATION-1's dev-200 has 1 of ≤3 looks remaining.
 > FOUNDATION-2 starts a fresh ledger on its own dev set.
