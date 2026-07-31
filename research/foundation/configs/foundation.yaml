@@ -21,6 +21,16 @@ data:
   train_file: data/hotpotqa_train_300.jsonl
   dev_file: data/hotpotqa_dev_200.jsonl
   val_file: data/hotpotqa_val_50.jsonl
+  eval_size: 600                   # FOUNDATION-2 frozen eval set. S2 power says
+  eval_file: data/hotpotqa_eval_600.jsonl
+                                   # the primary estimand (paired Δsteps at B=2)
+                                   # needs n >= 479 to resolve a 0.238-step
+                                   # effect at the 0.119 threshold. dev-200 is
+                                   # less than half of that; FOUNDATION-1's n=50
+                                   # gave a ±0.220 CI against a 0.164 effect,
+                                   # i.e. was ~15x underpowered. Disjoint from
+                                   # train-300 / dev-200 / val-50 by id AND by
+                                   # normalized question (scripts/s2_build_eval.py).
   manifest_file: data/manifest.json
   source_train: ../data_shared/hotpotqa_train.jsonl   # built by scripts/f1_data.py
   source_dev: ../data_shared/hotpotqa_dev.jsonl       # from the HF parquet
@@ -46,7 +56,15 @@ episode:
   # FREEZE POLICY: measured once at round 0 and frozen for the whole run.
   # Re-deriving per checkpoint would move the budget as the policy improves and
   # make arms incomparable.
-  gate_budget: medium              # B=3; 41% of episodes would overspend it
+  gate_budget: small
+  # CHANGED again 2026-07-31 after S2. The 41%-binding figure for B=3 came from
+  # the PILOT (untrained A1, mean stop 4.16). Measured against the policy that
+  # will actually be trained (a3, mean stop 3.33) the binding fractions are:
+  #     B=2 -> 64.8% BINDS   B=3 -> 25.5% slack   B=4 -> 17.2% slack
+  # Only B=2 binds, and it is also where FOUNDATION-1 found its one significant
+  # result (-0.70 steps, CI excludes zero). B=3 and B=4 are kept as the
+  # non-binding contrast, which makes the binding/non-binding dose-response
+  # visible instead of assumed.
   draft_retry: 1                   # malformed draft line -> 1 retry -> EMPTY_DRAFT
 
 economy:
