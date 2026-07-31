@@ -51,21 +51,39 @@ for SPEC in "ctrl:$LAM_CTRL" "trt:$LAM_TRT"; do
 done
 
 # ---- resolve each arm's final usable checkpoint ------------------------------
-final_ckpt() {  # newest round with a checkpoint, local or backed up
-  local tag=$1 best=""
-  for R in 1 2 3; do
-    for C in "$PWD/experiments/results/train/${tag}_round$R/checkpoint" \
-             "$BACKUP/checkpoints/${tag}_round$R"; do
-      [ -f "$C/config.json" ] && best="$C"
-    done
+ckpt_at() {     # checkpoint for a specific round, local or backed up
+  local tag=$1 R=$2
+  for C in "$PWD/experiments/results/train/${tag}_round$R/checkpoint" \
+           "$BACKUP/checkpoints/${tag}_round$R"; do
+    [ -f "$C/config.json" ] && { echo "$C"; return; }
   done
-  echo "$best"
 }
-CKPT_CTRL=$(final_ckpt ctrl); CKPT_TRT=$(final_ckpt trt)
+last_round() { local tag=$1 best=0
+  for R in 1 2 3; do [ -n "$(ckpt_at "$tag" "$R")" ] && best=$R; done; echo "$best"; }
+
+R_CTRL=$(last_round ctrl); R_TRT=$(last_round trt)
+CKPT_CTRL=$(ckpt_at ctrl "$R_CTRL"); CKPT_TRT=$(ckpt_at trt "$R_TRT")
 echo ""
-echo "control   checkpoint: ${CKPT_CTRL:-MISSING}"
-echo "treatment checkpoint: ${CKPT_TRT:-MISSING}"
+echo "control   round $R_CTRL: ${CKPT_CTRL:-MISSING}"
+echo "treatment round $R_TRT: ${CKPT_TRT:-MISSING}"
 [ -n "$CKPT_CTRL" ] && [ -n "$CKPT_TRT" ] || { echo "FATAL: an arm produced no checkpoint"; exit 1; }
+
+# If a health gate stopped one arm early, comparing round 3 against round 1 is an
+# ASYMMETRIC comparison — the exact trap FOUNDATION-1 hit with λ=1.0, where the
+# only honest fix was to report both. So when the rounds differ we additionally
+# evaluate the control AT THE TREATMENT'S ROUND and report both comparisons; the
+# protocol-matched one is the one the pre-registered rule reads.
+MATCHED=""
+if [ "$R_CTRL" != "$R_TRT" ]; then
+  echo "!! ROUND MISMATCH (control r$R_CTRL vs treatment r$R_TRT) — a health gate"
+  echo "!! stopped an arm early. Adding a round-matched control arm."
+  MATCHED=$(ckpt_at ctrl "$R_TRT")
+  [ -n "$MATCHED" ] || echo "!! no control checkpoint at round $R_TRT — matched arm unavailable"
+fi
+printf '{"control_round":%s,"treatment_round":%s,"matched":%s,"lambda_treatment":%s}\n' \
+  "$R_CTRL" "$R_TRT" "$([ -n "$MATCHED" ] && echo true || echo false)" "$LAM_TRT" \
+  > "$OUT/arm_provenance.json"
+cat "$OUT/arm_provenance.json"
 
 # ----------------------------------------------------------------- S5: eval --
 stop_executor() {
@@ -76,7 +94,10 @@ EVAL_FILE=$($PY -c "import sys;sys.path.insert(0,'.');from common import load_co
 echo ""
 echo "############ S5 EVALUATION on $EVAL_FILE ############"
 
-for SPEC in "control:$CKPT_CTRL" "treatment:$CKPT_TRT"; do
+EVAL_SPECS="control:$CKPT_CTRL treatment:$CKPT_TRT"
+[ -n "$MATCHED" ] && EVAL_SPECS="$EVAL_SPECS controlmatched:$MATCHED"
+
+for SPEC in $EVAL_SPECS; do
   ARM=${SPEC%%:*}; CKPT=${SPEC#*:}
   DONE=1
   for B in small medium large; do [ -s "$OUT/${ARM}_${B}.jsonl" ] || DONE=0; done
@@ -112,5 +133,9 @@ stop_executor
 echo ""
 echo "############ APPLYING THE PRE-REGISTERED RULE ############"
 $PY scripts/s3_analyse.py --dir "$OUT" | tee "$OUT/s3_verdict.txt"
+# Robustness only; cannot change the verdict. No-op unless a health gate stopped
+# an arm early and left the two arms at different rounds.
+$PY scripts/s5_matched.py --dir "$OUT" 2>&1 | tee -a "$OUT/s3_verdict.txt"
+$PY -m analysis.s5_figures --dir "$OUT" --out-dir experiments/reports/figs 2>&1 | tail -3
 cp "$OUT/s3_verdict.txt" "$OUT/s3_verdict.json" "$BACKUP/" 2>/dev/null || true
 echo "=== S4+S5 COMPLETE ==="
