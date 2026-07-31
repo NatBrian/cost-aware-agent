@@ -261,12 +261,21 @@ whatever it says.
 
 ### 7.1 Everything that changes
 
+> **Updated 2026-07-31 after S1/S2 ran.** Rows 1, 3 and 5 differ from this
+> document's first draft. Both changes were forced by measurement, and both are
+> recorded rather than quietly edited — see `s2_headroom.md`.
+
 | # | change | where |
 |---|---|---|
-| **1** | **Budgets `{2, 4, 8}` → `{2, 3, 4}`; gate budget B=4 → B=3** so every condition binds | `configs/foundation.yaml` |
-| **2** | **λ recalibrated** so the oracle quit rule is worth **≥ 0.05 utility** (it was worth +0.012) | `configs/foundation.yaml` |
-| **3** | **Headline metric → wasted spend** (§7.5), replacing mean steps and single-λ utility | `eval/metrics.py`, `eval/gate_check.py` |
-| **4** | **Detection threshold derived from S2-measured headroom**, not intuition | `ablation_preregistration` successor, written at S3 |
+| **1** | **Budgets `{2, 4, 8}` → `{2, 3, 4}`; gate budget → B=2.** ~~B=3~~ — the 41%-binding figure for B=3 came from the *pilot's untrained* policy. Against the policy that is actually trained (mean stop 3.33) the binding fractions are B=2: **64.8%**, B=3: 25.5%, B=4: 17.2%. **Only B=2 binds** | `configs/foundation.yaml` |
+| **2** | **λ recalibrated** to the size of the incentive → **λ\* = 0.568** (cap 0.6) | `configs/foundation.yaml` |
+| **3** | **Primary estimand → paired Δsteps at iso-F1.** ~~Wasted spend `W`~~ is **not runnable**: 72% exact zeros give it a paired SD of 1.64, needing n≈2289 at B=2 and n≈108k at B=4. It is retained as the *economic reading*, reported with an explicit underpowered warning | `eval/metrics.py`, `scripts/s3_analyse.py` |
+| **4** | **Detection threshold derived from S2-measured headroom** → **0.119 steps** (50% of the measured achievable 0.238) | `s3_preregistration.md` |
+| **5** | **New frozen eval set `eval-600`** — n ≥ 479 required by the power analysis, so dev-200 is less than half of what the test needs | `scripts/s2_build_eval.py` |
+
+Plus, from S1: **retriever similarity scores and per-step token counts are now
+recorded.** The scores were being discarded in two places and are among the
+strongest gold-free quit signals.
 
 Plus two schema additions that cost nothing now and prevent re-collection later
 (§12): **per-step token counts** and **retriever similarity scores**.
@@ -378,17 +387,25 @@ Binding rules, fixed now:
 
 ## 8. Stage sequence
 
-| stage | what happens | cost | gate |
-|---|---|---|---|
-| **S0** | **Re-score the existing λ = {0, 0.3, 1.0} checkpoints at binding budgets** with the wasted-spend metric. No training | **eval only, ~½ day** | Is there already a signal? A clear separation here is most of the answer for almost nothing |
-| **S1** | **Gold-free predictability check.** Classifier on the 2400 existing rollouts: gold-free features (retriever scores, draft churn, repeated queries, entity coverage, step index) → eventual success | **CPU only, ~1 day** | **held-out AUC ≥ 0.65.** Below that, hopelessness is visible only in hindsight, H1 is unreachable on this data, and the dataset change is promoted from Step 3 to mandatory. **This gate can end the redesign in a day** |
-| **S2** | **Headroom audit + economy calibration.** Replicate §3 at scale on the 2400 rollouts; measure oracle ΔW; derive λ and budgets; freeze and commit | ~2 GPU-h | Numbers committed **before** any threshold is written |
-| **S3** | **Pre-registration.** Hypotheses, estimands, thresholds (from S2), decision rule, and the analysis script | — | Committed before data exists |
-| **S4** | **Training.** One treatment run; λ=0 control reused | ~1 week | Post-round temp-1.0 health probe (malformed < 10%) |
-| **S5** | **Evaluation + verdict.** Frozen dev, 3 binding budgets, harness off and on | ~1 day | The S3 rule, applied verbatim by the S3 script |
+*(Status as of 2026-07-31. S1–S3 are done; their outcomes are recorded here
+rather than left as intentions.)*
 
-**S0 + S1 together are ~1.5 days on data already on disk, and either can end the
-whole thing early.** Nothing downstream starts until both clear.
+| stage | what happens | outcome / gate |
+|---|---|---|
+| **S1** | Gold-free predictability check — classifier on 2400 existing rollouts, features from `steps[:k]`, split by `task_id` | **PASS — held-out AUC 0.813** at k=3 (gate 0.65), replicated on three arms (.813 / .815 / .798). Strongest feature is the model's own confidence (`logprob_last`). `s1_predictability.md` |
+| **S2** | Headroom audit + economy calibration | **DONE, and it changed the design:** gate budget → **B=2** (the only one that binds), estimand → **Δsteps** (W needs n≈2289), **λ\* = 0.568**, threshold **0.119**, **eval-600** built. `s2_headroom.md` |
+| **S3** | Pre-registration + analysis script | **COMMITTED** before any S4 data existed. `s3_preregistration.md`, `scripts/s3_analyse.py` |
+| **S0** | Re-score the FOUNDATION-1 λ arms at the new budgets | Diagnostic only, on val-50. Never touches dev |
+| **S4** | **Both arms trained** — control λ=0, treatment λ=0.568, same base, data, seed, rounds, budgets | ~14h. Health probe after **every** round; a breach stops that arm at its last healthy checkpoint and is reported as a deviation, not hidden |
+| **S5** | Evaluate both on eval-600 × {2,3,4}, harness off; apply `s3_analyse.py` verbatim | ~6h. The S3 rule decides |
+
+**S1 and S2 cost about one CPU-day between them, on data already on disk, and S1
+could have ended the redesign outright.** It did not, so Step 1 proceeds.
+
+**Why the control is retrained rather than reused:** the FOUNDATION-1 λ=0
+checkpoint exists, but it was trained under budgets `{2,4,8}`. Reusing it would
+confound the λ change with the budget change — the exact error that forced a
+claim to be withdrawn in FOUNDATION-1. It costs a full extra arm and is worth it.
 
 ---
 
