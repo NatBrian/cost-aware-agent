@@ -45,6 +45,39 @@
 >   mandatory.
 >
 > Nothing downstream starts until both clear.
+
+> ## FOUNDATION-2 Step 1 — live status (2026-07-31)
+>
+> - **S1 gold-free predictability — PASS.** Held-out AUC **0.813** at k=3
+>   (gate 0.65), replicated on three arms (0.813 / 0.815 / 0.798), base rate .75.
+>   Strongest feature is `logprob_last` — the model's own confidence. The agent
+>   already knows when it is lost; it is not trained to act on it. Split is by
+>   `task_id`, never episode. Report: `s1_predictability.md`.
+> - **Code fixes — DONE**, 70 tests green. Retriever scores were being discarded
+>   in *two* places (server dropped the FAISS distances, client kept only
+>   title/text); token counts now recorded (only `raw_len` chars existed before);
+>   `W` estimand + tests added; schema v2 keeps FOUNDATION-1 rollouts loadable.
+> - **S2 headroom + calibration — DONE, and it changed the design:**
+>   - **Only B=2 binds** (64.8%) against the *trained* policy; B=3 is 25.5% and
+>     B=4 is 17.2%. My earlier "B=3 binds 41%" came from the **pilot's untrained**
+>     policy. Gate moved to **B=2**.
+>   - **`W` is not runnable** — 72% exact zeros, paired SD 1.64, needs n≈2289 at
+>     B=2 and n≈108k at B=4. Primary estimand switched to **paired Δsteps**
+>     (n≈479 at B=2). W stays as the economic reading, explicitly underpowered.
+>   - **The original ablation was ~15× underpowered**: it ran at B=4 with n=50
+>     where n≈751 is needed. "NOT EFFECTIVE against the pre-registered 0.5-step
+>     rule" stands; "the effect is 0.04, essentially zero" does **not** — that CI
+>     could not resolve the 0.164 effect either way.
+>   - **λ\* = 0.568** (cap 0.6), **threshold 0.119 steps**, **eval-600 built**
+>     (disjoint from train-300/dev-200/val-50 by id and normalized question).
+> - **S3 pre-registration — COMMITTED** before any S4 data existed, together with
+>   the analysis script that will be run unmodified (`s3_analyse.py`).
+> - **S0 / S4 / S5 — RUNNING.** S0 re-scores the FOUNDATION-1 λ arms at the new
+>   budgets; a chained job starts S4 (both arms, ~14h) then S5 (eval-600, ~6h) as
+>   soon as S0 releases the GPU.
+>
+> **Dev-look ledger:** FOUNDATION-1's dev-200 **not touched** by any of the
+> above — S0 uses val-50, S1/S2 use training rollouts, S5 uses the new eval-600.
 >
 > **Dev-look ledger:** FOUNDATION-1's dev-200 has 1 of ≤3 looks remaining.
 > FOUNDATION-2 starts a fresh ledger on its own dev set.
