@@ -1,5 +1,36 @@
 # Foundation implementation progress
 
+> **2026-07-31 — FOUNDATION-1 IS COMPLETE; the active plan is now
+> `research/paper_plan_v2_2_foundation.md` (FOUNDATION-2, the redesign).**
+> Everything below this banner is the FOUNDATION-1 record (stages I0–I7, E-a…E-g)
+> and stays as history. FOUNDATION-2 stages are G0–G7 and start a fresh log.
+>
+> **Why the redesign** (full diagnosis in the v2.2 plan §2–§4): FOUNDATION-1
+> passed its gate but the λ ablation showed it passed for the wrong reason —
+> better answers, not cheaper ones (λ 0→1.0 moved stopping 0.04 steps). Three
+> design errors, none a property of the method: (1) we targeted *stop-when-done*,
+> which has 0.31 steps of headroom against a 0.5-step threshold, while
+> *quit-when-hopeless* has ~0.94 and accounts for 52.7% of all steps spent;
+> (2) a scalar per-step price is state-independent and cannot express a
+> state-dependent stopping rule, so no λ could work; (3) the objective was scaled
+> so even a perfect oracle quit rule was worth +0.012 utility, and 2 of 3 budgets
+> could not bind.
+>
+> **New empirical basis, measured 2026-07-31 on existing rollouts (no new
+> compute):** 43% of episodes end with F1=0 after 5.16 steps = 52.7% of all steps
+> buy zero quality; P(eventual success | no progress by step k) decays
+> .574→.511→.315→.241→.213; an oracle quit rule saves 0.94 steps. Source:
+> `pilot.jsonl`, n=195, arm A1 untrained, `forced_continuation`. **Must be
+> replicated on the 2400 λ=0 rollouts before anything is pre-registered (G1).**
+>
+> **Next action: G0** — the gold-free predictability check (fit eventual-success
+> classifier on existing rollouts, CPU only, ~1 day). Gate: held-out AUC ≥ 0.65.
+> **This gate can kill the redesign cheaply** — if hopelessness is only visible in
+> hindsight, the dataset change becomes mandatory rather than optional.
+>
+> **Dev-look ledger:** FOUNDATION-1's dev-200 has 1 of ≤3 looks remaining.
+> FOUNDATION-2 starts a fresh ledger on its own dev set.
+
 > Living tracker — updated at every stage boundary. Stage = one commit.
 > Decisions locked 2026-07-22: GPUs allowed via ritual; judge = config placeholder
 > (URL to be provided before F3 calibration); commit per stage, push to main

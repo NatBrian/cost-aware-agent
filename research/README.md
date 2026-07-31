@@ -13,27 +13,74 @@ experiment outputs, reports. The root `experiments/` and `tests/` directories ar
 the **harness's** — never put research runs or research tests there.
 
 **What we are building right now:** the plan is
-[`paper_plan_v2_1_foundation.md`](paper_plan_v2_1_foundation.md) and the code that
-implements it is [`foundation/`](foundation/).
+[`paper_plan_v2_2_foundation.md`](paper_plan_v2_2_foundation.md) (FOUNDATION-2,
+the redesign) and the code that implements it is [`foundation/`](foundation/).
+The first run, FOUNDATION-1, is complete — see [What FOUNDATION-1 established and
+why it is being redesigned](#what-foundation-1-established-and-why-it-is-being-redesigned).
 
 ---
 
 ## Start here (read in this order)
 
-1. [`paper_plan_v2_1_foundation.md`](paper_plan_v2_1_foundation.md) — **the active
-   plan.** A deliberately small, end-to-end version of the full paper: step-count
-   budgets, HotpotQA only, GRPO with prompted-judge rewards, three arms, one
-   pre-registered GO/NO-GO gate. Reviewed doc-by-doc with the author 2026-07-22.
+1. [`paper_plan_v2_2_foundation.md`](paper_plan_v2_2_foundation.md) — **the active
+   plan.** FOUNDATION-2: the redesigned run. Contains the full diagnosis of why
+   FOUNDATION-1's result was uninformative, the corrected empirical picture, the
+   continuation-value method, the arms, the stage sequence G0–G7, and the rules
+   the pre-registered gate must follow. Drafted 2026-07-31.
 2. [`foundation_tasks/PROGRESS.md`](foundation_tasks/PROGRESS.md) — **the live
    tracker.** Which stage we are in, what is next, decisions locked, and the
    anti-overfitting policy. Always the current truth; this README is not.
-3. [`foundation_tasks/F0…F7*.md`](foundation_tasks/) — the stage spec for whatever
-   stage is current (one doc per stage, each with its own done-criteria gate).
-4. [`foundation/README.md`](foundation/README.md) → the code.
-5. [`paper_plan_v2_1.md`](paper_plan_v2_1.md) — only when full-paper context is
-   needed. It remains the source of truth for the eventual ICLR paper; the
-   foundation run de-risks it first. **Where the two conflict, the foundation doc
-   governs foundation work.**
+3. [`paper_plan_v2_1_foundation.md`](paper_plan_v2_1_foundation.md) — **the
+   completed FOUNDATION-1 plan.** History, not instructions: read it to understand
+   what was run and why, then build from v2.2. Reviewed doc-by-doc with the author
+   2026-07-22.
+4. [`foundation_tasks/F0…F7*.md`](foundation_tasks/) — the FOUNDATION-1 stage
+   specs. Still accurate for the machinery that carries over unchanged (harness,
+   collection, retrieval, GRPO, eval); superseded on reward design and metrics.
+5. [`foundation/README.md`](foundation/README.md) → the code.
+6. [`paper_plan_v2_1.md`](paper_plan_v2_1.md) — only when full-paper context is
+   needed. It remains the source of truth for the eventual ICLR paper. Note that
+   FOUNDATION-2 moves *back toward* it: the redesign largely restores two things
+   FOUNDATION-1 simplified away. **Where they conflict, the foundation doc governs
+   foundation work.**
+
+---
+
+## What FOUNDATION-1 established, and why it is being redesigned
+
+**It ran end to end and passed its pre-registered gate.** On the frozen dev-200 at
+B=4, harness off, the RL-trained arm beat both baselines on utility (A3 .289 vs
+A1 .205, A2 .180; paired CIs exclude zero), self-terminated in 77.5% of episodes,
+and had the *highest* F1 of any arm (.560).
+
+**Then the ablation showed the gate passed for the wrong reason.** Sweeping the
+step-cost coefficient from λ=0 to λ=1.0 changed mean steps by **0.04**. A3's steps
+never fell (3.61 vs A1's 3.54) — it learned to answer better, not to spend less.
+
+**Findings that survive into the paper:**
+
+- **Prompting beats enforcement** at every budget; at B=2 enforcement is
+  catastrophic (F1 .221 vs .478).
+- **A correctly-calibrated cost term can exert no behavioural pull.** λ was set so
+  the utility optimum sat exactly at the observed quality knee — and moved nothing.
+  *Where the optimum sits is not how hard the policy is pulled toward it.*
+- **A cost term does work where the budget binds** (B=2: −0.70 steps, CI excludes
+  zero, quality intact).
+- The pipeline, the pre-registration discipline, and a reward-hacking protocol
+  that made a falsifiable prediction and then refuted it against its own data.
+
+**Why the redesign** ([diagnosis in full](paper_plan_v2_2_foundation.md#2-the-diagnosis--three-design-errors-each-alone-sufficient-to-force-a-null)):
+three design errors, each alone sufficient to force a null, none of them a
+property of the method — (1) we priced *stop-when-done*, which has 0.31 steps of
+headroom on HotpotQA against a threshold of 0.5, while *quit-when-hopeless* has
+~0.94 and accounts for 53% of all steps spent; (2) a scalar price is
+state-independent while the optimal rule is state-dependent, so no λ can express
+it; (3) the objective was scaled so even a perfect oracle rule was worth +0.012
+utility, and two of three budgets could not bind.
+
+Reports: [`foundation_report.md`](foundation/experiments/reports/foundation_report.md)
+· [`ablation_report.md`](foundation/experiments/reports/ablation_report.md)
+· [`pre_redesign_diagnostics.md`](foundation/experiments/reports/pre_redesign_diagnostics.md)
 
 ---
 
@@ -43,7 +90,8 @@ implements it is [`foundation/`](foundation/).
 
 | Path | What it is |
 |---|---|
-| [`paper_plan_v2_1_foundation.md`](paper_plan_v2_1_foundation.md) | The foundation plan: the simplifications vs. the full plan (each with its reason), the three arms, the reward design, the stage sequence, the pre-registered gate, and the metrics. |
+| [`paper_plan_v2_2_foundation.md`](paper_plan_v2_2_foundation.md) | **The active plan (FOUNDATION-2).** Why FOUNDATION-1's result was uninformative, the corrected empirical picture, the continuation-value reward, the five arms, stages G0–G7, and the rules the gate must follow. |
+| [`paper_plan_v2_1_foundation.md`](paper_plan_v2_1_foundation.md) | The completed FOUNDATION-1 plan — history: the simplifications vs. the full plan (each with its reason), the three arms, the prompted-judge reward, the stage sequence, and the gate it passed. |
 | [`foundation/`](foundation/) | **The code.** Python package implementing the plan end-to-end — agent, harness, collection, rubric/judge, rewards, GRPO trainer, eval, figures. See [the code map](#the-foundation-codebase) below. |
 | [`foundation_tasks/`](foundation_tasks/) | One spec doc per stage — `F0_repo_restructure`, `F1_data`, `F2_harness_trajectories`, `F3_rubric_reward_model`, `F4_baselines`, `F5_rl_training`, `F6_evaluation`, `F7_analysis_report` — plus `PROGRESS.md`, the living tracker (implementation stages I0–I7, then experiment stages E-a…E-g). |
 
@@ -77,7 +125,12 @@ implements it is [`foundation/`](foundation/).
 
 ---
 
-## The foundation run in one page
+## FOUNDATION-1 in one page (the completed run)
+
+> This describes the run that has already happened. For what we are building next,
+> see [`paper_plan_v2_2_foundation.md`](paper_plan_v2_2_foundation.md) — it changes
+> the reward, the cost model, the budgets, and the headline metric, while reusing
+> all the machinery below.
 
 **Task.** HotpotQA multi-hop QA. One tool: search over a local Wikipedia index.
 A *step* = one ReAct iteration (thought → search → observation); emitting an

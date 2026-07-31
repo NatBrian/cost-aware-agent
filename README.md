@@ -278,10 +278,34 @@ effort (RL training for cost-aware agents) that shares only the underlying idea.
 > `research/foundation/experiments/` is the research project's. They are unrelated.
 
 **Start here for the research side:** [`research/README.md`](research/README.md) —
-it indexes every research directory. The active work is the pipeline-validation
-run planned in
-[`research/paper_plan_v2_1_foundation.md`](research/paper_plan_v2_1_foundation.md)
-with code in [`research/foundation/`](research/foundation/).
+it indexes every research directory, with code in
+[`research/foundation/`](research/foundation/).
+
+**Where the research stands (2026-07-31).** The first end-to-end
+pipeline-validation run — FOUNDATION-1
+([plan](research/paper_plan_v2_1_foundation.md) ·
+[report](research/foundation/experiments/reports/foundation_report.md)) — ran to
+completion and passed its pre-registered gate: the RL-trained arm beat both
+prompting and harness enforcement on utility at every budget (B=4: .289 vs .205
+and .180, paired CIs excluding zero). A follow-up λ ablation then showed **the
+gate passed for the wrong reason** — the trained agent produced better answers,
+not cheaper ones, and sweeping the step-cost coefficient from 0 to 1.0 moved
+stopping by 0.04 steps
+([ablation](research/foundation/experiments/reports/ablation_report.md)).
+Diagnostics traced this to three design errors rather than to the method: the
+experiment required a larger effect than could physically exist on the dataset, a
+scalar per-step price cannot express a state-dependent stopping rule, and the
+objective was scaled so that even perfect play was worth +0.012 utility
+([diagnostics](research/foundation/experiments/reports/pre_redesign_diagnostics.md)).
+
+**The active plan is the redesign:**
+[`research/paper_plan_v2_2_foundation.md`](research/paper_plan_v2_2_foundation.md)
+(FOUNDATION-2). It re-targets the behaviour that the data says is actually there
+— *abandoning unproductive work*, where 53% of all steps currently buy zero
+quality — replaces the scalar price with a learned continuation value, and gates
+the whole redesign behind a one-CPU-day check that can kill it cheaply.
+FOUNDATION-1's plan and reports are kept, not deleted: they are the input to the
+redesign and their surviving findings carry into the paper.
 
 The harness is not a dependency of the research code (and vice versa) — the two
 only share a design principle: budget information is delivered to the agent as

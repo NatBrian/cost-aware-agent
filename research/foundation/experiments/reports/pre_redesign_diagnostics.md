@@ -1,5 +1,32 @@
 # Pre-redesign diagnostics — evidence for Brian's four proposals — 2026-07-31
 
+> **AMENDED 2026-07-31 (same day, after this report was written).** D1's
+> measurement stands. **Its dataset verdict does not.**
+>
+> D1 measured slack only among episodes that *succeeded* — "once you had a good
+> answer, could you have got there sooner?" (0.31 steps, median 0). Re-reading the
+> per-step `draft_f1_vs_gold` curves, which this report did not use, shows the
+> real cost sink is a different behaviour: **43% of episodes end with F1 = 0 after
+> 5.16 steps — 52.7% of all steps spent buy zero quality.** That waste is
+> predictable in advance (P(eventual success | no progress by step k) decays
+> .574 → .511 → .315 → .241 → .213), and an oracle quit rule captures **0.94
+> steps** — 3× D1's headroom and ~2× the threshold the ablation failed.
+>
+> **Corrected verdict:** HotpotQA cannot support a **stop-when-done** claim. It
+> **can** support a **quit-when-hopeless** claim. §D1's "it cannot support a
+> cost-aware-stopping claim" and the dataset-change recommendation below are
+> therefore too broad — the dataset change is an *amplifier*, not a prerequisite.
+>
+> Consequences for the priority order below: proposal #2 (dataset) drops from
+> "proven necessary" to "valuable"; proposal #3 (rubric) is promoted to first, and
+> goes further than a rubric rewrite — the per-step signal is *exactly computable*
+> from the draft curve, so the judge leaves the critical path entirely. Full
+> reasoning: `research/paper_plan_v2_2_foundation.md` §3.
+>
+> Caveat on the amendment's own numbers: n=195, arm A1 untrained,
+> `forced_continuation` mode. Replication on the 2400 λ=0 rollouts is stage G1 of
+> the redesign and precedes any pre-registration.
+
 Run on **existing rollouts** (λ=0 arm, round 1: 2400 episodes, 300 questions ×
 8 attempts) plus the committed dev-200 evaluation. No new compute, no new GPU
 time, and **dev-200 was not re-read** — the surviving row CSV was reused.
