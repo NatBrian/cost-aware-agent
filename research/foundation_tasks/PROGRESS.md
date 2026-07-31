@@ -79,6 +79,41 @@
 > **Dev-look ledger:** FOUNDATION-1's dev-200 **not touched** by any of the
 > above — S0 uses val-50, S1/S2 use training rollouts, S5 uses the new eval-600.
 >
+> ### 2026-07-31 — 8 HOURS LOST: the watchdog blocked the job it was watching
+>
+> **S4 did not start for ~8 hours.** GPUs were held and idle; nothing ran.
+>
+> **Cause — the fifth process-matching bug in this project, and I wrote it after
+> documenting the previous four.** The handoff chain waited for S0 to exit with
+> `pgrep -f "[s]0_rescore.sh"`. The *watchdog* I armed to catch stalls contained
+> the literal string `s0_rescore.sh` in its own command line (`for p in
+> s0_rescore.sh chain_s4.sh …`). So the chain matched the watchdog and waited
+> forever on a process that was never going to exit.
+>
+> **The watchdog also could not detect the stall it existed to catch**, for the
+> same reason: it counted its own command line as a live pipeline process, so its
+> "nothing is alive" branch was unreachable. It was self-satisfying.
+>
+> Compounding it: while clearing up, a `pkill -f "chain_s4.sh"` matched **its own
+> shell** and killed it — the same class of bug a second time in ten minutes.
+>
+> **Fixes adopted:**
+> 1. **Never wait on `pgrep` for a pipeline handoff.** Waiting on a *pattern* is
+>    waiting on anything that happens to mention the pattern, including the
+>    watcher. Wait on a **PID file** (`[ -d /proc/$(cat .s4.pid) ]`) or a
+>    **marker file**, both of which are exact.
+> 2. **A watcher must never be able to match itself.** If it must use patterns,
+>    exclude its own PID explicitly.
+> 3. **Kill by exact PID**, after reading `/proc/<pid>/cmdline` to confirm the
+>    target — never `pkill -f`.
+> 4. **Liveness is a positive signal, not the absence of an error.** The monitor
+>    reported nothing for 8 hours and I read silence as progress. A watcher must
+>    emit a periodic heartbeat, or "no news" is indistinguishable from "dead".
+>
+> S4 relaunched directly at 20:50 UTC (control arm λ=0.0 serving, config verified:
+> budgets {2,3,4}, gate small, train_lambda 0.0). Watchdog is now PID-file based
+> with no pattern matching anywhere.
+>
 > **Dev-look ledger:** FOUNDATION-1's dev-200 has 1 of ≤3 looks remaining.
 > FOUNDATION-2 starts a fresh ledger on its own dev set.
 
