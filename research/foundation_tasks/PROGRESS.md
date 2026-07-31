@@ -105,6 +105,44 @@ knowledge-limited). Standing 2-GPU hold at all times, even between experiments.
 
 ## Log
 
+- 2026-07-31 **PRE-REDESIGN DIAGNOSTICS — and they found that the ablation's
+  threshold exceeded the physically available headroom.**
+  Run on existing rollouts + the committed dev CSV. No new compute, dev-200 NOT
+  re-read.
+  **D1 — step slack at equal quality (the decisive one).** For each question,
+  among the attempts reaching the group's BEST F1, cheapest vs average steps:
+  **mean 0.313, MEDIAN 0.000**; 41% of groups have any slack, only 14% have ≥1
+  step. **More than half of all questions have literally none.**
+  **=> our pre-registered threshold was 0.5 steps against a ceiling of 0.313.
+  The ablation was unpassable by construction.** No λ, reward design or model
+  could have cleared it. This is a flaw in the experiment, not only the method,
+  and it must go in the write-up. It also softens the ablation's reading: the λ
+  term captured 13% of a tiny headroom — "not effective" stands, "incapable in
+  principle" does NOT, because the ceiling was never above 0.31.
+  **D2 — verbosity slack: at equal best quality the cheapest attempt uses 28%
+  FEWER CHARACTERS.** Difficulty is held constant and the outcome is identical,
+  so this is pure controllable waste — the strongest clean signal in the data,
+  and it corroborates the earlier malformed-step finding (2000-char thoughts hit
+  the 512-token cap).
+  **D3 — redundant search: 6.8% of all searches** (2.5% exact + 4.3% near-dup).
+  Real and controllable but small (~0.23 steps/episode).
+  **D4 — the 9B DOES read the budget: telling it moves 1.02 steps** (A0 3.92 flat
+  vs A1 2.96→3.98). That is 3x the total equal-quality slack and 25x the λ effect.
+  **Capability is NOT the binding constraint here** — which contradicts my own
+  earlier ranking of "bigger executor" as priority #2, based on the harness
+  result (Sonnet −29%, weak model nil). Corrected on data.
+  **Revised priorities for Brian's four proposals:** (1) dataset → long-horizon,
+  now PROVEN necessary; (2) token cost kept as its OWN dimension — 28% headroom,
+  difficulty-free — do NOT collapse tokens/tool-calls/steps into one dollar
+  figure or the clean signal hides under two confounded ones; (3) rubric →
+  controllable behaviours (redundancy, verbosity) rather than "was stopping
+  right", which was our weakest calibration bit (.775) and least actionable;
+  (4) bigger executor DEFERRED until tasks are long-horizon.
+  **Process rule adopted: run D1 FIRST on any new dataset and set the detection
+  threshold below the measured ceiling.** Ours was picked as "~14% of baseline"
+  and exceeded what was achievable.
+  Report: `experiments/reports/pre_redesign_diagnostics.md`.
+
 - 2026-07-31 **BACKUP GAP FOUND AND CLOSED — the λ=1.0 final checkpoint was never
   on /mnt/src.** Audit of "is everything backed up?" turned up 8 of 9 checkpoints:
   `lam10_round3` was missing — **the very artefact the pre-registered verdict was
