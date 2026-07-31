@@ -373,20 +373,85 @@ again be a headline.
 
 ## 10. Data
 
-**Training stays on HotpotQA + adds MuSiQue.** Justification: §3 shows HotpotQA
-retains ~0.94 steps of quit-headroom, so a dataset change is an *amplifier*, not a
-prerequisite — and MuSiQue is 4-hop, has a real train split, and runs on the
-existing retrieval index with zero new infrastructure. This also supplies v2.1's
-E6 difficulty-stopping consistency check for free.
+*(Revised 2026-07-31 after a literature check. The first draft justified MuSiQue
+on infrastructure convenience — a convenience argument, not evidence. The
+evidence below is stronger and also explains FOUNDATION-1's null.)*
 
-**GAIA and BrowseComp-Plus are transfer eval only.** GAIA has ~165 tasks and no
-train split; it cannot be a training set, and v2.1 §5.1 already assigns web
-research to transfer-eval-only for exactly this reason.
+### 10.1 Why HotpotQA had no slack — an independent explanation
 
-**Frozen dev discipline carries over unchanged**, with one addition: the
-FOUNDATION-1 dev-200 has **1 of 3 looks remaining**, and FOUNDATION-2 starts a
-**fresh look ledger** on its own dev set. Refinement happens on a val slice; every
-dev evaluation is logged in `PROGRESS.md` with date and reason.
+**DiRe** (Disconnected Reasoning) measures how much of a "multi-hop" benchmark is
+answerable *without* doing the multi-hop work:
+
+| dataset | DiRe answer-F1 (lower = less shortcuttable) | human–model gap | train split |
+|---|---|---|---|
+| **HotpotQA** | **68.8** | 9.6 | 90K |
+| 2WikiMultihopQA | — | **3.7** (near-saturated) | 167K |
+| **MuSiQue-Ans** | **37.8** | **28.2** | **19,938** (+2,417 dev) |
+
+**~69 F1 of HotpotQA is reachable without genuine multi-hop reasoning.** That is a
+mechanistic, independently-sourced explanation for our measured 0.31-step
+headroom: most questions do not require the second hop, so there is no
+discretionary work to price. We measured the ceiling; the dataset literature
+predicted it.
+
+MuSiQue was built by *composing* single-hop questions specifically to eliminate
+those shortcuts. The case for it is therefore not convenience — **it has the
+required-work structure HotpotQA lacks** — and it runs on the existing retrieval
+index. 2WikiMultihopQA has 8× the training data but a human–model gap of 3.7; it
+is too easy to be the headline and is demoted to an extra eval.
+
+### 10.2 The roster
+
+| dataset | role | why |
+|---|---|---|
+| **HotpotQA** | training (continuity arm) | Every FOUNDATION-1 number is on it; keeping it makes C2-vs-C3 directly comparable to what we already ran |
+| **MuSiQue** | **training (primary)** | DiRe 37.8, 2–4 hop, real train split, existing index. Also supplies v2.1's E6 difficulty-stopping check free |
+| **SimpleQA** | **low-slack negative control** (new) | §10.3 |
+| **BrowseComp-Plus** | long-horizon transfer eval | 830 queries over a fixed local 100K-doc corpus (ACL 2026) — reproducible, and the tool type matches training. **Not** a training set: §10.4 |
+| 2WikiMultihopQA · FRAMES · GAIA | extra transfer evals | No train split (GAIA 466 total / FRAMES 824), or too easy (2Wiki) |
+
+### 10.3 SimpleQA as the negative control
+
+4,326 single-answer short fact questions, **single-hop by construction**, no
+official train/test split. As a training set it is the worst possible choice: the
+optimal trajectory is one search, so there is no stopping *policy* to learn — and
+the harness project already ran this experiment (`real_cli` on HotpotQA-distractor,
+chosen for being low-slack: **+2.8%, not significant**).
+
+But it is the *right* negative control, and better than v2.1's MATH-500 slot
+because it is the **same domain and same tool** as training, so it isolates slack
+rather than confounding it with domain shift.
+
+> **Pre-registered prediction: our method shows ~zero step savings on SimpleQA.**
+> If it *does* show savings there, we are truncating necessary work and something
+> is wrong. This converts a null result into a falsification test.
+
+### 10.4 Why BrowseComp-Plus is not the training set
+
+It is the ideal long-horizon target — gpt-5 and o3 issue **>20 search calls per
+query** on it, ~6× our horizon. But **Qwen3-32B and SearchR1-32B issue fewer than
+2 calls despite being explicitly prompted to use the tool.** A 9B executor would
+very likely not engage the horizon at all, and we would have swapped a *no-slack*
+dataset for a *no-engagement* one — the same null from the opposite direction.
+
+This is also the one place D4's finding ("capability is not binding") could
+reverse: it may well bind at a 20-step horizon. Hence transfer eval now, and a
+capability retest there before any decision to train on it.
+
+### 10.5 The dataset decision is made by measurement, not by literature
+
+The rule from `pre_redesign_diagnostics.md` applies to this choice too. **G1 runs
+the headroom audit on each training candidate** — 300 questions, forced
+continuation, no training, ~2 GPU-hours each — and reports quit-headroom, step
+distribution, and failure rate. Literature says MuSiQue should be better; G1 says
+whether it is, before any threshold is written down.
+
+### 10.6 Dev discipline
+
+Carries over unchanged, with one addition: FOUNDATION-1's dev-200 has **1 of 3
+looks remaining**, and FOUNDATION-2 starts a **fresh look ledger** on its own dev
+set. Refinement happens on a val slice; every dev evaluation is logged in
+`PROGRESS.md` with date and reason.
 
 ---
 
@@ -488,7 +553,9 @@ sweep. Everything else is configuration.
 | 7 | λ calibrated to the quality knee | **λ calibrated so the oracle rule is worth ≥ 0.05 U** | §3.3 — oracle rule was worth +0.012, under the noise floor |
 | 8 | Thresholds from intuition | **Thresholds from measured headroom (G1 before G4)** | Required 0.5 steps where 0.31 existed |
 | 9 | No same-method control arm | **C2 scalar-price control, pre-committed** | An internalization claim had to be withdrawn for exactly this reason |
-| 10 | HotpotQA only | **HotpotQA + MuSiQue**; GAIA/BrowseComp transfer-eval only | §10 — HotpotQA retains quit-headroom, so this is an amplifier; GAIA has no train split |
+| 10 | HotpotQA only | **HotpotQA + MuSiQue**; GAIA/BrowseComp/FRAMES transfer-eval only | §10.1 — HotpotQA's DiRe is 68.8 (≈69 F1 reachable *without* multi-hop work), which independently explains the 0.31-step ceiling; MuSiQue's is 37.8 |
+| 11 | No negative control | **SimpleQA as a pre-registered low-slack control** | §10.3 — same domain, same tool, single-hop; predicts ~zero savings, so a positive result there falsifies us |
+| 12 | Cost recorded as characters (`raw_len`) | **Per-step prompt/completion token counts in the schema** | §8.1 needs dollars; `collect/schema.py` has no token fields today |
 
 **Not changed, deliberately:** GRPO, the 9B executor (D4: it already responds to
 budget signals by 1.02 steps — capability is not the binding constraint), the
@@ -503,10 +570,12 @@ retrieval env, the frozen-dev discipline, and the pre-registration culture.
    move it.
 2. **Dropping enforcement (old A2) to an appendix** — saves a full arm's compute.
    Confirm you are happy not re-running it at headline cost.
-3. **MuSiQue as the second training set** vs going straight to a long-horizon
-   deep-research benchmark. My recommendation is MuSiQue (zero new
-   infrastructure); the counter-argument is that reviewers may want the harder
-   setting in the headline rather than in transfer.
+3. ~~MuSiQue as the second training set~~ — **resolved 2026-07-31, §10.** MuSiQue
+   primary (DiRe 37.8 vs HotpotQA's 68.8), HotpotQA kept for continuity, SimpleQA
+   added as the negative control, BrowseComp-Plus held as transfer eval because
+   weak models issue <2 tool calls on it. Still open within this: whether the
+   headline should eventually move to BrowseComp-Plus, decided by the capability
+   retest in G1.
 4. **Dollar-denominated cost now vs steps-plus-tokens now.** Full dollars restores
    v2.1 fidelity but reintroduces the price map and its normalization pilot, which
    FOUNDATION-1 simplified away for good reasons.
