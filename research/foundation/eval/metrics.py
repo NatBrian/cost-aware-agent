@@ -51,6 +51,20 @@ def episode_row(ep: dict, lam: float) -> dict:
         "self_stopped": float(self_stopped),
         "hit_cap": float(ep.get("answered_at") is None and not ep["forced_stop"]),
         "config_hash": ep["config_hash"],
+        # --- FOUNDATION-2 primary estimand (plan v2.2 §7.5) -------------------
+        # W = steps spent on an episode that returned NOTHING. Averaged over ALL
+        # episodes (never conditioned on failure — conditioning would let a policy
+        # look good by failing more often). "How much of my budget went to
+        # nothing." 52.7% of all steps in the pilot were of this kind.
+        # W is only improvable two ways: succeed more often, or abandon failures
+        # faster — the target behaviour. It CAN be gamed by quitting everything,
+        # which is why the gate pairs it with a paired F1 floor.
+        "wasted_spend": float(ep["steps_used"]) if ep["final_f1"] <= 0 else 0.0,
+        "failed": float(ep["final_f1"] <= 0),
+        # abandonment = self-stopped early AND came back with nothing
+        "abandoned": float(self_stopped and ep["final_f1"] <= 0),
+        "tokens": float(sum(s.get("prompt_tokens", 0) + s.get("completion_tokens", 0)
+                            for s in ep.get("steps", []))),
     }
 
 
@@ -74,7 +88,10 @@ def aggregate(df: pd.DataFrame, n_resamples: int = 10000,
     out = []
     for (arm, b), g in df.groupby(["arm", "budget_B"]):
         row = {"arm": arm, "budget_B": b, "n": len(g)}
-        for m in ("f1", "em", "steps_used", "utility", "self_stopped", "hit_cap"):
+        for m in ("f1", "em", "steps_used", "utility", "self_stopped", "hit_cap",
+                  "wasted_spend", "failed", "abandoned", "tokens"):
+            if m not in g.columns:
+                continue          # FOUNDATION-1 CSVs predate the new columns
             lo, hi = bootstrap_ci(g[m].to_numpy(), n_resamples, seed)
             row[m] = g[m].mean()
             row[f"{m}_lo"], row[f"{m}_hi"] = lo, hi

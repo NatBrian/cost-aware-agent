@@ -24,13 +24,15 @@ class FakeLLM:
         self.calls.append([dict(m) for m in messages])
         return self.outputs.pop(0)
 
-    def chat_with_logprobs(self, messages, temperature=0.0):
-        return self.chat(messages, temperature), [-0.5, -0.1]
+    def chat_with_logprobs(self, messages, temperature=0.0, want_logprobs=True):
+        return (self.chat(messages, temperature),
+                [-0.5, -0.1] if want_logprobs else None,
+                {"prompt_tokens": 100, "completion_tokens": 20})
 
 
 class FakeRetriever:
     def search(self, query):
-        return [{"title": "Doc", "text": f"Info about {query}."}]
+        return [{"title": "Doc", "text": f"Info about {query}.", "score": 0.87}]
 
     def format_observation(self, hits):
         return "\n".join(f"[{i+1}] {h['title']}: {h['text']}" for i, h in enumerate(hits))

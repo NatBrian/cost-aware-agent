@@ -77,8 +77,18 @@ class Retriever:
         return {"title": rec.get("title", title.strip('"')), "text": text.strip()}
 
     def search(self, query: str, top_k: int) -> list[dict]:
-        _, idx = self.index.search(self.encode(query), top_k)
-        return [self.passage(int(i)) for i in idx[0] if i >= 0]
+        # The similarity SCORE is returned, not discarded. S1 (2026-07-31) found
+        # retrieval productivity among the strongest gold-free predictors of
+        # eventual failure, and the score is the most direct form of it: "is this
+        # query finding anything?" is exactly the quit signal FOUNDATION-2 needs.
+        # It was thrown away here (`_, idx = ...`) for the whole first run.
+        dist, idx = self.index.search(self.encode(query), top_k)
+        out = []
+        for d, i in zip(dist[0], idx[0]):
+            if i < 0:
+                continue
+            out.append(self.passage(int(i)) | {"score": float(d)})
+        return out
 
 
 def main() -> None:

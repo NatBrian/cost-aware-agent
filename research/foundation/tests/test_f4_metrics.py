@@ -144,3 +144,50 @@ def test_canonical_rows_excludes_offarm_modes():
     assert set(a3["mode"]) == {"none"} and len(a3) == 5
     assert a3.f1.mean() == pytest.approx(0.9)      # not the 3-mode blend
     assert set(out[out.arm == "a2"]["mode"]) == {"enforce"}
+
+
+# --- FOUNDATION-2: the wasted-spend estimand (plan v2.2 §7.5) ---------------
+
+def _ep(f1_val, steps, B=3, answered=True, mode="none"):
+    return {
+        "task_id": "t", "arm": "a3", "mode": mode, "budget_B": B, "rollout": 0,
+        "answered_at": steps if answered else None, "forced_stop": False,
+        "final_f1": f1_val, "final_em": 0.0, "steps_used": steps,
+        "config_hash": "h", "steps": [],
+    }
+
+
+def test_wasted_spend_counts_only_zero_quality_episodes():
+    from eval.metrics import episode_row
+    assert episode_row(_ep(0.0, 5), 0.3)["wasted_spend"] == 5.0
+    assert episode_row(_ep(0.7, 5), 0.3)["wasted_spend"] == 0.0
+
+
+def test_wasted_spend_is_unconditional_so_failing_more_cannot_help():
+    """W averages over ALL episodes. A policy that fails more often must show a
+    HIGHER W at equal steps -- conditioning on failure would invert this and let
+    a policy look thrifty by giving up on everything."""
+    import pandas as pd
+    from eval.metrics import episode_row
+    good = pd.DataFrame([episode_row(_ep(0.8, 4), 0.3) for _ in range(8)]
+                        + [episode_row(_ep(0.0, 4), 0.3) for _ in range(2)])
+    bad = pd.DataFrame([episode_row(_ep(0.8, 4), 0.3) for _ in range(2)]
+                       + [episode_row(_ep(0.0, 4), 0.3) for _ in range(8)])
+    assert good.wasted_spend.mean() < bad.wasted_spend.mean()
+
+
+def test_abandonment_requires_self_stop_and_zero_quality():
+    from eval.metrics import episode_row
+    assert episode_row(_ep(0.0, 2, B=3), 0.3)["abandoned"] == 1.0
+    assert episode_row(_ep(0.6, 2, B=3), 0.3)["abandoned"] == 0.0   # succeeded
+    # enforced stops are not the policy's own decision
+    assert episode_row(_ep(0.0, 2, B=3, mode="enforce"), 0.3)["abandoned"] == 0.0
+
+
+def test_quitting_everything_lowers_W_which_is_why_the_F1_guard_exists():
+    """The known gaming route, asserted so nobody removes the F1 floor."""
+    import pandas as pd
+    from eval.metrics import episode_row
+    honest = pd.DataFrame([episode_row(_ep(0.0, 6), 0.3) for _ in range(5)])
+    quitter = pd.DataFrame([episode_row(_ep(0.0, 1), 0.3) for _ in range(5)])
+    assert quitter.wasted_spend.mean() < honest.wasted_spend.mean()

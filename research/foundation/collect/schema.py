@@ -11,6 +11,15 @@ REQUIRED_STEP = {
     "t": int, "action_type": str, "query_or_answer": str, "obs_digest": str,
     "draft": str, "draft_f1_vs_gold": float,
 }
+# Added 2026-07-31 (schema v2, plan v2.2 §12). Validated when present so that
+# FOUNDATION-1 rollouts — which predate these fields and are still read by the
+# S1/S2 analyses — stay loadable. New collection always writes them.
+OPTIONAL_STEP = {
+    "prompt_tokens": int,        # real cost of the step, not a character proxy
+    "completion_tokens": int,
+    "retrieval_scores": list,    # per-hit similarity; the quit signal S1 found
+}
+SCHEMA_VERSION = 2
 ARMS = ("a0", "a1", "a2", "a3")
 ACTIONS = ("search", "answer", "malformed")
 
@@ -36,6 +45,10 @@ def validate_episode(ep: dict) -> None:
                 raise ValueError(f"step {i} missing key: {key}")
             if not isinstance(s[key], typ):
                 raise ValueError(f"step {i}[{key}] wrong type")
+        for key, typ in OPTIONAL_STEP.items():
+            if key in s and not isinstance(s[key], typ):
+                raise ValueError(f"step {i}[{key}] is {type(s[key]).__name__}, "
+                                 f"want {typ.__name__}")
         if s["action_type"] not in ACTIONS:
             raise ValueError(f"step {i} unknown action_type: {s['action_type']}")
         if s["t"] != i + 1:

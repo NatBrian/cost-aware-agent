@@ -33,7 +33,20 @@ retrieval:
 
 episode:
   t_max: 10                        # hard cap, all arms
-  budgets: {small: 2, medium: 4, large: 8}    # FROZEN from pilot 2026-07-22 (P25/P75/~P90 of steps-to-95%-peak)
+  budgets: {small: 2, medium: 3, large: 4}
+  # CHANGED 2026-07-31 (FOUNDATION-2 Step 1, plan v2.2 §7.3). Was {2, 4, 8}.
+  # A budget can only change behaviour if the policy would otherwise exceed it.
+  # Measured against the policy's own stopping distribution (n=195), the % of
+  # episodes that would overspend each budget is:
+  #     B=2 -> 75%   B=3 -> 41%   B=4 -> 33%   B=8 -> 6%
+  # We ran {2,4,8} and GATED AT B=4. So a third of the evaluation went to a
+  # condition where the budget was irrelevant to 94% of episodes, and the gate sat
+  # on the borderline. B=2 — the one clearly-binding budget — is the ONLY place
+  # the cost term ever worked (-0.70 steps, CI excludes zero, F1 intact).
+  # FREEZE POLICY: measured once at round 0 and frozen for the whole run.
+  # Re-deriving per checkpoint would move the budget as the policy improves and
+  # make arms incomparable.
+  gate_budget: medium              # B=3; 41% of episodes would overspend it
   draft_retry: 1                   # malformed draft line -> 1 retry -> EMPTY_DRAFT
 
 economy:
@@ -41,7 +54,17 @@ economy:
                                    # FROZEN from pilot: knee at step 3 becomes
                                    # interior optimum at B=4. Do NOT move this for
                                    # the ablation, or arms become incomparable.
-  train_lambda: 1.0                # ablation arm lam10
+  train_lambda: 1.0                # PLACEHOLDER — S2 overwrites this before S4.
+  # FOUNDATION-2 calibrates λ to the SIZE OF THE INCENTIVE, not to where the
+  # optimum sits (plan v2.2 §7.4). FOUNDATION-1 put the optimum exactly at the
+  # quality knee and nothing moved: where the optimum sits is not how hard the
+  # policy is pulled toward it. New rule — choose λ such that
+  #     ΔU(oracle quit rule) = λ·(Δsteps/B) − ΔF1_loss  ≥  0.05
+  # It was worth +0.012 in FOUNDATION-1, far under the noise floor.
+  # Provisionally λ ≈ 0.5; HARD CAP 0.6 — λ=1.0 breached the policy-health gate
+  # (11% malformed vs the 10% limit) and gave the lowest F1 of the three arms.
+  lambda_cap: 0.6
+  # --- historical note (FOUNDATION-1 ablation) ---
                                    # moves ONLY this: 0.0 (no step price) / 0.3
                                    # (original) / 1.0 (steps clearly expensive).
                                    # At λ=0.3, B=4 a step costs .075 while buying

@@ -69,8 +69,24 @@ def test_retrieval_client_parses_hits(monkeypatch):
                         lambda *a, **k: _FakeResp(results=hits))
     c = RetrievalClient("http://x:1", top_k=3)
     out = c.search("capital of France?")
-    assert out == [{"title": "Paris", "text": "Capital of France."}]
-    assert "Paris" in c.format_observation(out)
+    # score defaults to 0.0 when an older server omits it — never a KeyError
+    assert out == [{"title": "Paris", "text": "Capital of France.", "score": 0.0}]
+
+
+def test_retrieval_client_preserves_similarity_scores(monkeypatch):
+    """The scores were discarded for the whole first run. S1 (2026-07-31) found
+    retrieval productivity is among the strongest gold-free predictors of
+    eventual failure, so losing them again would silently cap the quit signal."""
+    hits = [{"title": "Paris", "text": "Capital.", "score": 0.91},
+            {"title": "Lyon", "text": "City.", "score": 0.42}]
+    monkeypatch.setattr("envs.retrieval_client.requests.post",
+                        lambda *a, **k: _FakeResp(results=hits))
+    c = RetrievalClient("http://x:1", top_k=3)
+    out = c.search("capital of France?")
+    assert [h["score"] for h in out] == [0.91, 0.42]
+    # the score must not leak into what the agent reads — it is for logging only
+    obs = c.format_observation(out)
+    assert "Paris" in obs and "0.91" not in obs
 
 
 def test_retrieval_client_raises_on_http_error(monkeypatch):

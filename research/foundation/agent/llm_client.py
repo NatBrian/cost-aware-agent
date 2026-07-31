@@ -17,15 +17,26 @@ class OpenAIChat:
         self.extra_body = extra_body or {}
 
     def chat(self, messages: list[dict], temperature: float = 0.0) -> str:
-        content, _ = self.chat_with_logprobs(messages, temperature,
-                                             want_logprobs=False)
+        content, _, _ = self.chat_with_logprobs(messages, temperature,
+                                                want_logprobs=False)
         return content
 
-    def chat_with_logprobs(self, messages: list[dict], temperature: float = 0.0,
-                           want_logprobs: bool = True) -> tuple[str, list[float] | None]:
-        """Returns (content, per-sampled-token logprobs or None). Logprobs of
-        the CHOSEN tokens are the trainer's pi_old for importance ratios and
-        the KL-to-round-start anchor (F5 round-synced design)."""
+    def chat_with_logprobs(
+        self, messages: list[dict], temperature: float = 0.0,
+        want_logprobs: bool = True,
+    ) -> tuple[str, list[float] | None, dict]:
+        """Returns (content, per-sampled-token logprobs or None, usage).
+
+        Logprobs of the CHOSEN tokens are the trainer's pi_old for importance
+        ratios and the KL-to-round-start anchor (F5 round-synced design).
+
+        `usage` is {prompt_tokens, completion_tokens} from the server, returned
+        rather than stashed on the instance because collection runs many episodes
+        concurrently against one client and instance state would race. Cost was
+        recorded only as `raw_len` (characters) for the whole first run, which
+        made dollar-denominated cost impossible to compute after the fact
+        (plan v2.2 §12). Missing usage degrades to zeros, never a KeyError.
+        """
         body = {"model": self.model, "messages": messages,
                 "temperature": temperature, "max_tokens": self.max_tokens,
                 **self.extra_body}
@@ -38,8 +49,12 @@ class OpenAIChat:
             raise LLMError(f"LLM server unreachable: {e}") from e
         if resp.status_code != 200:
             raise LLMError(f"LLM server HTTP {resp.status_code}: {resp.text[:200]}")
-        choice = resp.json()["choices"][0]
+        data = resp.json()
+        choice = data["choices"][0]
         lps = None
         if want_logprobs and choice.get("logprobs"):
             lps = [t["logprob"] for t in choice["logprobs"].get("content") or []]
-        return choice["message"]["content"], lps
+        u = data.get("usage") or {}
+        usage = {"prompt_tokens": int(u.get("prompt_tokens") or 0),
+                 "completion_tokens": int(u.get("completion_tokens") or 0)}
+        return choice["message"]["content"], lps, usage
