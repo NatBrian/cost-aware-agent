@@ -144,6 +144,43 @@
 > brings whichever arm sits at the higher round down to the lower one, in either
 > direction, so the round-matched comparison always exists.
 >
+> ### 2026-08-01 — DATA CORRUPTION: two collection trees wrote the same shards
+>
+> **Killing the parent script did not kill its children.** `run_lambda_arm.sh`
+> was reparented to init (PPID 1) and kept collecting. On relaunch, **two complete
+> collection trees ran concurrently against the same
+> `trt_round1/rollouts_shard*.jsonl`**: 3800 lines containing only **1915 unique**
+> (task_id, rollout, budget) triples — nearly every episode written twice.
+>
+> **Nothing downstream would have caught it.** GRPO groups on
+> (task_id, budget_B), so duplicates silently inflate group sizes, double-count
+> trajectories in the advantage baseline, and bias the update toward whichever
+> episodes happened to be written twice. The run would have completed and produced
+> a number. Caught only because the progress heartbeat showed `collected=3771`
+> against a hard maximum of 2400 — a sanity bound I had added for a different
+> reason.
+>
+> Also orphaned: the **vLLM EngineCore survived its API server being killed**,
+> holding 130 GB on GPU 1 and blocking the relaunch. It has to be killed
+> separately, by PID, after confirming ownership.
+>
+> **Damage:** contained to `trt_round1`, which was deleted and recollected.
+> **`scripts/check_rollout_integrity.py --all` confirms every other round is
+> clean** — ctrl 1–3 and the FOUNDATION-1 lam0/lam10 arms all have exactly 2400
+> lines, 2400 unique keys, uniform group sizes of 8×300. That retroactively
+> validates the S1/S2 analyses built on those rollouts.
+>
+> **Fixes adopted:**
+> 1. **Launch long runs with `setsid`** so the run owns a process group, and kill
+>    with `kill -- -PGID`. Killing a bare parent PID orphans the tree.
+> 2. **`scripts/check_rollout_integrity.py`** — duplicates, malformed JSON, group
+>    sizes, expected count. Run it before any round's data is trusted.
+> 3. **Identify processes by exact `/proc/<pid>/cmdline` equality**, never
+>    `pgrep -f`. `pgrep -f "s4_s5_run.sh"` matched my own shell for the third time
+>    in this session and wrote the wrong PID into `.s4.pid`.
+> 4. **After killing a serving process, check the GPU** — `nvidia-smi
+>    --query-compute-apps` — because the engine core outlives the API server.
+>
 > **Dev-look ledger:** FOUNDATION-1's dev-200 has 1 of ≤3 looks remaining.
 > FOUNDATION-2 starts a fresh ledger on its own dev set.
 
