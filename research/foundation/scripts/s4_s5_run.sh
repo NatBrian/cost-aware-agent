@@ -58,8 +58,24 @@ ckpt_at() {     # checkpoint for a specific round, local or backed up
     [ -f "$C/config.json" ] && { echo "$C"; return; }
   done
 }
+# A round counts only if it PASSED its health probe. Checkpoints are written and
+# backed up BEFORE the probe runs (deliberately: a failed probe is evidence worth
+# keeping), so "a checkpoint exists" does not mean "this policy is usable".
+# ctrl_round3 exists and scored 20.5% malformed against a 10% gate; selecting the
+# newest existing checkpoint would have silently evaluated a damaged policy and
+# called it the control. (2026-08-01)
+healthy_at() {
+  local tag=$1 R=$2
+  for M in "$PWD/experiments/results/train/${tag}_round$R/HEALTHY" \
+           "$BACKUP/checkpoints/${tag}_round$R/HEALTHY"; do
+    [ -f "$M" ] && { echo yes; return; }
+  done
+}
 last_round() { local tag=$1 best=0
-  for R in 1 2 3; do [ -n "$(ckpt_at "$tag" "$R")" ] && best=$R; done; echo "$best"; }
+  for R in 1 2 3; do
+    [ -n "$(healthy_at "$tag" "$R")" ] && [ -n "$(ckpt_at "$tag" "$R")" ] && best=$R
+  done
+  echo "$best"; }
 
 R_CTRL=$(last_round ctrl); R_TRT=$(last_round trt)
 CKPT_CTRL=$(ckpt_at ctrl "$R_CTRL"); CKPT_TRT=$(ckpt_at trt "$R_TRT")
@@ -73,16 +89,26 @@ echo "treatment round $R_TRT: ${CKPT_TRT:-MISSING}"
 # only honest fix was to report both. So when the rounds differ we additionally
 # evaluate the control AT THE TREATMENT'S ROUND and report both comparisons; the
 # protocol-matched one is the one the pre-registered rule reads.
-MATCHED=""
+# The mismatch can go EITHER WAY. This was written assuming the treatment would
+# breach first (λ=0.568 being the untested value); in the event the λ=0 CONTROL
+# breached at round 3 while the treatment may reach 3. So: bring whichever arm sits
+# at the HIGHER round back down to the lower one, and evaluate that as the
+# round-matched comparison.
+MATCHED=""; MATCHED_NAME=""
+R_MATCH=$(( R_CTRL < R_TRT ? R_CTRL : R_TRT ))
 if [ "$R_CTRL" != "$R_TRT" ]; then
   echo "!! ROUND MISMATCH (control r$R_CTRL vs treatment r$R_TRT) — a health gate"
-  echo "!! stopped an arm early. Adding a round-matched control arm."
-  MATCHED=$(ckpt_at ctrl "$R_TRT")
-  [ -n "$MATCHED" ] || echo "!! no control checkpoint at round $R_TRT — matched arm unavailable"
+  echo "!! stopped an arm early. Round-matched comparison will use r$R_MATCH."
+  if [ "$R_CTRL" -gt "$R_TRT" ]; then
+    MATCHED_NAME=controlmatched;   MATCHED=$(ckpt_at ctrl "$R_MATCH")
+  else
+    MATCHED_NAME=treatmentmatched; MATCHED=$(ckpt_at trt  "$R_MATCH")
+  fi
+  [ -n "$MATCHED" ] || echo "!! no checkpoint at round $R_MATCH — matched arm unavailable"
 fi
-printf '{"control_round":%s,"treatment_round":%s,"matched":%s,"lambda_treatment":%s}\n' \
-  "$R_CTRL" "$R_TRT" "$([ -n "$MATCHED" ] && echo true || echo false)" "$LAM_TRT" \
-  > "$OUT/arm_provenance.json"
+printf '{"control_round":%s,"treatment_round":%s,"match_round":%s,"matched":%s,"matched_arm":"%s","lambda_treatment":%s}\n' \
+  "$R_CTRL" "$R_TRT" "$R_MATCH" "$([ -n "$MATCHED" ] && echo true || echo false)" \
+  "$MATCHED_NAME" "$LAM_TRT" > "$OUT/arm_provenance.json"
 cat "$OUT/arm_provenance.json"
 
 # ----------------------------------------------------------------- S5: eval --
@@ -95,7 +121,7 @@ echo ""
 echo "############ S5 EVALUATION on $EVAL_FILE ############"
 
 EVAL_SPECS="control:$CKPT_CTRL treatment:$CKPT_TRT"
-[ -n "$MATCHED" ] && EVAL_SPECS="$EVAL_SPECS controlmatched:$MATCHED"
+[ -n "$MATCHED" ] && EVAL_SPECS="$EVAL_SPECS ${MATCHED_NAME}:$MATCHED"
 
 for SPEC in $EVAL_SPECS; do
   ARM=${SPEC%%:*}; CKPT=${SPEC#*:}

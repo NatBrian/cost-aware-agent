@@ -83,6 +83,14 @@ for R in $(seq "$START" 3); do
     echo "(round $R artefacts ARE backed up to $BACKUP — a failed probe is a result)"
     exit 1
   fi
+  # Mark the round HEALTHY. Checkpoints are written and backed up BEFORE the probe
+  # (deliberately — a failed probe is evidence worth keeping), so "a checkpoint
+  # exists" does NOT mean "this policy passed". Selecting the newest existing
+  # checkpoint would have picked ctrl_round3, which scored 20.5% malformed against
+  # a 10% gate. Downstream selection reads this marker, never the directory
+  # listing. (2026-08-01)
+  touch "$DIR/HEALTHY"
+  cp "$DIR/HEALTHY" "$BACKUP/checkpoints/${TAG}_round$R/HEALTHY" 2>/dev/null || true
 
   INIT="$PWD/$DIR/checkpoint"
   # keep only the newest local checkpoint: 19G each, all are on /mnt/src

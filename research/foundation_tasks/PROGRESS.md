@@ -114,6 +114,36 @@
 > budgets {2,3,4}, gate small, train_lambda 0.0). Watchdog is now PID-file based
 > with no pattern matching anywhere.
 >
+> ### 2026-08-01 — the λ=0 CONTROL failed its round-3 health gate
+>
+> | round | malformed | hit_cap | F1 | steps | gate |
+> |---|---|---|---|---|---|
+> | 1 | 3.6% | 2.5% | .500 | 3.45 | PASS |
+> | 2 | 6.7% | 2.5% | .456 | 3.35 | PASS |
+> | **3** | **20.5%** | 10.0% | .502 | 3.65 | **FAIL** |
+>
+> **This is the control — λ=0, no cost pressure at all.** The damage is from
+> training itself, not from pricing. FOUNDATION-1's λ=0 arm ran 2.2 / 3.5 / 5.8%
+> and passed; the only design difference is the budgets ({2,3,4} vs {2,4,8}), so
+> **training under tighter budgets appears to degrade the policy faster.** That is
+> a finding in its own right and belongs in the report.
+>
+> Per pre-registration §8 the arm stops at its **last healthy checkpoint, round 2**.
+>
+> **Bug this exposed in my own runner (fixed before it could corrupt the result).**
+> Checkpoints are written and backed up *before* the probe runs — deliberately,
+> because a failed probe is evidence worth keeping. So `ctrl_round3/checkpoint`
+> exists. My `last_round` selected the newest *existing* checkpoint, which would
+> have made the **20.5%-malformed policy the control arm** and silently invalidated
+> the whole comparison. Fixed: `run_lambda_arm.sh` now writes a `HEALTHY` marker
+> only after a probe passes, and selection reads the marker, never the directory
+> listing. Verified: selection returns ctrl round 2.
+>
+> **Second fix:** the round-mismatch guard assumed the *treatment* would breach
+> first (λ=0.568 being the untested value). It went the other way. The guard now
+> brings whichever arm sits at the higher round down to the lower one, in either
+> direction, so the round-matched comparison always exists.
+>
 > **Dev-look ledger:** FOUNDATION-1's dev-200 has 1 of ≤3 looks remaining.
 > FOUNDATION-2 starts a fresh ledger on its own dev set.
 

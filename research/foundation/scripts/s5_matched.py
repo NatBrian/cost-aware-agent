@@ -80,12 +80,21 @@ def main() -> None:
     f1 = lambda e: e["final_f1"]
     out = {"provenance": prov, "comparisons": {}}
 
-    for label, ctrl_arm in (("protocol-matched (decides)", "control"),
-                            ("round-matched (robustness)", "controlmatched")):
-        print(f"{label}")
+    # The early-stopping arm can be either one. Whichever sat at the higher round
+    # was re-evaluated at the lower round, so substitute that arm's matched file.
+    m_arm = prov.get("matched_arm", "controlmatched")
+    if m_arm == "controlmatched":
+        pairs = (("protocol-matched (decides)", "control", "treatment"),
+                 ("round-matched (robustness)", "controlmatched", "treatment"))
+    else:
+        pairs = (("protocol-matched (decides)", "control", "treatment"),
+                 ("round-matched (robustness)", "control", "treatmentmatched"))
+
+    for label, ctrl_arm, trt_arm in pairs:
+        print(f"{label}   [{trt_arm} vs {ctrl_arm}]")
         out["comparisons"][label] = {}
         for bname, B in budgets.items():
-            c, t = load(d, ctrl_arm, bname), load(d, "treatment", bname)
+            c, t = load(d, ctrl_arm, bname), load(d, trt_arm, bname)
             if not c or not t:
                 continue
             ds = delta(c, t, steps, seed)
