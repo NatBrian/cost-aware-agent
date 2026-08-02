@@ -1,0 +1,60 @@
+FOUNDATION-2 Step 1 — pre-registered analysis
+gate budget B=2 (small);  threshold -0.119 steps;  F1 guard -0.02
+
+arm         B     n   steps      F1       W   fail%  self-stop       U
+control     2   600   2.977   0.433   1.092    29.8       32.8  -0.014
+control     3   600   3.350   0.427   1.335    30.0       69.7   0.092
+control     4   600   3.530   0.423   1.365    28.7       78.0   0.158
+treatment   2   600   2.810   0.513   1.073    33.3       40.0   0.091
+treatment   3   600   3.047   0.531   1.148    31.7       76.0   0.227
+treatment   4   600   3.343   0.526   1.330    32.0       82.3   0.275
+
+==================================================================
+H1 — PRE-REGISTERED GATE @ B=2,  n=600 paired tasks
+  control   steps 2.977   F1 0.433
+  treatment steps 2.810   F1 0.513
+  Δsteps -0.167  95% CI [-0.280, -0.057]
+  ΔF1    +0.080  95% CI [+0.053, +0.108]
+
+  cond1  Δsteps <= -0.119      : PASS  (-0.167)
+  cond2  95% CI entirely below 0 : PASS  (upper -0.057)
+  cond3  ΔF1 >= -0.02 (guard)    : PASS  (+0.080)
+
+  H1 VERDICT: PASS
+
+==================================================================
+H2 — does the saving concentrate on work that was going to fail?
+  control FAILED       n= 179  Δsteps -0.486  95% CI [-0.832, -0.151]
+  control SUCCEEDED    n= 421  Δsteps -0.031  95% CI [-0.093, +0.038]
+
+  H2 SUPPORTED — the saving is larger on doomed work
+
+==================================================================
+W (economic reading; NOT gated on — S2: needs n~2289, we have 600)
+  ΔW -0.018  95% CI [-0.168, +0.132]  -- underpowered, do not claim significance
+
+==================================================================
+Dose-response (pre-registered prediction: |Δsteps| largest at B=2)
+  B=3 and B=4 are UNDERPOWERED by S2 (n~751 needed at B=4);
+  a null there is uninformative and is not evidence of absence.
+  B=2  Δsteps -0.167  95% CI [-0.280, -0.057]
+  B=3  Δsteps -0.303  95% CI [-0.420, -0.190]
+  B=4  Δsteps -0.187  95% CI [-0.288, -0.085]
+
+wrote experiments/results/s5_eval/s3_verdict.json
+ROUND-MATCHED ROBUSTNESS CHECK
+  control round 2, treatment round 3 -- a health gate stopped an arm early.
+
+protocol-matched (decides)   [treatment vs control]
+   B=2  n= 600  Δsteps -0.167* [-0.280,-0.057]   ΔF1 +0.080 [+0.053,+0.108] <- GATE
+   B=3  n= 600  Δsteps -0.303* [-0.420,-0.190]   ΔF1 +0.104 [+0.078,+0.130]
+   B=4  n= 600  Δsteps -0.187* [-0.288,-0.085]   ΔF1 +0.103 [+0.076,+0.130]
+
+round-matched (robustness)   [treatmentmatched vs control]
+   B=2  n= 600  Δsteps -0.162* [-0.290,-0.035]   ΔF1 +0.068 [+0.042,+0.094] <- GATE
+   B=3  n= 600  Δsteps -0.270* [-0.387,-0.155]   ΔF1 +0.094 [+0.067,+0.120]
+   B=4  n= 600  Δsteps -0.192* [-0.310,-0.075]   ΔF1 +0.098 [+0.072,+0.125]
+
+At the gate budget the two comparisons AGREE in sign (-0.167 vs -0.162).
+
+wrote experiments/results/s5_eval/s5_matched.json
