@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 # One GRPO round: sharded collect -> stop server -> train -> serve checkpoint.
 # Usage: bash scripts/e5_round.sh <round_dir> <n_tasks> <G> [max_steps] [init_ckpt]
+#
+# TASK_FILE env var selects the training set (default HotpotQA, so every existing
+# caller is unchanged). T4 sets it to the MuSiQue split to test whether the effect
+# grows with horizon.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=.venv/bin/python
 ROUND=$1; N=$2; G=$3; MAX=${4:-}; INIT=${5:-}
+TASK_FILE=${TASK_FILE:-data/hotpotqa_train_300.jsonl}
 SHARDS=6
 mkdir -p "$ROUND"
 
-echo "== collect ($N tasks x G=$G, $SHARDS shards, train mode) =="
+echo "== collect ($N tasks x G=$G, $SHARDS shards, train mode) from $TASK_FILE =="
 PER=$(( (N + SHARDS - 1) / SHARDS ))
 for s in $(seq 0 $((SHARDS - 1))); do
-  $PY -m collect.run_collection --task-file data/hotpotqa_train_300.jsonl \
+  $PY -m collect.run_collection --task-file "$TASK_FILE" \
       --skip $((s * PER)) --limit $PER --arm a3 --mode none --budget draw \
       --g "$G" --train --out "$ROUND/rollouts_shard$s.jsonl" &
 done
@@ -20,7 +25,10 @@ cat "$ROUND"/rollouts_shard*.jsonl > "$ROUND/rollouts.jsonl"
 wc -l "$ROUND/rollouts.jsonl"
 
 echo "== stop OUR executor server =="
-pkill -u "$(whoami)" -f "vllm serve.*8378" || true
+# Bracketed so the pattern cannot match the shell running it -- an unbracketed
+# `pkill -f` matched its own process three times in this project and once killed
+# the very script issuing it. (2026-08-01)
+pkill -u "$(whoami)" -f "[v]llm serve.*8378" || true
 sleep 25
 
 echo "== train =="
