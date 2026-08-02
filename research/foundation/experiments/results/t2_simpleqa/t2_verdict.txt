@@ -1,0 +1,31 @@
+T2 — SimpleQA negative control (single-hop), B=2, n=500
+
+   control   steps 3.010  F1 0.296  nonzero 47%
+   treatment steps 2.782  F1 0.381  nonzero 46%
+
+1. overall (paired)
+   Δsteps                             -0.228  95% CI [-0.362,-0.098]  *
+   ΔF1  <- the discriminating quantity +0.085  95% CI [+0.060,+0.109]  *
+
+2. ΔF1 by what the treatment did with its steps
+   (the same decomposition T1 ran on HotpotQA)
+   spent FEWER steps (n=46)           +0.073  95% CI [+0.011,+0.145]  *
+   spent the SAME (n=444)             +0.090  95% CI [+0.065,+0.117]  *
+   spent MORE (n=10)                  -0.118  95% CI [-0.250,+0.000]
+
+3. THE COMPARISON THAT DECIDES
+   ΔF1 | steps not reduced (n=454)    +0.086  95% CI [+0.060,+0.113]  *
+
+   HotpotQA equivalent (T1): +0.092, CI excluded zero
+
+   VERDICT: REGULARISER. The treatment answers single-hop fact
+   lookups better, where there is no multi-hop reasoning to improve.
+   The quality gain is GENERIC and must be reported as a confound,
+   not as a benefit of cost-aware training.
+   The STOPPING result is unaffected -- T1 showed Δsteps and ΔF1 are
+   independent -- but the paper may claim only the stopping effect.
+
+4. note on Δsteps, which this test does NOT hinge on
+   The agent spends >3 steps on single-hop questions and leaves most
+   unanswered, so doomed work exists here too and a negative Δsteps is
+   consistent with cost-awareness rather than evidence against it.
