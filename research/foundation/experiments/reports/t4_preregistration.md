@@ -64,6 +64,28 @@ would say the effect does not scale on either account, and the ~6% saving on
 HotpotQA is close to what this method delivers. That is a publishable limit, and
 it should be reported as plainly as a positive.
 
+## Caveat found mid-run: the health probe is out-of-domain
+
+`probe_policy_health.sh` hardcodes `data/hotpotqa_val_50.jsonl`, so the MuSiQue
+arms are health-checked on **HotpotQA** questions.
+
+- **The gate itself remains valid.** It tests malformed-output rate (<10%) and
+  cap-out rate (<15%), which are format and behaviour properties of the policy,
+  not domain performance.
+- **The probe's F1 must NOT be read as MuSiQue performance.** mqctrl round 1
+  reports F1 0.502 on the probe while its own MuSiQue training rollouts score
+  0.259. Those are different datasets, not a contradiction.
+
+**Deliberately not changed mid-run.** Round 1 was already gated on HotpotQA;
+switching rounds 2–3 to a MuSiQue probe would make the three rounds
+non-comparable and would mean the arm's stopping criterion changed part-way
+through. Consistency matters more here than domain-matching, given the gate
+metrics are domain-independent. Logged as a known limitation instead.
+
+*(Incidental observation, not a result: a MuSiQue-trained control scoring 0.502 on
+HotpotQA val-50 is close to the HotpotQA-trained control's 0.500 at the same
+round. n=40, so this is an anecdote.)*
+
 ## Unchanged commitments
 
 - Gate budget B=2; paired per task; 10k bootstrap; same λ pair (0 / 0.568).
