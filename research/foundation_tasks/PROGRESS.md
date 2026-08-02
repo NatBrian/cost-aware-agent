@@ -1,5 +1,41 @@
 # Foundation implementation progress
 
+> ## 2026-08-02 — FOUNDATION-2 Step 1 COMPLETE: **H1 PASS, H2 SUPPORTED**
+>
+> Decided by `scripts/s3_analyse.py`, committed before the data existed and run
+> unmodified. Frozen eval-600, temp 0, harness off, paired, 10k bootstrap.
+>
+> | | control (λ=0) | treatment (λ=0.568) | Δ @ B=2 | 95% CI |
+> |---|---|---|---|---|
+> | steps | 2.977 | **2.810** | **−0.167** | [−0.280, −0.057] |
+> | F1 | 0.433 | **0.513** | **+0.080** | [+0.053, +0.108] |
+>
+> All three gate conditions PASS (threshold −0.119, guard −0.02). **F1 rose** —
+> a Pareto improvement, not a trade.
+>
+> **H2 SUPPORTED — abandonment, not haste:** doomed work −0.486 [−0.832, −0.151];
+> successful work −0.031 [−0.093, +0.038]. 16× larger on work that was going
+> nowhere, and only that partition excludes zero.
+>
+> **Robustness:** the control failed its round-3 health gate (20.5% malformed) and
+> stopped at r2 while the treatment passed all three, so the treatment was
+> re-evaluated at r2. Round-matched −0.162 vs protocol −0.167 — same sign and
+> magnitude, so the effect is not an artefact of extra training.
+>
+> **Pre-registered prediction that FAILED:** |Δsteps| was predicted largest at B=2
+> (the only binding budget). It is largest at **B=3** (−0.303), and the effect is
+> significant at all three budgets without tracking the binding fraction. Recorded
+> rather than dropped; it undercuts the "binding budget is the determinant" story
+> and needs investigation before being repeated.
+>
+> **W stays null** (−0.018, CI contains zero) exactly as S2 predicted at n=600 vs
+> the ~2289 needed. Switching the estimand at S2, *before* the data existed, is
+> what made this answerable.
+>
+> Report: `experiments/reports/s5_verdict.md`. Next: Step 3 scale-up (§10 of the
+> v2.2 plan). Step 2 (Snell continuation value) is **not triggered** — its trigger
+> was an H1 failure.
+
 > **2026-07-31 — FOUNDATION-1 IS COMPLETE; the active plan is now
 > `research/paper_plan_v2_2_foundation.md` (FOUNDATION-2, the redesign).**
 > Everything below this banner is the FOUNDATION-1 record (stages I0–I7, E-a…E-g)
