@@ -72,7 +72,7 @@ economy:
                                    # FROZEN from pilot: knee at step 3 becomes
                                    # interior optimum at B=4. Do NOT move this for
                                    # the ablation, or arms become incomparable.
-  train_lambda: 0.0                # ablation arm mqctrl
+  train_lambda: 0.568                # ablation arm mqtrt
   # FOUNDATION-2 calibrates λ to the SIZE OF THE INCENTIVE, not to where the
   # optimum sits (plan v2.2 §7.4). FOUNDATION-1 put the optimum exactly at the
   # quality knee and nothing moved: where the optimum sits is not how hard the

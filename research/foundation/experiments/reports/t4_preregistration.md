@@ -86,6 +86,32 @@ metrics are domain-independent. Logged as a known limitation instead.
 HotpotQA val-50 is close to the HotpotQA-trained control's 0.500 at the same
 round. n=40, so this is an anecdote.)*
 
+## Amendment (2026-08-02, before the treatment arm finished): which comparison is primary
+
+**The MuSiQue λ=0 control failed its round-2 health gate at 29.4% malformed** and
+stopped at **round 1**. Its trajectory was 4.5% → 29.4%, against the HotpotQA
+control's 3.6% → 6.7% → 20.5% (failed at round 3). Steps also *rose* to 4.08 as it
+degraded: without cost pressure, training on the harder dataset degenerates faster
+and toward **longer, malformed** episodes.
+
+If the treatment survives to round 3, the protocol comparison would be
+**round 1 control vs round 3 treatment** — three times the training on one side.
+That is far too confounded to headline, and much worse than the 2-vs-3 asymmetry
+on HotpotQA.
+
+**Decision, recorded before the numbers exist: on MuSiQue the ROUND-MATCHED
+comparison is primary, and the protocol comparison is secondary.** Matching at the
+lower round holds training amount fixed so that only λ differs, which is the whole
+point of having a control. This inverts the precedence used on HotpotQA — stated
+here explicitly rather than chosen later, because choosing after seeing which one
+looks better is exactly the freedom pre-registration exists to remove.
+
+**Known cost of this choice:** the round-matched pair will be two lightly-trained
+policies (one round each), so the effect may be smaller than a fully-trained
+comparison would show, and a null there is weaker evidence of absence than it
+would be at round 3. That is the price of an unconfounded comparison, and it will
+be stated with the result.
+
 ## Unchanged commitments
 
 - Gate budget B=2; paired per task; 10k bootstrap; same λ pair (0 / 0.568).
