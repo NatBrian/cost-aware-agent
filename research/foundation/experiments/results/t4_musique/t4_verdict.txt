@@ -1,0 +1,31 @@
+T4 — MuSiQue, gate budget B=2, n=600
+
+   control   steps 3.580  F1 0.272
+   treatment steps 3.282  F1 0.261
+
+1. BETWEEN datasets — does the effect grow?
+   Δsteps on MuSiQue                      -0.298  [-0.492,-0.102]  *
+   Δsteps on HotpotQA (Step 1)            -0.167
+   -> ratio 1.79x
+
+2. WITHIN MuSiQue — Δsteps by required hops (the stronger test)
+   holds dataset/policy/training fixed and varies only the horizon
+   2-hop (n=311)                          -0.071  [-0.283,+0.135]
+   3-hop (n=189)                          -0.720  [-1.074,-0.365]  *
+   4-hop (n=100)                          -0.210  [-0.920,+0.490]
+
+3. H2 selectivity — must concentrate on doomed work
+   control FAILED (n=324)                 -0.562  [-0.901,-0.238]  *
+   control SUCCEEDED (n=276)              +0.011  [-0.134,+0.163]
+
+4. the T2 regularisation confound — is it here too?
+   ΔF1 | steps not reduced (n=474)        -0.010  [-0.036,+0.016]
+   HotpotQA equivalent                    +0.092
+   SimpleQA equivalent                    +0.086
+   A similar value means the generic quality effect reproduces here
+   as well, and remains a confound to disclose rather than a benefit.
+
+5. all budgets
+   B=2  Δsteps -0.298 [-0.492,-0.102]   ΔF1 -0.011 [-0.034,+0.011]
+   B=3  Δsteps -0.268 [-0.447,-0.092]   ΔF1 +0.020 [-0.006,+0.045]
+   B=4  Δsteps -0.318 [-0.470,-0.168]   ΔF1 +0.015 [-0.009,+0.040]
