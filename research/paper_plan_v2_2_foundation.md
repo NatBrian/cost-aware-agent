@@ -468,13 +468,22 @@ T_max — precisely the Snell input, and 195 such episodes are on disk.
 
 ## 10. STEP 3 — the full paper (deferred, not abandoned)
 
-> **CORRECTED 2026-08-05 by the T4 result.** This section justifies BrowseComp by
-> **episode length**. That rationale is wrong. The effect tracks **failure rate**,
-> not horizon: within MuSiQue it peaks at 3-hop (where failure is 61.9%) rather
-> than rising monotonically with hops, and the per-doomed-episode saving is
-> constant at −0.42 to −0.58 across all three datasets. **Choose the next
-> benchmark for difficulty, not for how long its episodes are.** BrowseComp may
-> still be right — it is both hard *and* long — but for the other reason.
+> **CORRECTED 2026-08-05, then SOFTENED the same day (see `u2_mechanism_correction.md`).**
+>
+> An earlier version of this note said the effect tracks **failure rate, not
+> horizon**, and that the next benchmark should be chosen for difficulty rather
+> than length. **That claim is withdrawn.** It rested on failure rates measured in
+> the *training rollouts*, where they peak at 3-hop; on the *evaluation set* —
+> where the effect is actually measured — failure rate and horizon both rise
+> monotonically (45.8/57.9/76.0% and 3.21/3.87/4.34 steps), so the two mechanisms
+> make the same prediction and cannot be separated. The apparent 3-hop peak is
+> also not significant (3-hop − 4-hop = −0.285, CI [−0.806, +0.210]).
+>
+> **What stands:** the effect grows on harder data (MuSiQue −0.267 vs HotpotQA
+> −0.167). **What is undetermined:** why. **Practical guidance:** choose a
+> benchmark where the agent *fails often* **and** episodes are long — both are
+> higher where the effect was larger, and we cannot say which drives it.
+> BrowseComp still qualifies on both counts.
 >
 > **Two additions to this step, both forced by results:**
 >
