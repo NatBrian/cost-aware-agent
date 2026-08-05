@@ -1,5 +1,21 @@
 # Paper Plan v2.2 — FOUNDATION-2, the redesigned pipeline-validation run
 
+> ## RESULTS ARE IN (2026-08-05) — read `foundation/experiments/reports/T5_SYNTHESIS.md`
+>
+> **Step 1 PASSED.** A scalar per-step price teaches abandonment of doomed work:
+> −0.167 steps on HotpotQA (pre-registered gate), −0.228 on SimpleQA (out of
+> distribution), −0.267 pooled on MuSiQue across two seeds. Every CI excludes zero.
+> It scales with **failure rate**, not horizon.
+>
+> **Four things in this document are now WRONG and are corrected in place below:**
+> §7.3/§12's dose-response rationale (falsified), §9's Step-2 trigger (not fired),
+> §10's BrowseComp rationale (wrong reason), and the absence of a standing
+> λ=0-control requirement. Sections are annotated rather than rewritten so the
+> original reasoning stays auditable.
+>
+> **Do not claim from this plan that cost-aware training improves quality.** It
+> does not; that effect is a separable confound (T1/T2/T4).
+>
 > **Status:** implementation-ready (2026-07-31, rewritten). Supersedes
 > `paper_plan_v2_1_foundation.md` (FOUNDATION-1) as the active plan. FOUNDATION-1
 > is **not deleted**: it ran to completion, produced a GO, and its results and
@@ -291,6 +307,17 @@ modes · frozen-dev discipline · config-as-single-source-of-truth.
 
 ### 7.3 Budgets
 
+> **FALSIFIED 2026-08-05.** The reasoning below — that the effect lives where the
+> budget *binds*, inherited from FOUNDATION-1's lone B=2 result — did not survive.
+> The pre-registered dose-response prediction (|Δsteps| largest at B=2) **failed**:
+> the effect was largest at B=3 on HotpotQA and is significant at *all three*
+> budgets on MuSiQue without tracking the binding fraction (64.8 / 25.5 / 17.2%).
+>
+> Binding budgets are still a reasonable default — B=2 is where the pre-registered
+> gate was set and it passed — but **"the budget must bind" is not the mechanism**,
+> and should not be used to justify budget selection in future work. The mechanism
+> is how much doomed work exists (T4, H-fail).
+
 New: **`{small: 2, medium: 3, large: 4}`**, gate at **medium = 3** (41% of
 episodes would overspend it). Derivation in §2 Error 2; re-measured at S2 against
 the *current* policy before freezing.
@@ -409,7 +436,15 @@ claim to be withdrawn in FOUNDATION-1. It costs a full extra arm and is worth it
 
 ---
 
-## 9. STEP 2 — conditional, only if Step 1 is null
+## 9. STEP 2 — NOT TRIGGERED (2026-08-05)
+
+> **Do not build this.** The trigger was "Step 1's gate fails **and** S1 cleared".
+> S1 cleared (AUC 0.813) but **Step 1 passed**, so the condition never fired. A
+> scalar price turned out to be sufficient, which makes the result simpler than
+> the machinery designed for it. The section is kept for the reasoning and in case
+> a future negative result revives it.
+
+### 9-original. STEP 2 — conditional, only if Step 1 is null
 
 **Trigger:** Step 1's gate fails *and* S1 cleared (AUC ≥ 0.65, so the signal
 exists and the price simply cannot exploit it). That combination is a strong,
@@ -432,6 +467,29 @@ T_max — precisely the Snell input, and 195 such episodes are on disk.
 ---
 
 ## 10. STEP 3 — the full paper (deferred, not abandoned)
+
+> **CORRECTED 2026-08-05 by the T4 result.** This section justifies BrowseComp by
+> **episode length**. That rationale is wrong. The effect tracks **failure rate**,
+> not horizon: within MuSiQue it peaks at 3-hop (where failure is 61.9%) rather
+> than rising monotonically with hops, and the per-doomed-episode saving is
+> constant at −0.42 to −0.58 across all three datasets. **Choose the next
+> benchmark for difficulty, not for how long its episodes are.** BrowseComp may
+> still be right — it is both hard *and* long — but for the other reason.
+>
+> **Two additions to this step, both forced by results:**
+>
+> 1. **Any arm using λ needs a λ=0 control at matched training.** Without it,
+>    generic training effects get silently credited to the method — which is what
+>    happened to the quality gain until T1/T2/T4 separated it.
+> 2. **MuSiQue is now the headline dataset**, not HotpotQA: larger effect
+>    (−0.267 vs −0.167), no quality confound, selectivity intact, and it exposes
+>    the reallocation behaviour that HotpotQA does not.
+>
+> **Already completed from this section:** SimpleQA (as the negative control —
+> it did its job and separated two effects) and MuSiQue (as the headline).
+> Remaining: token/dollar cost, frontier sweep, transfer evals, negative controls.
+
+### 10-original — deferred items as originally written
 
 | item | evidence it will matter | why deferred |
 |---|---|---|
