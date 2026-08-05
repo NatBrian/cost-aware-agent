@@ -1,171 +1,174 @@
 # FOUNDATION-2 — final synthesis — 2026-08-05
 
 What the paper can claim, with what evidence, and what it must not claim.
-Covers Step 1 (S0–S5) and the follow-up phase (T1–T4), plus T3's two completed
-seeds. **Seed 789 is outstanding** — blocked by another user holding all 8 GPUs;
-auto-resume is armed.
+Covers Step 1 (S0–S5) and the follow-up phase (T1–T4, U1–U4).
+
+**Outstanding:** seed 789 — blocked by another user holding all 8 GPUs;
+auto-resume armed. Everything else is complete.
 
 ---
 
-## 1. The headline claim
+## 1. The claim
 
 > **A scalar per-step cost price teaches a ReAct agent to abandon work that is
-> going nowhere. The saving is selective, transfers out of distribution, and
-> grows with how often the agent gets stuck.**
+> going nowhere. The saving is selective, transfers to an unseen task
+> distribution, and is ~3× larger in tokens than in steps.**
 
-| dataset | Δsteps (treatment − control) | 95% CI |
-|---|---|---|
-| HotpotQA (pre-registered gate) | **−0.167** | [−0.280, −0.057] |
-| SimpleQA (out of distribution) | **−0.228** | [−0.362, −0.098] |
-| MuSiQue seed 42 (matched r1) | **−0.242** | [−0.432, −0.050] |
-| MuSiQue seed 123 (matched r3) | **−0.292** | [−0.488, −0.095] |
-| **MuSiQue pooled (2 seeds)** | **−0.267** | **[−0.404, −0.129]** |
+### In steps (the pre-registered, better-powered estimand)
 
-Every CI excludes zero. Roughly **6–8% fewer steps**.
-
-The HotpotQA number cleared a threshold (0.119) that was derived from measured
-headroom **before** the data existed, by a script committed before training
-started and run unmodified.
-
-## 2. It is selective — and on harder data it *reallocates*
-
-Partitioned by the **control's** outcome (a fixed split the treatment cannot
-influence):
-
-| dataset | on doomed work | on successful work |
-|---|---|---|
-| HotpotQA | −0.486 ✱ | −0.031 (n.s.) |
-| SimpleQA | −0.420 ✱ | −0.013 (n.s.) |
-| **MuSiQue (pooled)** | **−0.582 ✱** | **+0.114 ✱** |
-
-On the two easier sets the policy cuts dead ends and leaves productive work
-alone. **On MuSiQue it goes further: it spends the saved budget back on questions
-it can actually answer** (+0.114, CI excluding zero). That is a stronger and more
-interesting behaviour than pure abandonment — budget *reallocation* — and it only
-became visible on the hard dataset with a fully-trained pair.
-
-Stated carefully: reallocation is a **two-seed MuSiQue observation**, not
-established across datasets. The abandonment half is three-for-three.
-
-## 3. It scales with failure rate, not horizon
-
-Pre-registered before the treatment arm was trained (`t4_preregistration.md`):
-
-| | predicted between | predicted within | observed |
+| comparison | Δsteps | 95% CI | n |
 |---|---|---|---|
-| **H-fail** | ≈−0.24 (1.5–2×) | peaks at 3-hop | **−0.242, peaks at 3-hop** ✓ |
-| H-horizon | ≈−0.19 | monotone in hops | rejected — not monotone |
+| HotpotQA (pre-registered gate) | −0.167 | [−0.280, −0.057] | 600 |
+| SimpleQA (**never trained on**) | −0.228 | [−0.362, −0.098] | 500 |
+| MuSiQue seed 42 (matched r1) | −0.242 | [−0.435, −0.050] | 600 |
+| MuSiQue seed 123 (matched r3) | −0.292 | [−0.490, −0.090] | 600 |
+| **POOLED** | **−0.232** | **[−0.316, −0.148]** | **2300** |
 
-By hops: −0.148 / **−0.429 ✱** / −0.180, tracking failure rate (51.7 / 61.9 /
-50.7) rather than step count (3.50 / 3.63 / 3.74).
+Every comparison excludes zero. Fig: `u4_fig3_forest.pdf`.
 
-**The per-doomed-episode saving is stable at −0.42 to −0.58 across all three
-datasets.** That constancy is the mechanism: the overall effect scales with how
-much doomed work a dataset contains, not with how long its tasks are.
+### In tokens (the unit that matters)
 
-## 4. What the paper must NOT claim
+| dataset | rel. steps | **rel. tokens** | ratio |
+|---|---|---|---|
+| HotpotQA | −5.6% | **−13.4%** | 2.40 |
+| SimpleQA | −7.6% | **−32.9%** | 4.34 |
+| MuSiQue s42 | −6.8% | **−20.0%** | 2.97 |
+| MuSiQue s123 | −8.0% | **−22.4%** | 2.79 |
 
-**Not that cost-aware training improves answer quality.** F1 rose +0.080 on
-HotpotQA — but T1 showed the gain is statistically independent of the step saving
-(it lives on episodes whose step count never changed), T2 showed it reproduces on
-single-hop questions where no efficiency gain is possible, and T4 showed it
-**vanishes** on MuSiQue (−0.005, CI spans zero). It is a confound that can appear,
-not a benefit of the method.
+**~91% of the saving is prompt tokens** — context no longer re-read. Every step
+re-reads the whole conversation, so step 10 costs ~9.7× step 1; abandonment cuts
+the expensive tail. The agent is not terser (completion tokens barely move), it
+has fewer conversations to re-read.
 
-**Not that λ stabilises training.** See §5.
+**Honest caveat:** tokens are noisier — only 2 of 4 token CIs exclude zero, versus
+4 of 4 on steps. Δsteps stays the primary result; Δtokens is the more meaningful
+unit, reported with its wider intervals. Fig: `u4_fig2_steps_vs_tokens.pdf`.
 
-**Not a three-seed result** until seed 789 lands. Two seeds agree tightly
-(sd 0.035) and the pooled CI excludes zero, but the pre-registered bar was three.
+## 2. It is selective, not hasty
 
----
+Partitioned by the **control's** outcome — a fixed split the treatment cannot
+influence:
 
-## 5. Claims made and then withdrawn — the honesty log
-
-Four claims were stated during this work and later corrected by evidence. All are
-recorded because a reader deserves to know which conclusions survived scrutiny.
-
-| # | claim | why withdrawn |
+| dataset | doomed work | successful work |
 |---|---|---|
-| 1 | "Cost-aware training improves answer quality" (S5) | T1: independent of the saving. T2: reproduces where cost-awareness cannot operate. T4: absent on MuSiQue |
-| 2 | "λ is a general regulariser" (T2) | Too strong. T4 found no quality gain on MuSiQue. Either the effect belonged to those particular HotpotQA-trained policies, or one round is too little training — not separable with what we have |
-| 3 | "λ stabilises training, replicated on two datasets" (T4) | **T3 killed it.** Seed 123's λ=0 control trained cleanly through all three rounds (9.2 → 5.3 → 4.4% malformed) and its treatment was marginally *worse* at r3. Two controls died, one didn't. It was training noise read as a pattern at n=2 |
-| 4 | "\|Δsteps\| is largest at the binding budget B=2" (S3 §6, pre-registered) | Failed. Largest at B=3; the effect appears at all budgets without tracking the binding fraction |
+| HotpotQA | −0.486 ✱ | −0.031 |
+| SimpleQA | −0.420 ✱ | −0.013 |
+| MuSiQue s42 | −0.500 ✱ | +0.062 |
+| MuSiQue s123 | −0.663 ✱ | +0.168 ✱ |
 
-Claims 1–3 were mine and were stated more confidently than the evidence
-supported. Claim 4 was pre-registered precisely so it could fail visibly.
+**The per-doomed-episode saving is stable at −0.42 to −0.66 across three
+datasets**, while successful work is barely touched. If the price merely made the
+policy hastier, both columns would fall together. They do not, anywhere.
+Fig: `u4_fig1_selectivity.pdf`.
 
-**The step-reduction result is untouched by all four.** It is measured on paired
-evaluation data, not on health probes, and it survived every check aimed at it:
-an out-of-distribution control, a mechanism test, a scale test, and (so far) two
-seeds.
+**Concrete counts** (U3): on MuSiQue, 44 episodes where the treatment quit and
+nothing was lost against **3** where quitting cost a winnable answer — **14.7:1**.
+On HotpotQA, 2:1. About **half of all episodes are byte-identical** between arms.
+
+**What it looks like** — control burned all 10 steps and returned *no answer*;
+treatment reached the same dead end in 3, guessed, and stopped. And the honest
+downside: one case where the treatment quit one step before the lookup that would
+have resolved the question, and the control got it right.
+
+## 3. What the paper must NOT claim
+
+1. **Not that it improves answer quality.** F1 rose +0.080 on HotpotQA, but the
+   gain is statistically independent of the saving (T1), reproduces on single-hop
+   questions where no efficiency gain is possible (T2), and vanishes on MuSiQue
+   (T4). A confound to disclose, not a benefit.
+2. **Not that λ stabilises training.** Refuted by seed 123 (§5).
+3. **Not a mechanism for why the effect grows on harder data.** Withdrawn (§5).
+4. **Not "reallocation."** The +0.114 steps on successful work is real in
+   aggregate but corresponds to **zero** visible spend-more-and-win episodes
+   (U3). Say: *spends marginally more on work the control also succeeded at*.
+5. **Not a three-seed result** until seed 789 lands. Two seeds agree tightly
+   (sd 0.035); the pre-registered bar was three and is reported as unmet.
 
 ---
 
-## 6. Why FOUNDATION-1 got the opposite answer
+## 4. Why FOUNDATION-1 concluded the opposite
 
-FOUNDATION-1 concluded per-step economic rewards do **not** teach stopping
-(Δ = 0.04, "NOT EFFECTIVE"). Nothing about the method changed. Four measurement
-decisions did:
+It found Δ = 0.04, "NOT EFFECTIVE". Nothing about the method changed — four
+measurement decisions did:
 
 | | FOUNDATION-1 | Step 1 |
 |---|---|---|
 | gate budget | B=4 — slack for 67% of episodes | **B=2** — binds for 64.8% |
 | n | 50 | **600** (power analysis: ≥479) |
 | estimand | mean steps, single-λ utility | **paired Δsteps at iso-F1** |
-| threshold | 0.5 steps (ceiling was 0.31) | **0.119** — 50% of measured headroom |
+| threshold | 0.5 steps (ceiling was 0.31) | **0.119** — half the measured headroom |
 
-The original test ran at a budget the agent never hit, with n=50 where n≈751 was
+The original ran at a budget the agent never reached, with n=50 where n≈751 was
 needed — **~15× underpowered**. Its verdict against its own rule stands; the
 softer reading ("the effect is essentially zero") never did.
 
 **The transferable lesson: measure the achievable ceiling and the noise floor
-before choosing a threshold.** Both of FOUNDATION-1's failures — and one of ours,
-where the `W` estimand needed n≈2289 — were caught by that single discipline.
+before choosing a threshold.** That single discipline caught both of
+FOUNDATION-1's failures and one of ours (the `W` estimand needed n≈2289).
 
 ---
 
-## 7. Corrections to `paper_plan_v2_2_foundation.md`
+## 5. Six claims made and withdrawn — the honesty log
 
-1. **§10 scale-up rationale is wrong.** The plan justifies BrowseComp by *episode
-   length*. H-fail says the effect tracks **failure rate**. The target may be
-   right; the reason is not. Next benchmark should be chosen for difficulty.
-2. **Step 2 (Snell continuation value) is not triggered and should not be built.**
-   Its trigger was an H1 failure. H1 passed, so a scalar price suffices — the
-   result is simpler than the machinery designed for it.
-3. **The dose-response prediction (§7.3, §12) is falsified** and should not be
-   repeated as a rationale for budget selection.
-4. **Add a standing requirement:** any arm using λ needs a λ=0 control at
-   *matched training*, or regularisation is silently credited to the method.
+| # | claim | why withdrawn |
+|---|---|---|
+| 1 | "Cost-aware training improves quality" (S5) | T1: independent of the saving. T2: reproduces where cost-awareness cannot operate. T4: absent on MuSiQue |
+| 2 | "λ is a general regulariser" (T2) | Too strong — no quality gain on MuSiQue |
+| 3 | "λ stabilises training, replicated" (T4) | Seed 123's λ=0 control trained cleanly through all 3 rounds; its treatment was marginally *worse*. Two controls died, one didn't — noise read as a pattern at n=2 |
+| 4 | "\|Δsteps\| is largest where the budget binds" (S3, pre-registered) | Failed. Largest at B=3; significant at all budgets without tracking the binding fraction |
+| 5 | "The effect scales with failure rate, not horizon" (T4) | **Methodological error.** The premise was verified on training rollouts, where failure rate peaks at 3-hop; on the *eval set* both predictors rise monotonically, so the two hypotheses make the same prediction. The apparent peak is also not significant (3-hop − 4-hop CI [−0.806, +0.210]) |
+| 6 | "Reallocation of budget" (U1/T5) | Zero clean spend-more-and-win episodes exist (U3). The aggregate is a diffuse sub-step shift, not a purposive behaviour |
 
-## 8. Open questions
+Claims 1, 2, 3, 5 and 6 were mine and were stated more confidently than the
+evidence bore. Claim 4 was pre-registered so it could fail visibly.
 
-- **Why does λ improve F1 at all** (where it does)? Not better retrieval — the
-  treatment retrieves *fewer* distinct documents. Unexplained.
-- **Is reallocation real or MuSiQue-specific?** +0.114 on successful work is one
-  dataset, two seeds.
-- **The 3-hop peak rests on one significant cell**; 2-hop and 4-hop CIs span zero.
-- **Seed 789** — outstanding.
+**A distinct failure mode worth naming (from #5):** pre-registration prevents
+choosing a hypothesis *after* seeing results. It does **not** prevent validating a
+test's premise on **different data from the measurement**. Check the premise where
+you will measure.
 
-## 9. Standing limitations
+**The step-reduction result is untouched by all six.** It is measured on paired
+evaluation data, not health probes, and survived an out-of-distribution control, a
+mechanism test, a scale test, a token re-analysis, trajectory inspection, and two
+seeds.
 
-- One executor (Qwen3.5-9B), one judge, one λ value, three datasets.
-- Absolute effects are fractions of a step on 3–4 step tasks.
-- MuSiQue F1 is low (~0.27) against a 2018 Wikipedia index; both arms face this
-  equally, so the paired comparison is unaffected.
-- Health probes ran on HotpotQA val-50 even for MuSiQue arms — valid as a
-  format gate, but their F1 readings are out-of-domain.
-- The MuSiQue seed-42 comparison is two round-1 policies; seed 123 is round-3.
-  That they agree across training depths is reassuring, but neither is a
-  fully-powered fully-trained result on its own.
+---
 
-## 10. Artifacts
+## 6. Corrections to `paper_plan_v2_2_foundation.md`
 
-Reports: `s1_predictability.md` · `s2_headroom.md` · `s3_preregistration.md` ·
-`s0_rescore.md` · `s5_verdict.md` · `t1_f1_gain.md` · `t2_negative_control.md` ·
-`t4_preregistration.md` · `t4_musique.md` · this file.
+1. **§7.3** — "the budget must bind" is falsified as a mechanism (still a fine
+   default).
+2. **§9 Step 2** — not triggered; the Snell machinery should not be built.
+3. **§10** — BrowseComp is justified by the agent **failing often *and* episodes
+   being long**; we cannot say which drives the effect.
+4. **New standing requirement** — any arm using λ needs a λ=0 control at *matched
+   training*, or generic training effects get credited to the method.
 
-Results: `s5_eval/` (9) · `t2_simpleqa/` · `t4_musique/` (9) · `t3_seeds/`.
-Figures: `figs/fig_s5a_dose_response.pdf`, `fig_s5b_h2_split.pdf`.
+## 7. Open questions
 
-**Dev-look ledger:** FOUNDATION-1's dev-200 was never touched in this phase.
-eval-600 read once. MuSiQue eval-600 read once per seed.
+- **Why λ improves F1 where it does.** Not better retrieval — the treatment
+  fetches *fewer* distinct documents. Unexplained.
+- **Whether failure rate or horizon drives the growth.** Needs an eval set where
+  the two vary independently (e.g. fixed hop-count, varied distractor density).
+- **Seed 789.**
+
+## 8. Standing limitations
+
+One executor (Qwen3.5-9B), one judge, one λ, three datasets, ≤2 seeds. Absolute
+effects are fractions of a step on 3–4 step tasks. MuSiQue F1 is low (~0.27)
+against a 2018 Wikipedia index — both arms equally, so the paired comparison is
+unaffected. Health probes ran on HotpotQA val-50 even for MuSiQue arms: valid as a
+format gate, but their F1 readings are out-of-domain. MuSiQue seed 42 is matched
+at round 1 and seed 123 at round 3; that they agree across training depths is
+reassuring but neither is a fully-powered fully-trained result alone.
+
+## 9. Artifacts
+
+**Reports** (24): `s0`–`s5`, `t1`, `t2`, `t4`, `u1`–`u3`, both pre-registrations,
+this file.
+**Figures**: `u4_fig1_selectivity.pdf`, `u4_fig2_steps_vs_tokens.pdf`,
+`u4_fig3_forest.pdf`, `fig_s5a_dose_response.pdf`, `fig_s5b_h2_split.pdf`.
+**Results**: `s5_eval/` · `t2_simpleqa/` · `t4_musique/` · `t3_seeds/`.
+
+**Dev-look ledger:** FOUNDATION-1's dev-200 untouched in this phase; eval-600 read
+once; MuSiQue eval-600 read once per seed.
