@@ -272,9 +272,16 @@ Every row: both arms, same questions, difference measured per question.
 | SimpleQA *(never trained on)* | 500 | 3.010 | 2.782 | **−0.228** | +0.085 | 52.8% | 65.6% |
 | MuSiQue seed 42 | 600 | 3.580 | 3.338 | **−0.242** | −0.005 | 54.0% | 51.3% |
 | MuSiQue seed 123 | 600 | 3.630 | 3.338 | **−0.292** | −0.021 | 55.3% | 47.0% |
-| **POOLED** | **2300** | | | **−0.232** | | | |
+| **POOLED (corrected)** | **1700** | | | **−0.220** | | | |
 
-**Pooled 95% CI: [−0.316, −0.148].** Comfortably excludes zero.
+**Pooled 95% CI: [−0.295, −0.147].** Comfortably excludes zero.
+
+> **Correction made 2026-08-06.** An earlier version said −0.232 over 2300
+> questions. That double-counted MuSiQue: seeds 42 and 123 are tested on the
+> **same** 600 questions, so they are not two independent samples. Averaging
+> the seeds per question first gives **−0.220 over 1700 unique questions**.
+> The conclusion is unchanged; the number was wrong and is corrected here
+> rather than quietly edited.
 
 Note the last column: **roughly half of all episodes are byte-for-byte identical
 between the two arms.** The trained agent is not broadly hastier — it changes its

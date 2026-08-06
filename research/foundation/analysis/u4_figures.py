@@ -127,9 +127,19 @@ def fig3(data, out):
     for lab, d in data:
         lo, hi = bootstrap_ci(d["ds"], RES, SEED)
         rows.append((lab.replace("\n", " "), d["ds"].mean(), lo, hi, len(d["ks"])))
-    pooled = np.concatenate([d["ds"] for _, d in data])
+    # MuSiQue seeds share the SAME 600 eval questions, so concatenating them
+    # would double-count and narrow the CI. Average the seeds PER QUESTION first,
+    # then pool over UNIQUE questions. (corrected 2026-08-06)
+    by_q, order = {}, []
+    for lab, d in data:
+        for k, v in zip(d["ks"], d["ds"]):
+            key = (lab.split("seed")[0].strip(), k)      # collapse seeds of a dataset
+            if key not in by_q:
+                by_q[key] = []; order.append(key)
+            by_q[key].append(v)
+    pooled = np.array([np.mean(by_q[k]) for k in order], float)
     plo, phi = bootstrap_ci(pooled, RES, SEED)
-    rows.append(("POOLED (all)", pooled.mean(), plo, phi, len(pooled)))
+    rows.append(("POOLED (unique Qs)", pooled.mean(), plo, phi, len(pooled)))
 
     fig, ax = plt.subplots(figsize=(7.0, 0.55 * len(rows) + 1.6))
     ax.axvline(0, color="#444444", linewidth=0.9)

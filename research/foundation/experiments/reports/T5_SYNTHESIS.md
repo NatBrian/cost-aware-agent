@@ -22,7 +22,7 @@ auto-resume armed. Everything else is complete.
 | SimpleQA (**never trained on**) | −0.228 | [−0.362, −0.098] | 500 |
 | MuSiQue seed 42 (matched r1) | −0.242 | [−0.435, −0.050] | 600 |
 | MuSiQue seed 123 (matched r3) | −0.292 | [−0.490, −0.090] | 600 |
-| **POOLED** | **−0.232** | **[−0.316, −0.148]** | **2300** |
+| **POOLED (corrected)** | **−0.220** | **[−0.295, −0.147]** | **1700** |
 
 Every comparison excludes zero. Fig: `u4_fig3_forest.pdf`.
 
