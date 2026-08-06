@@ -18,6 +18,14 @@ OPTIONAL_STEP = {
     "prompt_tokens": int,        # real cost of the step, not a character proxy
     "completion_tokens": int,
     "retrieval_scores": list,    # per-hit similarity; the quit signal S1 found
+    # Added 2026-08-06 (audit). prompt_tokens/completion_tokens include retry
+    # attempts, which re-send the whole context. Without these a token comparison
+    # between arms with different malformed rates cannot be decomposed, and no
+    # re-analysis can recover it -- the 2026-08 token figures are permanently
+    # inflated by an unmeasurable amount for exactly this reason.
+    "n_retries": int,
+    "first_attempt_prompt_tokens": int,
+    "first_attempt_completion_tokens": int,
 }
 SCHEMA_VERSION = 2
 ARMS = ("a0", "a1", "a2", "a3")

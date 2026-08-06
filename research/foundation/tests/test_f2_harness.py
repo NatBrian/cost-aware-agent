@@ -181,3 +181,39 @@ def test_train_mode_captures_messages_logprobs_and_asst_idx():
     llm2 = FakeLLM([step_out("answer", "x", "x")])
     ep2 = run_episode(spec(), llm2, FakeRetriever())
     assert "messages" not in ep2 and "logprobs" not in ep2["steps"][0]
+
+
+def test_retry_tokens_are_separable_from_work_tokens():
+    """A retry re-sends the whole conversation, so prompt_tokens double on a
+    malformed step. That is a real cost and is counted -- but n_retries and the
+    first-attempt counts must also be recorded, or a token comparison between two
+    arms with different malformed rates cannot be decomposed afterwards. The
+    2026-08 token figures are permanently inflated because these were missing."""
+    from agent.harness import EpisodeSpec, run_episode
+    llm = FakeLLM([
+        "garbage with no action line",                       # forces one retry
+        "THOUGHT: t\nACTION: answer[Paris]\nBEST ANSWER SO FAR: Paris",
+    ])
+    spec = EpisodeSpec(task_id="t", question="q?", golds=["Paris"], arm="a1",
+                       mode="none", budget=2, t_max=5, temperature=0.0, seed=1,
+                       config_hash="h", draft_retry=1)
+    ep = run_episode(spec, llm, FakeRetriever())
+    s = ep["steps"][0]
+    assert s["n_retries"] == 1, "retry count not recorded"
+    # totals include both attempts; first-attempt fields isolate the original call
+    assert s["prompt_tokens"] == 200 and s["first_attempt_prompt_tokens"] == 100
+    assert s["completion_tokens"] == 40 and s["first_attempt_completion_tokens"] == 20
+    # the overhead is therefore recoverable
+    overhead = s["prompt_tokens"] - s["first_attempt_prompt_tokens"]
+    assert overhead == 100
+
+
+def test_clean_step_records_zero_retries():
+    from agent.harness import EpisodeSpec, run_episode
+    llm = FakeLLM(["THOUGHT: t\nACTION: answer[Paris]\nBEST ANSWER SO FAR: Paris"])
+    spec = EpisodeSpec(task_id="t", question="q?", golds=["Paris"], arm="a1",
+                       mode="none", budget=2, t_max=5, temperature=0.0, seed=1,
+                       config_hash="h", draft_retry=1)
+    s = run_episode(spec, llm, FakeRetriever())["steps"][0]
+    assert s["n_retries"] == 0
+    assert s["prompt_tokens"] == s["first_attempt_prompt_tokens"]

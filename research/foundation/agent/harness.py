@@ -60,14 +60,20 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
         if with_budget:
             messages.append({"role": "user",
                              "content": tracker_block(t - 1, spec.budget)})
-        # Tokens accumulate across the retry loop: a malformed reply that had to
-        # be re-asked really did cost what it cost, and hiding that would
-        # understate the price of degenerate steps.
+        # Tokens accumulate across the retry loop below, and a retry re-sends the
+        # WHOLE conversation -- so a retried step's prompt_tokens is roughly double
+        # a clean one's. That is a real cost and is counted, but it must be
+        # SEPARABLE afterwards: without n_retries recorded, a token comparison
+        # between two arms with different malformed rates silently mixes
+        # "did less work" with "needed fewer retries", and no re-analysis can undo
+        # it. Measured 2026-08-06: malformed steps carried 9-12x the tokens of
+        # clean ones and the arms' malformed rates differed by up to 2x. (audit)
         tok_in = tok_out = 0
         raw, step_lps, usage = llm.chat_with_logprobs(
             messages, spec.temperature, want_logprobs=spec.train_mode)
         tok_in += usage["prompt_tokens"]
         tok_out += usage["completion_tokens"]
+        first_in, first_out = usage["prompt_tokens"], usage["completion_tokens"]
         parsed = parse_step(raw)
         retries = 0
         while parsed is None and retries < spec.draft_retry:
@@ -95,8 +101,13 @@ def run_episode(spec: EpisodeSpec, llm, retriever) -> dict:
                 "draft": draft,
                 "draft_f1_vs_gold": f1(_final_from(draft), spec.golds),
                 "raw_len": len(raw),
-                # real cost of this step, not a character proxy (plan v2.2 §12)
+                # real cost of this step, not a character proxy (plan v2.2 §12).
+                # *_tokens INCLUDE retry attempts; n_retries and first_attempt_*
+                # let an analysis separate work done from format overhead.
                 "prompt_tokens": tok_in, "completion_tokens": tok_out,
+                "n_retries": retries,
+                "first_attempt_prompt_tokens": first_in,
+                "first_attempt_completion_tokens": first_out,
                 # retrieval productivity; populated on search steps below
                 "retrieval_scores": []}
         if "raw_excerpt" in parsed:
