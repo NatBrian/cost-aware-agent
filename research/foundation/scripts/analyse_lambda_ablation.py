@@ -32,7 +32,11 @@ ARMS = [("lam0", 0.0), ("lam03", 0.3), ("lam10", 1.0), ("lam10_r2", 1.0)]
 # lam10_r2 = λ=1.0 at its last HEALTHY checkpoint (round 3 failed its probe).
 # Reported for sensitivity; the pre-registered rule uses lam10 (round 3),
 # which is protocol-matched to the other arms.
-BUDGETS = {"small": 2, "medium": 4, "large": 8}
+# Budgets come from the config, never hard-coded. This literal held the
+# FOUNDATION-1 values {2,4,8} while the config moved to {2,3,4} on
+# 2026-07-31, so any re-run on post-redesign data computed self-stop and
+# utility with the wrong B. (audit 2026-08-06)
+BUDGETS = load_config()["episode"]["budgets"]
 THRESHOLD = 0.5          # pre-registered
 RESAMPLES = 10000        # pre-registered
 

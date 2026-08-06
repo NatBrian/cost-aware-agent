@@ -32,8 +32,12 @@ def rescore_a0(df: pd.DataFrame, budgets: dict, lam: float) -> pd.DataFrame:
         r = a0.copy()
         r["budget_B"] = B
         r["utility"] = r.f1 - lam * (r.steps_used / max(1, B))
+        # Must match eval/metrics.py:episode_row exactly, which also requires
+        # ~forced_stop. Two definitions of self_stopped in one codebase is how a
+        # figure and a table silently disagree. (audit 2026-08-06)
+        fs = r["forced_stop"] if "forced_stop" in r.columns else False
         r["self_stopped"] = ((r["mode"] == "none") & r.answered_at.notna()
-                             & (r.answered_at <= B)).astype(float)
+                             & ~fs & (r.answered_at <= B)).astype(float)
         out.append(r)
     return pd.concat([rest] + out, ignore_index=True)
 

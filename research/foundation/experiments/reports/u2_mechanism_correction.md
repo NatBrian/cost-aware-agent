@@ -1,5 +1,17 @@
 # U2 — the H-fail mechanism claim is WITHDRAWN — 2026-08-05
 
+> **FURTHER CORRECTION 2026-08-06.** The per-hop counts below (622 / 378 / 200)
+> **double-count**: seeds 42 and 123 are evaluated on the *same* 600 questions, so
+> pooling their rollouts treats one sample as two. The true per-hop n is
+> **311 / 189 / 100** and every interval in the table should be widened by ≈√2 —
+> e.g. the retained "3-hop is significant" cell −0.500 [−0.765, −0.243] becomes
+> roughly [−0.87, −0.13].
+>
+> This is the *same error* this report credits itself with catching elsewhere. It
+> does not change the conclusion (the mechanism claim was already withdrawn), but
+> it is logged because a report that corrects an error while committing it is
+> worse than one that does neither.
+
 **T4 concluded "H-fail confirmed, H-horizon rejected." That conclusion rests on a
 methodological error and does not survive.** The effect on MuSiQue is unchanged;
 only the *explanation* for why it grows is retracted.

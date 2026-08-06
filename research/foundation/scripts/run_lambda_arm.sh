@@ -33,7 +33,15 @@ INIT=""; START=1
 for R in 1 2 3; do
   for C in "$PWD/experiments/results/train/${TAG}_round$R/checkpoint" \
            "$BACKUP/checkpoints/${TAG}_round$R"; do
-    if [ -f "$C/config.json" ]; then INIT="$C"; START=$((R + 1)); break; fi
+    # A checkpoint EXISTING does not mean it passed its health probe -- checkpoints
+    # are written and backed up BEFORE the probe runs. Resuming on existence alone
+    # would train the next round on a damaged policy. Require the HEALTHY marker.
+    # (audit 2026-08-06)
+    # The marker sits beside the checkpoint dir locally ("<round>/HEALTHY") but
+    # inside it in the backup ("checkpoints/<tag>_round<R>/HEALTHY"), so check both.
+    if [ -f "$C/config.json" ] && { [ -f "$C/HEALTHY" ] || [ -f "$(dirname "$C")/HEALTHY" ]; }; then
+      INIT="$C"; START=$((R + 1)); break
+    fi
   done
 done
 [ "$START" -gt 1 ] && echo "RESUMING: rounds 1..$((START-1)) already trained; continuing from $INIT"

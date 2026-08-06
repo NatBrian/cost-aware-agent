@@ -1,3 +1,23 @@
+> # ⚠️ RETRACTED IN PART — 2026-08-06
+>
+> **Four independent audits found the headline here is substantially inflated and
+> that three interpretive claims are artefacts. Read
+> `CORRECTED_RESULTS.md` instead.** This document is kept unedited as a record of
+> what was claimed and when.
+>
+> | claimed here | corrected |
+> |---|---|
+> | Δsteps −0.22 | **−0.03 to −0.11** on well-formed episodes; 37–90% of the original was format-collapse, not deliberation |
+> | tokens −13% to −33% | **−10% to −13%** |
+> | "selective — cuts dead ends, not good work" | **withdrawn.** 70–85% reproduced by a placebo with no treatment |
+> | "unchanged / improved quality" | **withdrawn.** F1 rewards terseness; on a length-free metric quality is unchanged on 3 datasets and *worse* on HotpotQA |
+> | "pre-registered gate PASS" | **fails** on the corrected estimand (−0.112 vs the −0.119 threshold) |
+> | "grows on harder data" | **withdrawn.** p = 0.28–0.51 |
+>
+> Novelty is also pre-empted: arXiv 2510.01152 (MASH) and 2504.14870 (OTC-PO)
+> anticipate the method, mechanism, benchmark and transfer protocol, at 2–12× the
+> effect size.
+
 # Teaching an AI agent to stop wasting effort — the complete report
 
 **Everything we did, what we found, what we got wrong, and what it means.**
