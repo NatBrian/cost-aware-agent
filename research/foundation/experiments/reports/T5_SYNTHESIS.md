@@ -2,7 +2,7 @@
 >
 > **Four independent audits found the headline here is substantially inflated and
 > that three interpretive claims are artefacts. Read
-> `CORRECTED_RESULTS.md` instead.** This document is kept unedited as a record of
+> `foundation_v2_2_CORRECTED_RESULTS.md` instead.** This document is kept unedited as a record of
 > what was claimed and when.
 >
 > | claimed here | corrected |
@@ -19,6 +19,14 @@
 > effect size.
 
 # FOUNDATION-2 — final synthesis — 2026-08-05
+
+<!-- provenance -->
+> **Run:** FOUNDATION-2 · **Plan:** `research/paper_plan_v2_2_foundation.md`
+> **Lineage:** full paper plan `paper_plan_v2_1.md` → FOUNDATION-1
+> (`paper_plan_v2_1_foundation.md`, completed 2026-07-29, returned a null) →
+> **FOUNDATION-2** (the redesign, completed and closed 2026-08-11).
+> **Status of this run:** closed. Current findings are in
+> `foundation_v2_2_CORRECTED_RESULTS.md`.
 
 What the paper can claim, with what evidence, and what it must not claim.
 Covers Step 1 (S0–S5) and the follow-up phase (T1–T4, U1–U4).

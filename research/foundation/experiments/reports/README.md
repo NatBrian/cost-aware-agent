@@ -1,20 +1,28 @@
 # Report index — FOUNDATION-2
 
+<!-- provenance -->
+> **Run:** FOUNDATION-2 · **Plan:** `research/paper_plan_v2_2_foundation.md`
+> **Lineage:** full paper plan `paper_plan_v2_1.md` → FOUNDATION-1
+> (`paper_plan_v2_1_foundation.md`, completed 2026-07-29, returned a null) →
+> **FOUNDATION-2** (the redesign, completed and closed 2026-08-11).
+> **Status of this run:** closed. Current findings are in
+> `foundation_v2_2_CORRECTED_RESULTS.md`.
+
 Read in this order. Anything not listed is superseded.
 
 ## Start here
 
 | file | what it is |
 |---|---|
-| **`../../../PAPER_measurement_artefacts.md`** | **The paper draft.** Three measurement artefacts that break agent-efficiency experiments, with this project as the case study |
-| **`CORRECTED_RESULTS.md`** | **The current, corrected findings.** Supersedes the two documents below |
+| **`../../../foundation_v2_2_PAPER_measurement_artefacts.md`** | **The paper draft.** Three measurement artefacts that break agent-efficiency experiments, with this project as the case study |
+| **`foundation_v2_2_CORRECTED_RESULTS.md`** | **The current, corrected findings.** Supersedes the two documents below |
 
 ## Retracted in part — kept as a record of what was claimed
 
 | file | status |
 |---|---|
 | `T5_SYNTHESIS.md` | ⚠️ headline inflated; carries a retraction banner |
-| `../../../COMPLETE_REPORT.md` | ⚠️ same; plain-language version |
+| `../../../foundation_v2_2_COMPLETE_REPORT.md` | ⚠️ same; plain-language version |
 
 ## The experiment, in the order it ran
 

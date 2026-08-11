@@ -1,4 +1,12 @@
-# CORRECTED RESULTS — supersedes T5_SYNTHESIS.md and COMPLETE_REPORT.md
+# CORRECTED RESULTS — supersedes T5_SYNTHESIS.md and foundation_v2_2_COMPLETE_REPORT.md
+
+<!-- provenance -->
+> **Run:** FOUNDATION-2 · **Plan:** `research/paper_plan_v2_2_foundation.md`
+> **Lineage:** full paper plan `paper_plan_v2_1.md` → FOUNDATION-1
+> (`paper_plan_v2_1_foundation.md`, completed 2026-07-29, returned a null) →
+> **FOUNDATION-2** (the redesign, completed and closed 2026-08-11).
+> **Status of this run:** closed. Current findings are in
+> `foundation_v2_2_CORRECTED_RESULTS.md`.
 
 **2026-08-06.** Four independent audits found that the previously reported
 headline was substantially inflated and that three interpretive claims were

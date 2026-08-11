@@ -2,7 +2,7 @@
 >
 > **Four independent audits found the headline here is substantially inflated and
 > that three interpretive claims are artefacts. Read
-> `CORRECTED_RESULTS.md` instead.** This document is kept unedited as a record of
+> `foundation_v2_2_CORRECTED_RESULTS.md` instead.** This document is kept unedited as a record of
 > what was claimed and when.
 >
 > | claimed here | corrected |
@@ -19,6 +19,14 @@
 > effect size.
 
 # Teaching an AI agent to stop wasting effort — the complete report
+
+<!-- provenance -->
+> **Run:** FOUNDATION-2 · **Plan:** `research/paper_plan_v2_2_foundation.md`
+> **Lineage:** full paper plan `paper_plan_v2_1.md` → FOUNDATION-1
+> (`paper_plan_v2_1_foundation.md`, completed 2026-07-29, returned a null) →
+> **FOUNDATION-2** (the redesign, completed and closed 2026-08-11).
+> **Status of this run:** closed. Current findings are in
+> `foundation_v2_2_CORRECTED_RESULTS.md`.
 
 **Everything we did, what we found, what we got wrong, and what it means.**
 Written 2026-08-06. Assumes no prior knowledge of this project or of AI research.
@@ -570,7 +578,7 @@ All work is committed to GitHub and mirrored to backup storage at
 
 | What | Where |
 |---|---|
-| This report | `research/COMPLETE_REPORT.md` |
+| This report | `research/foundation_v2_2_COMPLETE_REPORT.md` |
 | Technical synthesis | `research/foundation/experiments/reports/T5_SYNTHESIS.md` |
 | Individual experiment reports (24) | `research/foundation/experiments/reports/` |
 | Figures (5) | `research/foundation/experiments/reports/figs/` |

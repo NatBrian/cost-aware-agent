@@ -1,6 +1,6 @@
 # Foundation implementation progress
 
-> ## 2026-08-11 — FOUNDATION-2 CLOSED. Read `experiments/reports/CORRECTED_RESULTS.md`.
+> ## 2026-08-11 — FOUNDATION-2 CLOSED. Read `experiments/reports/foundation_v2_2_CORRECTED_RESULTS.md`.
 >
 > **The finding, corrected and final:**
 >

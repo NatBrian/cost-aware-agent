@@ -1,5 +1,13 @@
 # Three Measurement Artefacts That Break Agent-Efficiency Experiments
 
+<!-- provenance -->
+> **Run:** FOUNDATION-2 · **Plan:** `research/paper_plan_v2_2_foundation.md`
+> **Lineage:** full paper plan `paper_plan_v2_1.md` → FOUNDATION-1
+> (`paper_plan_v2_1_foundation.md`, completed 2026-07-29, returned a null) →
+> **FOUNDATION-2** (the redesign, completed and closed 2026-08-11).
+> **Status of this run:** closed. Current findings are in
+> `foundation_v2_2_CORRECTED_RESULTS.md`.
+
 **A case study in which a pre-registered, adequately-powered, seed-replicated
 result was still an artefact.**
 
@@ -305,9 +313,9 @@ Artefact 1.
 
 | what | where |
 |---|---|
-| Corrected results | `foundation/experiments/reports/CORRECTED_RESULTS.md` |
-| Retracted originals (kept as record) | `T5_SYNTHESIS.md`, `COMPLETE_REPORT.md` |
-| Ten withdrawn claims, with what refuted each | `CORRECTED_RESULTS.md` §6, `T5_SYNTHESIS.md` §5 |
+| Corrected results | `foundation/experiments/reports/foundation_v2_2_CORRECTED_RESULTS.md` |
+| Retracted originals (kept as record) | `T5_SYNTHESIS.md`, `foundation_v2_2_COMPLETE_REPORT.md` |
+| Ten withdrawn claims, with what refuted each | `foundation_v2_2_CORRECTED_RESULTS.md` §6, `T5_SYNTHESIS.md` §5 |
 | Raw episodes | `foundation/experiments/results/{s5_eval,t2_simpleqa,t4_musique,t3_seeds}/` |
 | Pre-registrations | `s3_preregistration.md`, `t4_preregistration.md` |
 | Audit findings | `u2_mechanism_correction.md` and the reports above |
