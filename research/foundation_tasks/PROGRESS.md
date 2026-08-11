@@ -1,5 +1,67 @@
 # Foundation implementation progress
 
+> ## 2026-08-11 — FOUNDATION-2 CLOSED. Read `experiments/reports/CORRECTED_RESULTS.md`.
+>
+> **The finding, corrected and final:**
+>
+> > A per-step price makes the policy **terser and more robust to format
+> > collapse**. Total cost falls ~6–8%, of which roughly two-thirds is fewer
+> > catastrophic parser failures and **~1–3% is genuinely less deliberation**.
+> > Token cost falls ~10–13% on well-formed work. Answer quality is unchanged on
+> > three datasets and **significantly worse on HotpotQA**.
+>
+> It is **not** cost-aware abandonment, **not** selective, **not** iso-quality,
+> **not** scaling, and **not** novel.
+>
+> **Why closed rather than continued:**
+>
+> 1. **The interpretive claims did not survive audit.** Four independent audits
+>    found the headline was 37–90% format-collapse rather than learned stopping;
+>    that F1 rewards terseness, so the quality gain reverses on a length-free
+>    metric (−0.052 on HotpotQA); and that the selectivity signature is 70–85%
+>    reproducible by a **placebo** with no treatment. The pre-registered gate
+>    fails on the corrected estimand (−0.112 vs the −0.119 threshold).
+> 2. **The approach is pre-empted.** [MASH, arXiv:2510.01152](https://arxiv.org/abs/2510.01152)
+>    (Oct 2025) puts our claimed mechanism in its title, same reward, same
+>    algorithm, same benchmarks. [OTC-PO, arXiv:2504.14870](https://arxiv.org/abs/2504.14870)
+>    (NeurIPS 2025) reports up to **68.3%** fewer tool calls where we get 5.6%.
+> 3. **The remaining work could not change either conclusion.** Seed 789, the
+>    multiple-comparison marks and the token re-collection all polish numbers
+>    attached to a retired claim.
+>
+> **What was done well** (audit-confirmed): λ threading is correct and touches
+> nothing else; the GRPO math is sound; pairing is well-founded; the bootstrap
+> resamples the right unit; config hashes and task sets are identical across arms;
+> **every published number reproduces to three decimals.** The arithmetic was
+> honest throughout — the *estimand* was not.
+>
+> **State:** GPU hold released (it had already lapsed — we were not blocking
+> anyone). No processes running. Repo clean, everything pushed and mirrored to
+> `/mnt/src`. 72 tests green. Pipeline is restartable.
+>
+> **Known-open, deliberately** (see task list): seed 789 never ran — all 8 GPUs
+> were held by another user for 6 continuous days; multiple-comparison marks not
+> recomputed per table; historic token figures carry a disclosed, uncorrectable
+> retry inflation (the instrumentation is fixed going forward).
+>
+> ### The one thing worth carrying forward
+>
+> Three artefacts broke this result, and **all three are generic to
+> agent-efficiency research**:
+>
+> 1. **A step cap turns crashes into apparent deliberation.** Any `steps_used`
+>    metric with a hard cap has this.
+> 2. **F1 rewards terseness.** Any method that shortens outputs will look like it
+>    improves quality on F1/EM.
+> 3. **Conditioning on one arm's outcome manufactures selectivity.** We
+>    reproduced 70–85% of our own headline mechanism with a placebo.
+>
+> None were caught by pre-registration, power analysis, a frozen test set, an
+> out-of-distribution control, a mechanism test, or two seeds — **all of which
+> this project had.** They were caught by adversarial audit. That is the
+> transferable result, it needs no GPU time, and it is more defensible than the
+> effect we were chasing.
+
 > ## 2026-08-02 — FOUNDATION-2 Step 1 COMPLETE: **H1 PASS, H2 SUPPORTED**
 >
 > Decided by `scripts/s3_analyse.py`, committed before the data existed and run
